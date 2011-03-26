@@ -110,14 +110,17 @@ var ZVM_core = {
 		code = context.write();
 		
 		// Compile the routine with new Function()
-		;;; log( code );
-		//this.jit[context.pc] = new Function( 'e', code );
-		this.jit[context.pc] = eval( '(function(e){' + code + '})' );
-		
-		// Extra stuff for debugging
-		;;; this.jit[context.pc].context = context;
-		;;; this.jit[context.pc].code = code;
-		;;; if ( context.name ) { this.jit[context.pc].name = context.name; }
+		/* DEBUG */ if ( DEBUG ) {
+			log( code );
+			this.jit[context.pc] = eval( '(function(e){' + code + '})' );
+			
+			// Extra stuff for debugging
+			;;; this.jit[context.pc].context = context;
+			;;; this.jit[context.pc].code = code;
+			;;; if ( context.name ) { this.jit[context.pc].name = context.name; }
+		} /* ELSEDEBUG
+			this.jit[context.pc] = new Function( 'e', code );
+		/* ENDDEBUG */
 	},
 	
 	// Return control to the ZVM runner to perform some action

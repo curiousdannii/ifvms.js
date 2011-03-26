@@ -1,10 +1,13 @@
 /*
- * Abstract syntax trees for IF VMs
- *
- * Copyright (c) 2011 The ifvms.js team
- * Licenced under the BSD
- * http://github.com/curiousdannii/ifvms.js
- */
+
+Abstract syntax trees for IF VMs
+================================
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+
+*/
 
 /*
 
@@ -134,18 +137,6 @@ Opcode = Object.subClass({
 	label: function()
 	{
 		return '/* ' + this.pc + '/' + this.code + ' */ ';
-	},
-	
-	// A temp var unique to this opcode
-	temp: function()
-	{
-		return 't' + this.pc;
-	},
-	
-	// Add a temporary var to the pre list
-	pretemp: function( value )
-	{
-		this.pre.push( 'var ' + this.temp() + '=' + value );
 	}
 }),
 

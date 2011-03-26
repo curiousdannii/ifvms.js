@@ -1,11 +1,15 @@
-/*!
- * ZVM - the ifvms.js implementation of the Z-Machine
- * Built: BUILDDATE
- *
- * Copyright (c) 2011 The ifvms.js team
- * Licenced under the BSD
- * http://github.com/curiousdannii/ifvms.js
- */
+/*
+
+ZVM - the ifvms.js implementation of the Z-Machine
+==================================================
+
+Built: BUILDDATE
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+
+*/
 
 /*
 	
@@ -23,6 +27,23 @@ TODO:
 ;;; })();
 
 ;;; var ZVM = 1, GVM = 0, DEBUG = 1;
+
+// Array.indexOf compatibility
+// Note: the fromIndex parameter is not supported
+if ( ![].indexOf )
+{
+	Array.prototype.indexOf = function( obj )
+	{
+		for ( var i = 0, l = this.length; i < l; i++ )
+		{
+			if ( this[i] == obj )
+			{
+				return i;
+			}
+		}
+		return -1;
+	};
+}
 
 // Utility to extend objects
 var extend = function( old, add )
@@ -48,7 +69,7 @@ function( obj, func )
 },
 
 // Log wrapper
-log = window.console && window.console.log || function(){},
+log = window.console ? function( msg ){ console.log( msg ); } : function(){}
 
 // Short cuts
 fromCharCode = String.fromCharCode,
@@ -58,7 +79,6 @@ U2S = function( value )
 {
 	return ( (value & 0x8000) ? ~0xFFFF : 0 ) | value;
 },
-// Is S2U ever used?
 S2U = function( value )
 {
 	return value & 0xFFFF;

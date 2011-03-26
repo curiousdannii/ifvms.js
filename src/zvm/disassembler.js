@@ -158,6 +158,12 @@ var disassemble = function( engine )
 		// Create the instruction
 		context.ops.push( new opcodes[code]( engine, context, code, offset, pc, operands ) );
 		
+		// Check for the end of a large if block
+		if ( context.targets.indexOf( pc ) >= 0 )
+		{
+			idiom_if_block( context, pc );
+		}
+		
 		// We can't go any further, or can we...?
 		if ( opcode_class.stopper )
 		{

@@ -1,10 +1,13 @@
 /*
- * Z-Machine opcodes
- *
- * Copyright (c) 2011 The ifvms.js team
- * Licenced under the BSD
- * http://github.com/curiousdannii/ifvms.js
- */
+
+Z-Machine opcodes
+=================
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+
+*/
 
 /*
 	
@@ -16,24 +19,32 @@ TODO:
 	
 */
 
-var buffer = 'e.buffer+=',
-
 // If the .write() of an operand generates code to access the stack or the memory (if non-native ByteArray) then don't access it more than once
 // Currently only for branchers
-rUnsafeOperand = native_bytearrays ? /^s/ : /^[sm]/,
+var rUnsafeOperand = native_bytearrays ? /^s/ : /^[sm]/,
 safe_operand = function( opcode, operand )
 {
 	var temp = operand();
 	if ( rUnsafeOperand.test( temp ) )
 	{
-		opcode.pretemp( temp );
-		temp = opcode.temp();
+		pretemp( opcode, temp );
+		temp = temp_var( opcode );
 	}
 	return temp;
 },
+// A temp var unique to this opcode
+temp_var = function( opcode )
+{
+	return 't' + opcode.pc;
+},
+// Add a temporary var to the pre list
+pretemp = function( opcode, value )
+{
+	opcode.pre.push( 'var ' + opcode.temp() + '=' + value );
+},
 
-// Actually check??
-verifypiracy = opcode_builder( Brancher, function() { return 1; } ),
+// Common opcodes
+alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
 
 opcodes = {
 	
@@ -42,11 +53,11 @@ opcodes = {
 /* jg */ 3: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '>' + b.U2S(); } ),
 /* dec_chk */
 /* inc_chk */
-/* jin */ 6: opcode_builder( Brancher, function( a, b ) { return 'm.getUint16(e.objects+14*(' + a() + '-1)+6)==' + b(); } ),
+/* jin */ 6: opcode_builder( Brancher, function( a, b ) { return 'e.jin(' + a() + ',' + b() + ')'; } ),
 /* test */ 7: opcode_builder( Brancher, function( bitmap, flag ) { var temp = safe_operand( this, flag ); return bitmap() + '&' + temp + '==' + temp; } ),
 /* or */ 8: opcode_builder( Storer, function( a, b ) { return a() + '|' + b(); } ),
 /* and */ 9: opcode_builder( Storer, function( a, b ) { return a() + '&' + b(); } ),
-/* test_attr */ 10: opcode_builder( Brancher, function( object, attr ) { var temp = safe_operand( this, attr ); return '(m.getUint8(e.objects+14*(' + object() + '-1)+parseInt(' + temp + '/8))<<(' + temp + '%8))&128'; } ),
+/* test_attr */ 10: opcode_builder( Brancher, function( object, attr ) { return 'test_attr(' + object() + ',' + attr() + ')'; } ),
 /* set_attr */
 /* clear_attr */
 /* store */ 13: opcode_builder( Indirect, function( variable, value ) { return value(); } ),
@@ -78,29 +89,29 @@ opcodes = {
 /* print_obj */ 138: opcode_builder( Opcode, function( a ) { return buffer + 'e.text.decode(m.getUint16(e.objects+14*(' + a() + '-1)+13))[0]'; } ),
 /* ret */ 139: opcode_builder( Stopper, function( a ) { return 'e.ret(' + a() + ')'; } ),
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + (this.next - 2) + ''; } ),
-/* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return buffer + 'e.text.decode(' + addr() + '*' + this.e.packing_multipler + ')[0]'; } ),
+/* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.buffer+=e.text.decode(' + addr() + '*' + this.e.packing_multipler + ')[0]'; } ),
 /* load */
 /* call_1n */ 143: Caller,
 /* rtrue */ 176: opcode_builder( Stopper, function() { return 'e.ret(1)'; } ),
 /* rfalse */ 177: opcode_builder( Stopper, function() { return 'e.ret(0)'; } ),
 // Reconsider a generalised class for @print/@print_ret?
-/* print */ 178: opcode_builder( Opcode, function( text ) { return buffer + '"' + text + '"'; }, { printer: 1 } ),
-/* print_ret */ 179: opcode_builder( Stopper, function( text ) { return buffer + '"' + text + '"'; }, { printer: 1 } ),
+/* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.buffer+="' + text + '"'; }, { printer: 1 } ),
+/* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.buffer+="' + text + '"'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
 /* restart */ 183: opcode_builder( Stopper, function() { return 'e.act("restart")'; } ), // !!!
 /* ret_popped */
 /* catch */
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act("quit")'; } ),
-/* new_line */ 187: opcode_builder( Opcode, function() { return buffer + '"\\n"'; } ),
-/* verify */ 189: verifypiracy, // Actually check??
-/* piracy */ 191: verifypiracy,
+/* new_line */ 187: opcode_builder( Opcode, function() { return 'e.buffer+="\\n"'; } ),
+/* verify */ 189: alwaysbranch, // Actually check??
+/* piracy */ 191: alwaysbranch,
 /* call_vs */ 224: CallerStorer,
 /* storew */ 225: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint16(' + array() + '+2*' + index() + ',' + value() + ')'; } ),
 /* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint8(' + array() + '+' + index() + ',' + value() + ')'; } ),
 /* put_prop */
 /* aread */ 228: opcode_builder( Storer, function() { var storer = this.storer.v; this.storer = 0; return 'e.read(' + this.var_args( arguments ) + ',' + storer + ')'; }, { stopper: 1 } ),
-/* print_char */ 229: opcode_builder( Opcode, function( a ) { return buffer + 'String.fromCharCode(' + a() + ')'; } ),
-/* print_num */ 230: opcode_builder( Opcode, function( a ) { return buffer + a.U2S(); } ),
+/* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.buffer+=String.fromCharCode(' + a() + ')'; } ),
+/* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.buffer+=' + a.U2S(); } ),
 /* random */
 /* push */ /*232: Object.subClass({ // TODO: finish!
 	init: function()
@@ -142,7 +153,7 @@ opcodes = {
 /* set_font */
 /* save_undo */
 /* restore_undo */
-/* print_unicode */ 1011: opcode_builder( Opcode, function( a ) { return buffer + 'String.fromCharCode(' + a() + ')'; } ),
+/* print_unicode */ 1011: opcode_builder( Opcode, function( a ) { return 'e.buffer+=String.fromCharCode(' + a() + ')'; } ),
 /* check_unicode */
 // Assume we can print and read all unicode characters rather than actually testing
 1012: opcode_builder( Storer, function() { return 3; } ),

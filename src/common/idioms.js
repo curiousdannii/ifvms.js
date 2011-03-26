@@ -1,10 +1,13 @@
 /*
- * Inform idioms
- *
- * Copyright (c) 2011 The ifvms.js team
- * Licenced under the BSD
- * http://github.com/curiousdannii/ifvms.js
- */
+
+Inform idioms
+=============
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+ 
+*/
 
 /*
 	
@@ -22,7 +25,7 @@ var idiom_branch_reverser = function( context, pc )
 	{
 		// Make the last op be the brancher's result, reversing it's conditions
 		temp.result = context.ops.pop();
-		temp.invert = 1;
+		temp.invert = !temp.invert;
 		return 1;
 	}
 	return 0;

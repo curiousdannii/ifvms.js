@@ -1,10 +1,13 @@
 /*
- * Z-Machine runtime functions
- *
- * Copyright (c) 2011 The ifvms.js team
- * Licenced under the BSD
- * http://github.com/curiousdannii/ifvms.js
- */
+
+Z-Machine runtime functions
+===========================
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+
+*/
 
 /*
 	
@@ -13,6 +16,7 @@ TODO:
 */
 
 var runtime = {
+	
 	// Call a routine
 	call: function( addr, storer, next, args )
 	{
@@ -125,7 +129,7 @@ var runtime = {
 	{	
 		var i = 1, r;
 		
-		// Account for more many arguments
+		// Account for many arguments
 		while ( i < arguments.length )
 		{
 			if ( arguments[i++] == arguments[0] )
@@ -134,6 +138,11 @@ var runtime = {
 			}
 		}
 		return r;
+	},
+	
+	jin: function( child, parent )
+	{
+		return this.m.getUint16( this.objects + 14 * ( child - 1 ) + 6 ) == parent;
 	},
 	
 	// Request line input
@@ -193,7 +202,13 @@ var runtime = {
 		}
 	},
 	
+	test_attr: function( object, attribute )
+	{
+		return ( this.m.getUint8( this.objects + 14 * ( object - 1 ) + parseInt( attribute / 8 ) ) << ( attribute % 8 ) ) & 128;
+	},
+	
 	// Utilities for signed arithmetic
 	U2S: U2S,
 	S2U: S2U
+	
 };
