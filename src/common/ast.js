@@ -182,7 +182,7 @@ Brancher = Opcode.subClass({
 			this.context.targets.push( offset );
 			result = 'e.pc=' + offset;
 		}
-		this.result = result;
+		this.result = result + '; return';
 		this.offset = offset;
 		this.ops = [];
 		this.labels = [];
@@ -214,9 +214,19 @@ Brancher = Opcode.subClass({
 	{
 		var i = 0,
 		op,
+		result = this.result;
 		
-		// Account for other operands, autowriters and normal strings
-		result = this.result.write ? this.result.write() : this.result;
+		// Account for Contexts
+		if ( this.result instanceof Context )
+		{
+			result = this.result.write() + ( this.result.stopper ? '; return' : '' );
+			
+			// Extra line breaks for multi-op results
+			if ( this.result.ops.length > 1 )
+			{
+				result = '\n' + this.result.spacer + result + '\n';
+			}
+		}
 		
 		// Acount for many possible conditions
 		while ( i < this.ops.length )
@@ -228,7 +238,7 @@ Brancher = Opcode.subClass({
 		// Print out a label for all included branches, all pre-if statements and the branch itself
 		this.pre.push( '' );
 		return '/* ' + this.labels.join() + ' */ ' + this.pre.join( ';' ) +
-		( this.invert ? 'if (!(' : 'if (' ) + this.ops.join( '||' ) + ( this.invert ? ')) {' : ') {' ) + result + '; return}';
+		( this.invert ? 'if (!(' : 'if (' ) + this.ops.join( '||' ) + ( this.invert ? ')) {' : ') {' ) + result + '}';
 	}
 }),
 
@@ -327,6 +337,7 @@ Context = Object.subClass({
 		this.ops = [];
 		this.targets = []; // Branch targets
 		this.contexts = []; // List of sub-contexts (though including this one)
+		this.spacer = '';
 	},
 	
 	write: function()
@@ -341,7 +352,7 @@ Context = Object.subClass({
 		}
 		
 		// Return the code
-		return compiled_ops.join( ';\n' );
+		return compiled_ops.join( ';\n' + this.spacer );
 	}
 }),
 

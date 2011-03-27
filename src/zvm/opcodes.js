@@ -83,10 +83,10 @@ opcodes = {
 /* get_prop_length */ 132: opcode_builder( Storer, function( a ) { return 'e.get_prop_len(' + a() + ')'; } ),
 /* inc */ 133: opcode_builder( Opcode, function( a ) { return 'e.incdec(' + a() + ',1)'; } ),
 /* dec */ 134: opcode_builder( Opcode, function( a ) { return 'e.incdec(' + a() + ',-1)'; } ),
-/* print_addr */ 135: opcode_builder( Opcode, function( addr ) { return buffer + 'e.text.decode(' + addr() + ')[0]' } ),
+/* print_addr */ 135: opcode_builder( Opcode, function( addr ) { return 'e.buffer+=e.text.decode(' + addr() + ')[0]' } ),
 /* call_1s */ 136: CallerStorer,
 /* remove_obj */
-/* print_obj */ 138: opcode_builder( Opcode, function( a ) { return buffer + 'e.text.decode(m.getUint16(e.objects+14*(' + a() + '-1)+13))[0]'; } ),
+/* print_obj */ 138: opcode_builder( Opcode, function( a ) { return 'e.buffer+=e.text.decode(m.getUint16(e.objects+14*(' + a() + '-1)+13))[0]'; } ),
 /* ret */ 139: opcode_builder( Stopper, function( a ) { return 'e.ret(' + a() + ')'; } ),
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + (this.next - 2) + ''; } ),
 /* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.buffer+=e.text.decode(' + addr() + '*' + this.e.packing_multipler + ')[0]'; } ),

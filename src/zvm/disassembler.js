@@ -159,19 +159,16 @@ var disassemble = function( engine )
 		context.ops.push( new opcodes[code]( engine, context, code, offset, pc, operands ) );
 		
 		// Check for the end of a large if block
+		temp = 0;
 		if ( context.targets.indexOf( pc ) >= 0 )
 		{
-			idiom_if_block( context, pc );
+			temp = idiom_if_block( context, pc );
 		}
 		
-		// We can't go any further, or can we...?
-		if ( opcode_class.stopper )
+		// We can't go any further if we have a final stopper :(
+		if ( opcode_class.stopper && temp == 0 )
 		{
-			// Check if the second last op is a branch to the next address
-			if ( !idiom_branch_reverser( context, pc ) )
-			{
-				break;
-			}
+			break;
 		}
 	}
 	
