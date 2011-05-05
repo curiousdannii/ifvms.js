@@ -43,21 +43,33 @@ pretemp = function( opcode, value )
 	opcode.pre.push( 'var ' + opcode.temp() + '=' + value );
 },
 
+// Z-Machine brancher
+ZBrancher = Brancher.subClass({
+	// Calculate the offset
+	calc_offset: function()
+	{
+		var brancher = this.operands.pop(),
+		word = brancher > 0xFF;
+		this.offset = word ? ( (brancher & 0x1FFF) | (brancher & 0x2000 ? ~0x1FFF : 0) ) : brancher & 0x3F;
+		this.iftrue = brancher & ( word ? 0x8000 : 0x80 );
+	}
+}),
+
 // Common opcodes
-alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
+alwaysbranch = opcode_builder( ZBrancher, function() { return 1; } ),
 
 opcodes = {
 	
-/* je */ 1: opcode_builder( Brancher, function( a, b ) { return arguments.length == 2 ? a() + '==' + b() : 'e.jeq(' + this.var_args( arguments ) + ')'; } ),
-/* jl */ 2: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '<' + b.U2S(); } ),
-/* jg */ 3: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '>' + b.U2S(); } ),
+/* je */ 1: opcode_builder( ZBrancher, function( a, b ) { return arguments.length == 2 ? a() + '==' + b() : 'e.jeq(' + this.var_args( arguments ) + ')'; } ),
+/* jl */ 2: opcode_builder( ZBrancher, function( a, b ) { return a.U2S() + '<' + b.U2S(); } ),
+/* jg */ 3: opcode_builder( ZBrancher, function( a, b ) { return a.U2S() + '>' + b.U2S(); } ),
 /* dec_chk */
 /* inc_chk */
-/* jin */ 6: opcode_builder( Brancher, function( a, b ) { return 'e.jin(' + a() + ',' + b() + ')'; } ),
-/* test */ 7: opcode_builder( Brancher, function( bitmap, flag ) { var temp = safe_operand( this, flag ); return bitmap() + '&' + temp + '==' + temp; } ),
+/* jin */ 6: opcode_builder( ZBrancher, function( a, b ) { return 'e.jin(' + a() + ',' + b() + ')'; } ),
+/* test */ 7: opcode_builder( ZBrancher, function( bitmap, flag ) { var temp = safe_operand( this, flag ); return bitmap() + '&' + temp + '==' + temp; } ),
 /* or */ 8: opcode_builder( Storer, function( a, b ) { return a() + '|' + b(); } ),
 /* and */ 9: opcode_builder( Storer, function( a, b ) { return a() + '&' + b(); } ),
-/* test_attr */ 10: opcode_builder( Brancher, function( object, attr ) { return 'test_attr(' + object() + ',' + attr() + ')'; } ),
+/* test_attr */ 10: opcode_builder( ZBrancher, function( object, attr ) { return 'test_attr(' + object() + ',' + attr() + ')'; } ),
 /* set_attr */
 /* clear_attr */
 /* store */ 13: opcode_builder( Indirect, function( variable, value ) { return value(); } ),
@@ -76,7 +88,7 @@ opcodes = {
 /* call_2n */ 26: Caller,
 /* set_colour */
 /* throw */
-/* jz */ 128: opcode_builder( Brancher, function( a ) { return a() + '==0'; } ),
+/* jz */ 128: opcode_builder( ZBrancher, function( a ) { return a() + '==0'; } ),
 /* get_sibling */
 /* get_child */
 /* get_parent */

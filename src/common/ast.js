@@ -155,21 +155,14 @@ Brancher = Opcode.subClass({
 	{
 		var result,
 		prev,
-		
-		// Set aside the branch address - must be just a number
-		brancher = this.operands.pop(),
-		word,
 		offset;
 		
-		// Process the offset
-		/* ZVM */ if ( ZVM ) {
-			word = brancher > 0xFF;
-			offset = word ? ( (brancher & 0x1FFF) | (brancher & 0x2000 ? ~0x1FFF : 0) ) : brancher & 0x3F;
-			this.iftrue = brancher & ( word ? 0x8000 : 0x80 );
-		} /* ENDZVM */
-		/* GVM */ if ( GVM ) {
-		} /* ENDGVM */
+		// Calculate the offset
+		// VM specific Brancher classes must provide this function
+		this.calc_offset();
+		offset = this.offset;
 		
+		// Process the offset
 		if ( offset == 0 || offset == 1 )
 		{
 			result = 'e.ret(' + offset + ')';
@@ -182,6 +175,7 @@ Brancher = Opcode.subClass({
 			this.context.targets.push( offset );
 			result = 'e.pc=' + offset;
 		}
+		
 		this.result = result + '; return';
 		this.offset = offset;
 		this.ops = [];
