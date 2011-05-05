@@ -1,9 +1,7 @@
 /*
 
-ZVM - the ifvms.js implementation of the Z-Machine
-==================================================
-
-Built: BUILDDATE
+ZVM intro - various functions and compatibility fixes
+=====================================================
 
 Copyright (c) 2011 The ifvms.js team
 BSD licenced
@@ -26,7 +24,7 @@ TODO:
 // In debug mode close the closure now
 ;;; })();
 
-;;; var ZVM = 1, GVM = 0, DEBUG = 1;
+;;; var ZVM = 1, GVM = 0;
 
 // Array.indexOf compatibility
 // Note: the fromIndex parameter is not supported

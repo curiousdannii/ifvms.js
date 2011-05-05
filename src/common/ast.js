@@ -191,7 +191,8 @@ Brancher = Opcode.subClass({
 		if ( this.context.ops.length )
 		{
 			prev = this.context.ops.pop();
-			if ( prev instanceof Brancher && prev.offset == offset )
+			// As long as no other opcodes have an offset property we can skip the instanceof check
+			if ( /* prev instanceof Brancher && */ prev.offset == offset )
 			{
 				// Goes to same offset so reuse the Brancher arrays
 				this.pre = prev.pre;
@@ -217,14 +218,14 @@ Brancher = Opcode.subClass({
 		result = this.result;
 		
 		// Account for Contexts
-		if ( this.result instanceof Context )
+		if ( result instanceof Context )
 		{
 			result = this.result.write() + ( this.result.stopper ? '; return' : '' );
 			
 			// Extra line breaks for multi-op results
 			if ( this.result.ops.length > 1 )
 			{
-				result = '\n' + this.result.spacer + result + '\n';
+				result = '\n' + result + '\n';
 			}
 		}
 		
@@ -307,11 +308,11 @@ Caller = Stopper.subClass({
 		
 		// Code generate
 		// Debug: include label if possible
-		/* DEBUG */ if ( DEBUG ) {
+		/* DEBUG */
 			addr = addr.write();
 			var targetname = window.vm_functions && parseInt( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
 			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.var_args( this.operands ) + '])' + targetname;
-		} /* ENDDEBUG */
+		/* ENDDEBUG */
 		return this.label() + 'e.call(' + addr.write() + ',' + this.result.v + ',' + this.next + ',[' + this.var_args( this.operands ) + '])';
 	}
 }),
@@ -337,7 +338,7 @@ Context = Object.subClass({
 		this.ops = [];
 		this.targets = []; // Branch targets
 		this.contexts = []; // List of sub-contexts (though including this one)
-		this.spacer = '';
+		;;; this.spacer = '';
 	},
 	
 	write: function()
@@ -352,7 +353,9 @@ Context = Object.subClass({
 		}
 		
 		// Return the code
-		return compiled_ops.join( ';\n' + this.spacer );
+		// DEBUG: Pretty print!
+		;;; return this.spacer + compiled_ops.join( ';\n' + this.spacer );
+		return compiled_ops.join( ';' );
 	}
 }),
 
@@ -362,11 +365,11 @@ RoutineContext = Context.subClass({
 	{
 		// Add in some extra vars and return
 		// Debug: If we have routine names, find this one's name
-		/* DEBUG */ if ( DEBUG ) {
+		/* DEBUG */
 			this.name = window.vm_functions && find_func_name( this.pc );
 			var funcname = this.name ? '/* ' + this.name + ' */\n' : '';
 			return funcname + 'var l=e.l,m=e.m,s=e.s;\n' + this._super();
-		} /* ENDDEBUG */
+		/* ENDDEBUG */
 		return 'var l=e.l,m=e.m.data,s=e.s;\n' + this._super();
 	}
 }),

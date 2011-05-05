@@ -1,10 +1,13 @@
 /*
- * The Z-Machine VM for versions 5 and 8
- *
- * Copyright (c) 2011 The ifvms.js team
- * Licenced under the BSD
- * http://github.com/curiousdannii/ifvms.js
- */
+
+The Z-Machine VM for versions 5 and 8
+=====================================
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+
+*/
 
  /*
 
@@ -110,7 +113,7 @@ var ZVM_core = {
 		code = context.write();
 		
 		// Compile the routine with new Function()
-		/* DEBUG */ if ( DEBUG ) {
+		/* DEBUG */
 			log( code );
 			this.jit[context.pc] = eval( '(function(e){' + code + '})' );
 			
@@ -118,7 +121,7 @@ var ZVM_core = {
 			;;; this.jit[context.pc].context = context;
 			;;; this.jit[context.pc].code = code;
 			;;; if ( context.name ) { this.jit[context.pc].name = context.name; }
-		} /* ELSEDEBUG
+		/* ELSEDEBUG
 			this.jit[context.pc] = new Function( 'e', code );
 		/* ENDDEBUG */
 	},
