@@ -1,5 +1,5 @@
 /*
- * Z-Machine text coding
+ * Z-Machine text functions
  *
  * Copyright (c) 2011 The ifvms.js team
  * Licenced under the BSD
@@ -54,10 +54,14 @@ Text = Object.subClass({
 			alphabets = standard_alphabets;
 		}
 		this.alphabets = alphabets;
+		
+		// Parse the standard dictionary
+		this.dictionaries = {};
+		this.parse_dict( this.e.dictionary );
 	},
 	
 	// Decode Z-chars into Unicode
-	decode: function( addr )
+	decode: function( addr, finaladdr )
 	{
 		var memory = this.e.m,
 		
@@ -75,8 +79,14 @@ Text = Object.subClass({
 			return this.e.jit[addr];
 		}
 		
-		// Go through until we reach a stop bit
-		while (1)
+		// Don't go past the end of the file if we haven't been given a final address
+		if ( !finaladdr )
+		{
+			finaladdr = memory.getUint16( 0x1A ) * this.e.packing_multipler;
+		}
+		
+		// Go through until we've reached the end of the text or a stop bit
+		while ( addr < finaladdr )
 		{
 			word = memory.getUint16( addr );
 			addr += 2;
@@ -126,7 +136,7 @@ Text = Object.subClass({
 		}
 		
 		// Cache and return
-		result = [ fromCharCode.apply( this, result ), addr - start_addr ];
+		result = [ this.array_to_text( result ), addr - start_addr ];
 		this.e.jit[start_addr] = result;
 		return result;
 	},
@@ -135,5 +145,86 @@ Text = Object.subClass({
 	escape: function( text )
 	{
 		return text.replace( rnewline, '\\n' ).replace( rdoublequote, '\\"' );
+	},
+	
+	array_to_text: function( array )
+	{
+		// String.fromCharCode can be given an array of numbers if we call apply on it!
+		return String.fromCharCode.apply( 1, array );
+	},
+	
+	text_to_array: function( text )
+	{
+		var array = [], i = 0, l = text.length;
+		while ( i < l )
+		{
+			array.push( text.charCodeAt( i++ ) & 0xFF );
+		}
+		return array;
+	},
+	
+	// Parse and cache a dictionary
+	parse_dict: function( addr )
+	{
+		var memory = this.e.m,
+		
+		addr_start = addr,
+		dict = {},
+		seperators_len,
+		entry_len,
+		endaddr,
+		anentry,
+		
+		// Get the word separators and generate a RegExp to tokenise with
+		seperators_len = memory.getUint8( addr++ ),
+		separators = this.array_to_text( memory.getBuffer( addr, seperators_len ) );
+		// Match either a separator or something bound by them
+		dict.lexer_pattern = new RegExp( '[' + separators + ']|(^|\\b)\\S+?(?=$|[ ' + separators + '])', 'g' );
+		addr += seperators_len;
+		
+		// Go through the dictionary and cache its entries
+		entry_len = memory.getUint8( addr++ );
+		endaddr = addr + 2 + entry_len * memory.getUint16( addr );
+		addr += 2;
+		while ( addr < endaddr )
+		{
+			dict[this.decode( addr, addr + 6 )[0]] = addr;
+			addr += entry_len;
+		}
+		this.dictionaries[addr_start] = dict;
+	},
+	
+	// Tokenise a text
+	tokenise: function( dictionary, text, buffer )
+	{
+		// Parse the dictionary if needed
+		if ( !this.dictionaries[dictionary] )
+		{
+			this.parse_dict( dictionary );
+		}
+		dictionary = this.dictionaries[dictionary];
+		
+		var memory = this.e.m,
+		
+		i = 0,
+		max_words = memory.getUint8( buffer ),
+		lexer = dictionary.lexer_pattern,
+		word;
+		
+		// Reset the lexer's index
+		lexer.lastIndex = 0;
+		
+		// Go through the text until we either have reached the max number of words, or we can't find any more
+		text = text.toLowerCase();
+		while ( i < max_words && ( word = lexer.exec( text ) ) )
+		{
+			// Fill out the buffer
+			word = word[0];
+			memory.setUint16( buffer + 2 + i * 4, dictionary[word] || 0 );
+			memory.setUint8( buffer + 4 + i * 4, word.length );
+			memory.setUint8( buffer + 5 + i++ * 4, lexer.lastIndex - word.length );
+		}
+		// Update the number of found words
+		memory.setUint8( buffer + 1, i );
 	}
 });

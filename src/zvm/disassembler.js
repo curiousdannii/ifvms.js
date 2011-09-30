@@ -87,7 +87,8 @@ var disassemble = function( engine )
 		{
 			log('Missing opcode #' + code);
 			engine.stop = 1;
-			break;
+			console.log(context.write())
+			throw Error;
 		}
 		
 		// Variable for quicker access to the opcode flags

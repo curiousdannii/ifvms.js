@@ -93,7 +93,7 @@ Variable = Operand.subClass({
 }),
 
 // Generic opcode
-// .func() must be set, which returns what .write() will actually return; it is passed operands as its arguments
+// .func() must be set, which returns what .write() will actually return; it is passed the operands as its arguments
 Opcode = Object.subClass({
 	init: function( engine, context, code, pc, next, operands )
 	{
@@ -117,7 +117,7 @@ Opcode = Object.subClass({
 	// Write out the opcode, passing .operands to .func(), with a JS comment of the pc/opcode
 	write: function()
 	{
-		return this.label() + ( this.func ? this.func( this.operands ) : '' );
+		return this.label() + ( this.func ? this.func.apply( this, this.operands ) : '' );
 	},
 	
 	// Return a string of the operands separated by commas
@@ -227,7 +227,7 @@ Brancher = Opcode.subClass({
 		while ( i < this.ops.length )
 		{
 			op = this.ops[i];
-			this.ops[i++] = ( op.iftrue ? '' : '!(' ) + op.func( op.operands ) + ( op.iftrue ? '' : ')' );
+			this.ops[i++] = ( op.iftrue ? '' : '!(' ) + op.func.apply( op, op.operands ) + ( op.iftrue ? '' : ')' );
 		}
 		
 		// Print out a label for all included branches, all pre-if statements and the branch itself
@@ -369,8 +369,7 @@ RoutineContext = Context.subClass({
 }),
 
 // Opcode builder
-// Pass in a function, return a new Class whose .func is set to pass in operands as its arguments
-// operands will also be changed to an array of write() functions
+// Pass in a function, and its operands will be changed to an array of write() functions
 opcode_builder = function( Class, func, flags )
 {
 	var flags = flags || {},
@@ -392,11 +391,7 @@ opcode_builder = function( Class, func, flags )
 				i++;
 			}
 		},
-		
-		func: function( operands )
-		{
-			return func.apply( this, operands );
-		}
+		func: func
 	} );
 	return Class.subClass(props);
 },

@@ -28,23 +28,25 @@ TODO:
 
 // Array.indexOf compatibility
 // Note: the fromIndex parameter is not supported
-if ( ![].indexOf )
+var indexOf = function( array, obj )
 {
-	Array.prototype.indexOf = function( obj )
+	if ( [].indexOf )
 	{
-		for ( var i = 0, l = this.length; i < l; i++ )
+		return array.indexOf( obj );
+	}
+	
+	for ( var i = 0, l = array.length; i < l; i++ )
+	{
+		if ( array[i] == obj )
 		{
-			if ( this[i] == obj )
-			{
-				return i;
-			}
+			return i;
 		}
-		return -1;
-	};
-}
+	}
+	return -1;
+},
 
 // Utility to extend objects
-var extend = function( old, add )
+extend = function( old, add )
 {
 	for ( name in add )
 	{
@@ -67,10 +69,10 @@ function( obj, func )
 },
 
 // Log wrapper
-log = window.console ? function( msg ){ console.log( msg ); } : function(){}
+log = window.console ? function(){ console.log.apply( console, arguments ); } : function(){}
 
 // Short cuts
-fromCharCode = String.fromCharCode,
+//fromCharCode = String.fromCharCode,
 
 // Utilities for 16-bit signed arithmetic
 U2S = function( value )

@@ -69,10 +69,10 @@ opcodes = {
 /* test */ 7: opcode_builder( ZBrancher, function( bitmap, flag ) { var temp = safe_operand( this, flag ); return bitmap() + '&' + temp + '==' + temp; } ),
 /* or */ 8: opcode_builder( Storer, function( a, b ) { return a() + '|' + b(); } ),
 /* and */ 9: opcode_builder( Storer, function( a, b ) { return a() + '&' + b(); } ),
-/* test_attr */ 10: opcode_builder( ZBrancher, function( object, attr ) { return 'test_attr(' + object() + ',' + attr() + ')'; } ),
+/* test_attr */ 10: opcode_builder( ZBrancher, function( object, attr ) { return 'e.test_attr(' + object() + ',' + attr() + ')'; } ),
 /* set_attr */
 /* clear_attr */
-/* store */ 13: opcode_builder( Indirect, function( variable, value ) { return value(); } ),
+/* store */ 13: opcode_builder( Indirect, function( variable, value ) { return value(); } ), // !!!
 /* insert_obj */
 /* loadw */ 15: opcode_builder( Storer, function( array, index ) { return 'm.getUint16(' + array() + '+2*' + index() + ')'; } ),
 /* loadb */ 16: opcode_builder( Storer, function( array, index ) { return 'm.getUint8(' + array() + '+' + index() + ')'; } ),
@@ -111,7 +111,10 @@ opcodes = {
 /* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.buffer+="' + text + '"'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
 /* restart */ 183: opcode_builder( Stopper, function() { return 'e.act("restart")'; } ), // !!!
-/* ret_popped */
+/* ret_popped */ 184: Stopper.subClass({
+	post: function() { this.operands.push( new Variable( this.e, 0 ) ); },
+	func: function( a ) { return 'e.ret(' + a.write() + ')'; }
+}),
 /* catch */
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act("quit")'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.buffer+="\\n"'; } ),
@@ -125,16 +128,11 @@ opcodes = {
 /* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.buffer+=String.fromCharCode(' + a() + ')'; } ),
 /* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.buffer+=' + a.U2S(); } ),
 /* random */
-/* push */ /*232: Object.subClass({ // TODO: finish!
-	init: function()
-	{
-		var self = this;
-		self._super.apply( self, arguments );
-		
-		// Create a new storer
-		self.storer = new Variable( self.e, 0 );
-	}
-}),*/
+/* push */ 232: Storer.subClass({
+	storer: 0, // Don't grab an extra byte
+	post: function() { this.storer = new Variable( this.e, 0 ); },
+	func: function( a ) { return a.write(); }
+}),
 /* pull */
 /* split_window */
 /* set_window */

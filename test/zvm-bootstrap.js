@@ -82,7 +82,6 @@ function run( engine )
 				order.response = response;
 				order.terminator = 10;
 				engine.event( order );
-				return;
 			}
 			
 			// Quit

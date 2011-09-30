@@ -27,20 +27,16 @@ var ZVM_core = {
 	// (Re)start the VM
 	restart: function()
 	{
-		var memory,
-		version,
-		property_defaults;
-		
 		// Set up the memory
-		this.m = ByteArray( this.data );
-		memory = this.m,
+		var memory = ByteArray( this.data ),
 		
-		version = memory.getUint8( 0x00 );
+		version = memory.getUint8( 0x00 ),
 		property_defaults = memory.getUint16( 0x0A );
 		
 		extend( this, {
 			
-			// Stack and locals
+			// Memory, stack and locals
+			m: memory,
 			s: [],
 			l: [],
 			call_stack: [],
@@ -50,12 +46,11 @@ var ZVM_core = {
 			
 			// IO stuff
 			orders: [],
-			ui: new UI( this ),
-			text: new Text( this ),
 			
 			// Get some header variables
 			version: version,
 			pc: memory.getUint16( 0x06 ),
+			dictionary: memory.getUint16( 0x08 ),
 			property_defaults: property_defaults,
 			objects: property_defaults + 126,
 			globals: memory.getUint16( 0x0C ),
@@ -63,6 +58,11 @@ var ZVM_core = {
 			// Routine and string packing multiplier
 			packing_multipler: version == 5 ? 4 : 8
 			
+		});
+		// Separate these classes as they need stuff from above
+		extend( this, {
+			ui: new UI( this ),
+			text: new Text( this )			
 		});
 		
 		// Set some other header variables
@@ -163,12 +163,21 @@ var ZVM_core = {
 			this.store( data.storer, data.terminator );
 			
 			// Check if the response is too long, and then set its length
-			b = data.response;
-			if ( b.length > data.len )
+			a = data.response;
+			if ( a.length > data.len )
 			{
-				b = b.slice( 0, data.len );
+				a = a.slice( 0, data.len );
 			}
-			memory.setUint8( data.text + 1, b.length );
+			memory.setUint8( data.text + 1, a.length );
+			
+			// Store the response in the buffer
+			memory.setBuffer( data.text + 2, this.text.text_to_array( a ) );
+			
+			if ( data.parse )
+			{
+				// Tokenise the response
+				this.text.tokenise( this.dictionary, a, data.parse );
+			}
 		}
 	}
 };

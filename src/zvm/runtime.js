@@ -75,7 +75,7 @@ var runtime = {
 				// Second size byte
 				if ( this_property & 0x80 )
 				{
-					this_property = memory.getUint8( properties + 1 );
+					this_property = memory.getUint8( properties + 1 ) & 0x3F;
 					properties += this_property ? this_property + 2 : 66;
 				}
 				else
@@ -86,6 +86,8 @@ var runtime = {
 		}
 	},
 	
+	// Get the length of a property
+	// This opcode expects the address of the property data, not a property block
 	get_prop_len: function( addr )
 	{
 		// Spec 1.1
@@ -94,7 +96,7 @@ var runtime = {
 			return 0;
 		}
 		
-		var value = this.m.getUint8( addr );
+		var value = this.m.getUint8( addr - 1 );
 		
 		// Two size/number bytes
 		if ( value & 0x80 )
@@ -157,8 +159,8 @@ var runtime = {
 	
 		// Add the order
 		this.act( 'read', {
-			text: text,
-			parse: parse,
+			text: text, // text-buffer
+			parse: parse, // parse-buffer
 			len: this.m.getUint8( text ),
 			initiallen: this.m.getUint8( text + 1 ),
 			time: time,

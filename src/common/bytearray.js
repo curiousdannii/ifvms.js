@@ -36,11 +36,19 @@ ByteArray = native_bytearrays ?
 		
 		/* ZVM */ if ( ZVM ) {
 			return {
-				//data: data,
+				data: data,
 				getUint8: function( index ) { return data[index]; },
 				getUint16: function( index ) { return data[index] << 8 | data[index + 1]; },
+				getBuffer: function( start, length ) { return data.slice( start, start + length ); },
 				setUint8: function( index, value ) { data[index] = value & 0xFF; },
-				setUint16: function( index, value ) { data[index] = (value >> 8) & 0xFF; data[index + 1] = value & 0xFF; }
+				setUint16: function( index, value ) { data[index] = (value >> 8) & 0xFF; data[index + 1] = value & 0xFF; },
+				setBuffer: function( index, buffer )
+				{
+					for ( var i = 0; i < buffer.length; i++ )
+					{
+						data[index + i] = buffer[i] & 0xFF;
+					}
+				}
 			};
 		} /* ENDZVM */
 		/* GVM */ if ( GVM ) {
