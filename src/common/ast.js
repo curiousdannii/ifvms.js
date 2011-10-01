@@ -117,6 +117,7 @@ Opcode = Object.subClass({
 		this.operands = operands;
 
 		// Pre-if statements
+		// Currently only for @test ??
 		this.pre = [];
 		
 		// Post-init function (so that they don't all have to call _super)
@@ -276,6 +277,7 @@ Storer = Opcode.subClass({
 }),
 
 // Indirect storer opcodes
+// Currently only @store
 Indirect = Opcode.subClass({
 	// Fake a storer operand
 	post: function()

@@ -215,8 +215,8 @@ class DebugFile:
         return func
 
 # Compile the .inf
-#command = 'inform -kE2~S~Dwx praxix.inf'
-command = 'inform -k~Dx praxix.inf'
+command = 'inform -kE2~S~Dwx praxix.inf'
+#command = 'inform -k~Dx praxix.inf'
 os.system(command)
 
 # Load the debug file
