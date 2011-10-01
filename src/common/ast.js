@@ -37,6 +37,12 @@ var Operand = Object.subClass({
 	write: function()
 	{
 		return this.v;
+	},
+	
+	// Convert an Operand into a signed operand
+	U2S: function()
+	{
+		return U2S( this.v );
 	}
 }),
 
@@ -89,6 +95,12 @@ Variable = Operand.subClass({
 				return 'm.getUint16(' + offset + ')';
 			}
 		}
+	},
+	
+	// Convert an Operand into a signed operand
+	U2S: function()
+	{
+		return 'e.U2S(' + this.write() + ')';
 	}
 }),
 
@@ -215,7 +227,7 @@ Brancher = Opcode.subClass({
 		if ( result instanceof Context )
 		{
 			// Update the context to be a child of this context
-			;;; result.parent = this.context;
+			;;; result.context = this.context;
 			
 			result = result.write() + ( result.stopper ? '; return' : '' );
 			
@@ -345,7 +357,7 @@ Context = Object.subClass({
 		i = 0;
 		
 		// Indent the spacer further if needed
-		;;; if ( this.parent ) { this.spacer = this.parent.spacer + '  '; }
+		;;; if ( this.context ) { this.spacer = this.context.spacer + '  '; }
 		
 		// Write out the individual lines
 		while ( i < ops.length )
@@ -376,7 +388,7 @@ RoutineContext = Context.subClass({
 }),
 
 // Opcode builder
-// Pass in a function, and its operands will be changed to an array of write() functions
+// Easily build a new opcode from a class
 opcode_builder = function( Class, func, flags )
 {
 	var flags = flags || {},
@@ -385,56 +397,8 @@ opcode_builder = function( Class, func, flags )
 		{
 			var i = 0, operands;
 			this._super.apply( this, arguments );
-			
-			// Alter .operands
-			operands = this.operands;
-			while ( i < operands.length )
-			{
-				// Don't autowrite a branch address/text literal
-				if ( operands[i] instanceof Operand )
-				{
-					operands_autowriter( operands, operands[i], i );
-				}
-				i++;
-			}
 		},
 		func: func
 	} );
 	return Class.subClass(props);
-},
-
-// A closure is needed as i changes
-operands_autowriter = function( operands, orig_operand, i )
-{
-	operands[i] = function()
-	{
-		return orig_operand.write();
-	};
-	//operands[i] = bind( orig_operand, orig_operand.write );
-	
-	// Add some extra functions
-	extend( operands[i], {
-		// Put the original operand back
-		orig: orig_operand,
-		v: orig_operand.v,
-	
-		// Add back a .write()
-		write: function()
-		{
-			return orig_operand.write();
-		},
-		
-		// Convert an Operand into a signed operand
-		U2S: function()
-		{
-			// Variable operand
-			if ( orig_operand instanceof Variable )
-			{
-				return 'e.U2S(' + orig_operand.write() + ')';
-			}
-			
-			// Constant operand
-			return U2S( orig_operand.v );
-		}
-	});
 };

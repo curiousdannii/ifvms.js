@@ -54,6 +54,7 @@ var ZVM_core = {
 			property_defaults: property_defaults,
 			objects: property_defaults + 126,
 			globals: memory.getUint16( 0x0C ),
+			staticmem: memory.getUint16( 0x0E ),
 			
 			// Routine and string packing multiplier
 			packing_multipler: version == 5 ? 4 : 8
@@ -124,6 +125,10 @@ var ZVM_core = {
 		/* ELSEDEBUG
 			this.jit[context.pc] = new Function( 'e', code );
 		/* ENDDEBUG */
+		if ( context.pc < this.staticmem )
+		{
+			console.warn( 'Caching a JIT function in dynamic memory: ' + context.pc );
+		}
 	},
 	
 	// Return control to the ZVM runner to perform some action

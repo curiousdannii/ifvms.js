@@ -138,6 +138,10 @@ Text = Object.subClass({
 		// Cache and return
 		result = [ this.array_to_text( result ), addr - start_addr ];
 		this.e.jit[start_addr] = result;
+		if ( start_addr < this.e.staticmem )
+		{
+			console.warn( 'Caching a string in dynamic memory: ' + start_addr );
+		}
 		return result;
 	},
 	

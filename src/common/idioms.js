@@ -12,6 +12,8 @@ http://github.com/curiousdannii/ifvms.js
 /*
 	
 TODO:
+	loops
+	break (& continue?)
 	
 */
 
@@ -67,4 +69,4 @@ update_contexts = function( ops, context )
 	{
 		ops[i].context = context;
 	}
-}
+};

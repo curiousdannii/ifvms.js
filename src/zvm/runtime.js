@@ -57,11 +57,12 @@ var runtime = {
 		if ( addr )
 		{
 			// Assume we're being called for a valid short property
-			return memory[memory.getUint8( addr - 1 ) & 0x40 ? 'getUint16' : 'getUint8']( addr );
+			return ( memory.getUint8( addr - 1 ) & 0x40 ? memory.getUint16 : memory.getUint8 )( addr );
 		}
 		
 		// Use the default properties table
-		return memory.getUint16( this.property_defaults + 2 * property );
+		// Remember that properties are 1-indexed
+		return memory.getUint16( this.property_defaults + 2 * ( property - 1 ) );
 	},
 	
 	get_prop_addr: function( object, property )
