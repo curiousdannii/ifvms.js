@@ -21,7 +21,10 @@ var runtime = {
 	call: function( addr, storer, next, args )
 	{
 		var i,
-		locals_count;
+		locals_count,
+		
+		// Keep the number of provided args for @check_arg_count
+		provided_args = args.length;
 		
 		// Get the number of locals and advance the pc
 		this.pc = addr * this.packing_multipler;
@@ -38,11 +41,29 @@ var runtime = {
 		// Prepend to the locals array
 		this.l = args.concat( this.l );
 		
-		// Push the call stack
-		this.call_stack.push( [ next, storer, locals_count, this.s.length ] );
+		// Push the call stack (well unshift really)
+		this.call_stack.unshift( [ next, storer, locals_count, this.s.length, provided_args ] );
 	},
 	
 	// Object model functions
+	get_prop: function( object, property )
+	{
+		var memory = this.m,
+		
+		// Try to find the property
+		addr = this.get_prop_addr( object, property );
+		
+		// If we have the property
+		if ( addr )
+		{
+			// Assume we're being called for a valid short property
+			return memory[memory.getUint8( addr - 1 ) & 0x40 ? 'getUint16' : 'getUint8']( addr );
+		}
+		
+		// Use the default properties table
+		return memory.getUint16( this.property_defaults + 2 * property );
+	},
+	
 	get_prop_addr: function( object, property )
 	{
 		var memory = this.m,
@@ -172,7 +193,7 @@ var runtime = {
 	// Return from a routine
 	ret: function( result )
 	{
-		var call_stack = this.call_stack.pop(),
+		var call_stack = this.call_stack.shift(),
 		storer = call_stack[1];
 		
 		// Correct everything again

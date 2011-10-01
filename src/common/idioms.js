@@ -29,6 +29,7 @@ var idiom_if_block = function( context, pc )
 			subcontext = new Context( context.e, context.ops[i + 1] );
 			subcontext.ops = context.ops.slice( i + 1 );
 			context.ops.length = i + 1;
+			update_contexts( subcontext.ops, subcontext );
 			
 			// Set that Context as the branch's target, and invert its condition
 			context.ops[i].result = subcontext;
@@ -38,9 +39,6 @@ var idiom_if_block = function( context, pc )
 			subcontext.stopper = subcontext.ops[subcontext.ops.length - 1].stopper;
 			
 			/* DEBUG */
-				// Indent subcontexts
-				subcontext.spacer = context.spacer + '  ';
-				
 				// Check whether this could be a complex condition
 				var allbranches = 1;
 				for ( i = 0; i < subcontext.ops.length; i++ )
@@ -60,4 +58,13 @@ var idiom_if_block = function( context, pc )
 			return 1;
 		}
 	}
-};
+},
+
+// Update the contexts of new contexts
+update_contexts = function( ops, context )
+{
+	for ( var i = 0; i < ops.length; i++ )
+	{
+		ops[i].context = context;
+	}
+}

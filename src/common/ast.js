@@ -214,12 +214,16 @@ Brancher = Opcode.subClass({
 		// Account for Contexts
 		if ( result instanceof Context )
 		{
-			result = this.result.write() + ( this.result.stopper ? '; return' : '' );
+			// Update the context to be a child of this context
+			;;; result.parent = this.context;
+			
+			result = result.write() + ( result.stopper ? '; return' : '' );
 			
 			// Extra line breaks for multi-op results
 			if ( this.result.ops.length > 1 )
 			{
 				result = '\n' + result + '\n';
+				;;; result += this.context.spacer;
 			}
 		}
 		
@@ -331,7 +335,6 @@ Context = Object.subClass({
 		this.pc = pc;
 		this.ops = [];
 		this.targets = []; // Branch targets
-		this.contexts = []; // List of sub-contexts (though including this one)
 		;;; this.spacer = '';
 	},
 	
@@ -341,6 +344,10 @@ Context = Object.subClass({
 		compiled_ops = [],
 		i = 0;
 		
+		// Indent the spacer further if needed
+		;;; if ( this.parent ) { this.spacer = this.parent.spacer + '  '; }
+		
+		// Write out the individual lines
 		while ( i < ops.length )
 		{
 			compiled_ops.push( ops[i++].write() );
@@ -348,7 +355,7 @@ Context = Object.subClass({
 		
 		// Return the code
 		// DEBUG: Pretty print!
-		;;; return this.spacer + compiled_ops.join( ';\n' + this.spacer );
+		;;; return ( ops.length > 1 ? this.spacer : '' ) + compiled_ops.join( ';\n' + this.spacer );
 		return compiled_ops.join( ';' );
 	}
 }),

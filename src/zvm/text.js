@@ -195,8 +195,14 @@ Text = Object.subClass({
 	},
 	
 	// Tokenise a text
-	tokenise: function( dictionary, text, buffer )
+	tokenise: function( text, buffer, dictionary )
 	{
+		// Use the default dictionary if one wasn't provided
+		if ( !dictionary )
+		{
+			dictionary = this.e.dictionary;
+		}
+		
 		// Parse the dictionary if needed
 		if ( !this.dictionaries[dictionary] )
 		{
@@ -219,10 +225,9 @@ Text = Object.subClass({
 		while ( i < max_words && ( word = lexer.exec( text ) ) )
 		{
 			// Fill out the buffer
-			word = word[0];
-			memory.setUint16( buffer + 2 + i * 4, dictionary[word] || 0 );
-			memory.setUint8( buffer + 4 + i * 4, word.length );
-			memory.setUint8( buffer + 5 + i++ * 4, lexer.lastIndex - word.length );
+			memory.setUint16( buffer + 2 + i * 4, dictionary[word[0]] || 0 );
+			memory.setUint8( buffer + 4 + i * 4, word[0].length );
+			memory.setUint8( buffer + 5 + i++ * 4, word.index );
 		}
 		// Update the number of found words
 		memory.setUint8( buffer + 1, i );

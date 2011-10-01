@@ -31,8 +31,8 @@ var disassemble = function( engine )
 	context = new RoutineContext( engine, engine.pc );
 	
 	// Set the context's root context to be itself, and add it to the list of subcontexts
-	context.root = context;
-	context.contexts[0] = context;
+	//context.root = context;
+	//context.contexts[0] = context;
 	
 	// Run through until we can no more
 	while (1)

@@ -154,7 +154,7 @@ var ZVM_core = {
 	event: function( data )
 	{
 		var memory = this.m,
-		a, b;
+		response;
 		
 		// Handle line input
 		if ( data.code == 'read' )
@@ -163,20 +163,20 @@ var ZVM_core = {
 			this.store( data.storer, data.terminator );
 			
 			// Check if the response is too long, and then set its length
-			a = data.response;
-			if ( a.length > data.len )
+			response = data.response;
+			if ( response.length > data.len )
 			{
-				a = a.slice( 0, data.len );
+				response = response.slice( 0, data.len );
 			}
-			memory.setUint8( data.text + 1, a.length );
+			memory.setUint8( data.text + 1, response.length );
 			
 			// Store the response in the buffer
-			memory.setBuffer( data.text + 2, this.text.text_to_array( a ) );
+			memory.setBuffer( data.text + 2, this.text.text_to_array( response ) );
 			
 			if ( data.parse )
 			{
 				// Tokenise the response
-				this.text.tokenise( this.dictionary, a, data.parse );
+				this.text.tokenise( response, data.parse );
 			}
 		}
 	}

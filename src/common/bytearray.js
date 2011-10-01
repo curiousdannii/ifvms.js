@@ -11,6 +11,7 @@
 Todo:
 	consider whether direct array access would help (what did i mean by this???)
 	is signed access needed?
+	add a system for guards, to run callbacks if certain addresses were written to
 
 */
 

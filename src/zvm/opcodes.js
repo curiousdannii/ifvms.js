@@ -20,27 +20,17 @@ TODO:
 */
 
 // If the .write() of an operand generates code to access the stack or the memory (if non-native ByteArray) then don't access it more than once
-// Currently only for branchers
+// Currently only for @test
 var rUnsafeOperand = native_bytearrays ? /^s/ : /^[sm]/,
 safe_operand = function( opcode, operand )
 {
 	var temp = operand();
 	if ( rUnsafeOperand.test( temp ) )
 	{
-		pretemp( opcode, temp );
-		temp = temp_var( opcode );
+		opcode.pre.push( 'var ' + opcode.temp() + '=' + temp );
+		temp = 't' + opcode.pc;
 	}
 	return temp;
-},
-// A temp var unique to this opcode
-temp_var = function( opcode )
-{
-	return 't' + opcode.pc;
-},
-// Add a temporary var to the pre list
-pretemp = function( opcode, value )
-{
-	opcode.pre.push( 'var ' + opcode.temp() + '=' + value );
 },
 
 // Z-Machine brancher
@@ -57,6 +47,9 @@ ZBrancher = Brancher.subClass({
 
 // Common opcodes
 alwaysbranch = opcode_builder( ZBrancher, function() { return 1; } ),
+
+// Common functions
+simple_func = function( a ) { return a.write(); },
 
 opcodes = {
 	
@@ -76,7 +69,7 @@ opcodes = {
 /* insert_obj */
 /* loadw */ 15: opcode_builder( Storer, function( array, index ) { return 'm.getUint16(' + array() + '+2*' + index() + ')'; } ),
 /* loadb */ 16: opcode_builder( Storer, function( array, index ) { return 'm.getUint8(' + array() + '+' + index() + ')'; } ),
-/* get_prop */
+/* get_prop */ 17: opcode_builder( Storer, function( object, property ) { return 'e.get_prop(' + object() + ',' + property() + ')'; } ),
 /* get_prop_addr */ 18: opcode_builder( Storer, function( object, property ) { return 'e.get_prop_addr(' + object() + ',' + property() + ')'; } ),
 /* get_next_prop */
 /* add */ 20: opcode_builder( Storer, function( a, b ) { return 'e.S2U(' + a() + '+' + b() + ')'; } ),
@@ -111,10 +104,7 @@ opcodes = {
 /* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.buffer+="' + text + '"'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
 /* restart */ 183: opcode_builder( Stopper, function() { return 'e.act("restart")'; } ), // !!!
-/* ret_popped */ 184: Stopper.subClass({
-	post: function() { this.operands.push( new Variable( this.e, 0 ) ); },
-	func: function( a ) { return 'e.ret(' + a.write() + ')'; }
-}),
+/* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'e.ret(' + a.write() + ')'; }, { post: function() { this.operands.push( new Variable( this.e, 0 ) ); } } ),
 /* catch */
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act("quit")'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.buffer+="\\n"'; } ),
@@ -128,12 +118,8 @@ opcodes = {
 /* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.buffer+=String.fromCharCode(' + a() + ')'; } ),
 /* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.buffer+=' + a.U2S(); } ),
 /* random */
-/* push */ 232: Storer.subClass({
-	storer: 0, // Don't grab an extra byte
-	post: function() { this.storer = new Variable( this.e, 0 ); },
-	func: function( a ) { return a.write(); }
-}),
-/* pull */
+/* push */ 232: opcode_builder( Storer, simple_func, { post: function() { this.storer = new Variable( this.e, 0 ); }, storer: 0 } ),
+/* pull */ 233: opcode_builder( Storer, simple_func, { post: function() { this.storer = this.operands.pop(); this.operands.push( new Variable( this.e, 0 ) ); } } ),
 /* split_window */
 /* set_window */
 /* call_vs2 */ 236: CallerStorer,
@@ -155,7 +141,7 @@ opcodes = {
 /* encode_text */
 /* copy_table */
 /* print_table */
-/* check_arg_count */
+/* check_arg_count */ 255: opcode_builder( ZBrancher, function( arg ) { return arg() + '<=e.call_stack[0][4]'; } ),
 /* save */
 /* restore */
 /* log_shift */
