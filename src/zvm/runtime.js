@@ -144,7 +144,7 @@ var runtime = {
 		else
 		{
 			var offset = this.globals + ( varnum - 16 ) * 2;
-			this.m.setUint16( offset, this.m.data.setUint16( offset ) + change );
+			this.m.setUint16( offset, this.m.setUint16( offset ) + change );
 		}
 	},
 	

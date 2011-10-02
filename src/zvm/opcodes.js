@@ -32,39 +32,60 @@ safe_operand = function( opcode, operand )
 	return temp;
 },
 
-// Z-Machine brancher
-ZBrancher = Brancher.subClass({
-	// Calculate the offset
-	calc_offset: function()
-	{
-		var brancher = this.operands.pop(),
-		word = brancher > 0xFF;
-		this.offset = word ? ( (brancher & 0x1FFF) | (brancher & 0x2000 ? ~0x1FFF : 0) ) : brancher & 0x3F;
-		this.iftrue = brancher & ( word ? 0x8000 : 0x80 );
-	}
-}),
-
-// Common opcodes
-alwaysbranch = opcode_builder( ZBrancher, function() { return 1; } ),
-
 // Common functions
 simple_func = function( a ) { return a.write(); },
 
+// Common opcodes
+alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
+
+// Indirect storer opcodes - rather non-generic I'm afraid
+// Not used for inc/dec
+// @load (variable) -> (result)
+// @pull (variable)
+// @store (variable) value
+Indirect = Storer.subClass({
+	storer: 0,
+	
+	// Fake a storer operand
+	post: function()
+	{
+		var operands = this.operands;
+		
+		// If the indirect operand is a variable we replace it with a new variable whose value is the first
+		// If it's a constant we replace it with a simple variable immediately 
+		operands[0] = new Variable( this.e, operands[0] instanceof Variable ? operands[0] : operands[0].v );
+		
+		// If we don't have a storer, use the indirect operand
+		if ( !this.storer )
+		{
+			this.storer = operands.shift();
+		}
+		
+		// @pull needs an added stack. If for some reason it was compiled with two operands this will break!
+		if ( operands.length == 0 )
+		{
+			operands.push( new Variable( this.e, 0 ) );
+		}
+	},
+	
+	func: simple_func
+}),
+
 opcodes = {
 	
-/* je */ 1: opcode_builder( ZBrancher, function( a, b ) { return arguments.length == 2 ? a.write() + '==' + b.write() : 'e.jeq(' + this.var_args( arguments ) + ')'; } ),
-/* jl */ 2: opcode_builder( ZBrancher, function( a, b ) { return a.U2S() + '<' + b.U2S(); } ),
-/* jg */ 3: opcode_builder( ZBrancher, function( a, b ) { return a.U2S() + '>' + b.U2S(); } ),
+/* je */ 1: opcode_builder( Brancher, function( a, b ) { return arguments.length == 2 ? a.write() + '==' + b.write() : 'e.jeq(' + this.var_args( arguments ) + ')'; } ),
+/* jl */ 2: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '<' + b.U2S(); } ),
+/* jg */ 3: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '>' + b.U2S(); } ),
 /* dec_chk */
 /* inc_chk */
-/* jin */ 6: opcode_builder( ZBrancher, function( a, b ) { return 'e.jin(' + a.write() + ',' + b.write() + ')'; } ),
-/* test */ 7: opcode_builder( ZBrancher, function( bitmap, flag ) { var temp = safe_operand( this, flag ); return bitmap.write() + '&' + temp + '==' + temp; } ),
+/* jin */ 6: opcode_builder( Brancher, function( a, b ) { return 'e.jin(' + a.write() + ',' + b.write() + ')'; } ),
+/* test */ 7: opcode_builder( Brancher, function( bitmap, flag ) { var temp = safe_operand( this, flag ); return bitmap.write() + '&' + temp + '==' + temp; } ),
 /* or */ 8: opcode_builder( Storer, function( a, b ) { return a.write() + '|' + b.write(); } ),
 /* and */ 9: opcode_builder( Storer, function( a, b ) { return a.write() + '&' + b.write(); } ),
-/* test_attr */ 10: opcode_builder( ZBrancher, function( object, attr ) { return 'e.test_attr(' + object.write() + ',' + attr.write() + ')'; } ),
+/* test_attr */ 10: opcode_builder( Brancher, function( object, attr ) { return 'e.test_attr(' + object.write() + ',' + attr.write() + ')'; } ),
 /* set_attr */
 /* clear_attr */
-/* store */ 13: opcode_builder( Indirect, function( variable, value ) { return value.write(); } ), // !!!
+/* store */ 13: Indirect,
 /* insert_obj */
 /* loadw */ 15: opcode_builder( Storer, function( array, index ) { return 'm.getUint16(' + array.write() + '+2*' + index.write() + ')'; } ),
 /* loadb */ 16: opcode_builder( Storer, function( array, index ) { return 'm.getUint8(' + array.write() + '+' + index.write() + ')'; } ),
@@ -80,7 +101,7 @@ opcodes = {
 /* call_2n */ 26: Caller,
 /* set_colour */
 /* throw */
-/* jz */ 128: opcode_builder( ZBrancher, function( a ) { return a.write() + '==0'; } ),
+/* jz */ 128: opcode_builder( Brancher, function( a ) { return a.write() + '==0'; } ),
 /* get_sibling */
 /* get_child */
 /* get_parent */
@@ -94,7 +115,7 @@ opcodes = {
 /* ret */ 139: opcode_builder( Stopper, function( a ) { return 'e.ret(' + a.write() + ')'; } ),
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + (this.next - 2) + ''; } ),
 /* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.buffer+=e.text.decode(' + addr.write() + '*' + this.e.packing_multipler + ')[0]'; } ),
-/* load */
+/* load */ 142: Indirect.subClass( { storer: 1 } ),
 /* call_1n */ 143: Caller,
 /* rtrue */ 176: opcode_builder( Stopper, function() { return 'e.ret(1)'; } ),
 /* rfalse */ 177: opcode_builder( Stopper, function() { return 'e.ret(0)'; } ),
@@ -114,11 +135,11 @@ opcodes = {
 /* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint8(' + array.write() + '+' + index.write() + ',' + value.write() + ')'; } ),
 /* put_prop */
 /* aread */ 228: opcode_builder( Storer, function() { var storer = this.storer.v; this.storer = 0; return 'e.read(' + this.var_args( arguments ) + ',' + storer + ')'; }, { stopper: 1 } ),
-/* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.buffer+=String.fromCharCode(' + a.write() + ')'; } ),
+/* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.buffer+=String.fromCharCode(' + a.write() + ')'; } ), // !!! Needs proper ZSCII transcoding
 /* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.buffer+=' + a.U2S(); } ),
 /* random */
 /* push */ 232: opcode_builder( Storer, simple_func, { post: function() { this.storer = new Variable( this.e, 0 ); }, storer: 0 } ),
-/* pull */ 233: opcode_builder( Storer, simple_func, { post: function() { this.storer = this.operands.pop(); this.operands.push( new Variable( this.e, 0 ) ); } } ),
+/* pull */ 233: Indirect,
 /* split_window */
 /* set_window */
 /* call_vs2 */ 236: CallerStorer,
@@ -131,7 +152,7 @@ opcodes = {
 /* output_stream */
 /* input_stream */
 /* sound_effect */
-/* read_char */
+/* read_char */ 246: opcode_builder( Stopper, function() { return 'e.act("quit")'; } ), // !!!
 /* scan_table */
 /* not */ 248: opcode_builder( Storer, function( a ) { return '~' + a.write(); } ),
 /* call_vn */ 249: Caller,
@@ -140,7 +161,7 @@ opcodes = {
 /* encode_text */
 /* copy_table */
 /* print_table */
-/* check_arg_count */ 255: opcode_builder( ZBrancher, function( arg ) { return arg.write() + '<=e.call_stack[0][4]'; } ),
+/* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return arg.write() + '<=e.call_stack[0][4]'; } ),
 /* save */
 /* restore */
 /* log_shift */

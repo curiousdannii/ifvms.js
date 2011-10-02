@@ -12,6 +12,7 @@ http://github.com/curiousdannii/ifvms.js
 /*
 
 All AST nodes must use these functions, even constants
+(An exception is made for branch addresses and text literals which remain as primitives)
 write() functions are used to generate JIT code
 
 Aside from Variable is currently generic and could be used for Glulx too
@@ -168,12 +169,11 @@ Brancher = Opcode.subClass({
 	{
 		var result,
 		prev,
-		offset;
 		
 		// Calculate the offset
-		// VM specific Brancher classes must provide this function
-		this.calc_offset();
-		offset = this.offset;
+		brancher = this.operands.pop(),
+		offset = brancher[1];
+		this.iftrue = brancher[0];
 		
 		// Process the offset
 		if ( offset == 0 || offset == 1 )
@@ -276,34 +276,6 @@ Storer = Opcode.subClass({
 	}
 }),
 
-// Indirect storer opcodes
-// Currently only @store
-Indirect = Opcode.subClass({
-	// Fake a storer operand
-	post: function()
-	{
-		// If the variable is a constant we can create the storer now
-		if ( !(this.operands[0] instanceof Variable) )
-		{
-			this.storer = new Variable( this.e, this.operands[0].v );
-		}
-	},
-	write: function()
-	{
-		var operands = this.operands,
-		data = this._super();
-		
-		// If we the variable is not a constant we can only make it now
-		if ( operands[0] instanceof Variable )
-		{
-			this.storer = new Variable( this.e, operands[0].write ? operands[0].write() : operands[0] );
-		}
-		
-		// Write out (be careful because if the variable is a constant it could have already been dealt with)
-		return this.storer ? this.storer.write( data ) : data;
-	}
-}),
-
 // Routine calling opcodes
 Caller = Stopper.subClass({
 	post: function()
@@ -385,7 +357,7 @@ RoutineContext = Context.subClass({
 			var funcname = this.name ? '/* ' + this.name + ' */\n' : '';
 			return funcname + 'var l=e.l,m=e.m,s=e.s;\n' + this._super();
 		/* ENDDEBUG */
-		return 'var l=e.l,m=e.m.data,s=e.s;\n' + this._super();
+		return 'var l=e.l,m=e.m,s=e.s;\n' + this._super();
 	}
 }),
 
@@ -393,14 +365,10 @@ RoutineContext = Context.subClass({
 // Easily build a new opcode from a class
 opcode_builder = function( Class, func, flags )
 {
-	var flags = flags || {},
-	props = extend( flags, {
-		init: function()
-		{
-			var i = 0, operands;
-			this._super.apply( this, arguments );
-		},
-		func: func
-	} );
-	return Class.subClass(props);
+	var flags = flags || {};
+	if ( func )
+	{
+		flags.func = func;
+	}
+	return Class.subClass( flags );
 };

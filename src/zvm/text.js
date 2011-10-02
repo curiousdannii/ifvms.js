@@ -196,23 +196,18 @@ Text = Object.subClass({
 			addr += entry_len;
 		}
 		this.dictionaries[addr_start] = dict;
+		
+		return dict;
 	},
 	
 	// Tokenise a text
 	tokenise: function( text, buffer, dictionary )
 	{
 		// Use the default dictionary if one wasn't provided
-		if ( !dictionary )
-		{
-			dictionary = this.e.dictionary;
-		}
+		dictionary = dictionary || this.e.dictionary;
 		
 		// Parse the dictionary if needed
-		if ( !this.dictionaries[dictionary] )
-		{
-			this.parse_dict( dictionary );
-		}
-		dictionary = this.dictionaries[dictionary];
+		dictionary = this.dictionaries[dictionary] || this.parse_dict( dictionary );
 		
 		var memory = this.e.m,
 		

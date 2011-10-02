@@ -69,7 +69,7 @@ function( obj, func )
 },
 
 // Log wrapper
-log = window.console ? function(){ console.log.apply( console, arguments ); } : function(){}
+log = window.console ? function(){ console.log.apply( console, arguments ); } : function(){},
 
 // Short cuts
 //fromCharCode = String.fromCharCode,

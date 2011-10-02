@@ -1,10 +1,13 @@
 /*
- * Z-Machine disassembler - disassembles zcode into an AST
- *
- * Copyright (c) 2011 The ifvms.js team
- * Licenced under the BSD
- * http://github.com/curiousdannii/ifvms.js
- */
+
+Z-Machine disassembler - disassembles zcode into an AST
+=======================================================
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+
+*/
 
 /*
 
@@ -85,9 +88,9 @@ var disassemble = function( engine )
 		// TODO: implement proper errors here
 		if ( !opcodes[code] )
 		{
-			log('Missing opcode #' + code);
+			log('Missing opcode #' + code + ' at pc=' + offset);
 			engine.stop = 1;
-			console.log(context.write())
+			console.log( context.write() );
 			throw Error;
 		}
 		
@@ -139,10 +142,18 @@ var disassemble = function( engine )
 		}
 		
 		// Check for a branch address
+		// If we don't calculate the offset now we won't be able to tell the difference between 0x40 and 0x0040
 		if ( opcode_class.brancher )
 		{
 			temp = memory.getUint8( pc++ );
-			operands.push( temp & 0x40 ? temp : (temp << 8) | memory.getUint8(pc++) );
+			operands.push( [
+				temp & 0x80, // iftrue
+				temp & 0x40 ?
+					// single byte address
+					temp & 0x3F :
+					// word address, but first get the second byte of it
+					( ( temp = (temp << 8) | memory.getUint8(pc++) ) & 0x2000 ? ~0x1FFF : 0 ) | ( temp & 0x1FFF )
+			] );
 		}
 		
 		// Check for a text literal
