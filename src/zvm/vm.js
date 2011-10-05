@@ -9,7 +9,7 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
- /*
+/*
 
 This file represents the public API of the ZVM class, while runtime.js contains most other class functions
 	
@@ -18,7 +18,9 @@ TODO:
 */
 
 // The VM itself!
+/* DEBUG */
 var ZVM_core = {
+/* ENDDEBUG */
 	
 	init: function()
 	{
@@ -64,6 +66,7 @@ var ZVM_core = {
 			packing_multipler: version == 5 ? 4 : 8
 			
 		});
+		this.extension_table = new ExtensionTable( this );
 		// Separate these classes as they need stuff from above
 		extend( this, {
 			ui: new UI( this ),
@@ -182,4 +185,8 @@ var ZVM_core = {
 			this.print( response + '\n' );
 		}
 	}
+/* DEBUG */
 };
+/* ELSEDEBUG
+});
+/* ENDDEBUG */

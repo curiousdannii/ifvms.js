@@ -29,7 +29,7 @@ IndirectVariable = Variable.subClass({
 	{
 		var havevalue = arguments.length,
 		variable = this.v;
-		if ( this.v.write || this.v == 0 )
+		if ( variable.write || variable == 0 )
 		{
 			value = value && value.write ? value.write() : value;
 			variable = variable.write ? variable.write() : variable;
@@ -105,13 +105,13 @@ opcodes = {
 /* get_prop_length */ 132: opcode_builder( Storer, function( a ) { return 'e.get_prop_len(' + a.write() + ')'; } ),
 /* inc */ 133: opcode_builder( Opcode, function( a ) { return 'e.incdec(' + a.write() + ',1)'; } ),
 /* dec */ 134: opcode_builder( Opcode, function( a ) { return 'e.incdec(' + a.write() + ',-1)'; } ),
-/* print_addr */ 135: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr.write() + ')[0])' } ),
+/* print_addr */ 135: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr.write() + '))' } ),
 /* call_1s */ 136: CallerStorer,
 /* remove_obj */
-/* print_obj */ 138: opcode_builder( Opcode, function( a ) { return 'e.print(e.text.decode(m.getUint16(e.objects+14*(' + a.write() + '-1)+13))[0])'; } ),
+/* print_obj */ 138: opcode_builder( Opcode, function( a ) { return 'e.print(e.text.decode(m.getUint16(e.objects+14*(' + a.write() + '-1)+13)))'; } ),
 /* ret */ 139: opcode_builder( Stopper, function( a ) { return 'e.ret(' + a.write() + ')'; } ),
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + (this.next - 2) + ''; } ),
-/* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr.write() + '*' + this.e.packing_multipler + ')[0])'; } ),
+/* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr.write() + '*' + this.e.packing_multipler + '))'; } ),
 /* load */ 142: Indirect.subClass( { storer: 1 } ),
 /* call_1n */ 143: Caller,
 /* rtrue */ 176: opcode_builder( Stopper, function() { return 'e.ret(1)'; } ),
@@ -132,7 +132,7 @@ opcodes = {
 /* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint8(' + array.write() + '+' + index.U2S() + ',' + value.write() + ')'; } ),
 /* put_prop */
 /* aread */ 228: opcode_builder( Stopper, function() { var storer = this.operands.pop(); return 'e.read(' + this.var_args() + ',' + storer.v + ');e.pc=' + this.next; }, { storer: 1 } ),
-/* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(e.text.zscii_to_text([' + a.write() + ']))'; } ), // !!! Needs proper ZSCII transcoding
+/* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(e.text.zscii_to_text([' + a.write() + ']))'; } ),
 /* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.print(' + a.U2S() + ')'; } ),
 /* random */
 /* push */ 232: opcode_builder( Storer, simple_func, { post: function() { this.storer = new Variable( this.e, 0 ); }, storer: 0 } ),

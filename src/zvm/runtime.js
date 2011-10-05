@@ -15,7 +15,12 @@ TODO:
 	
 */
 
+// When building just create the class directly from runtime.js and vm.js, no need for these vars
+/* DEBUG */
 var runtime = {
+/* ELSEDEBUG
+window.ZVM = Object.subClass( {
+/* ENDDEBUG */
 	
 	art_shift: function( number, places )
 	{
@@ -135,6 +140,12 @@ var runtime = {
 		return value & 0x40 ? 2 : 1;
 	},
 	
+	// Access the header extension table
+	header_extension: function( word, value )
+	{
+		
+	},
+	
 	// Quick hack for @inc/@dec
 	// It would be possible to do this with AST nodes but it would be very messy
 	incdec: function( varnum, change )
@@ -237,7 +248,7 @@ var runtime = {
 		}
 		var state = this.undo.pop();
 		this.pc = state[0];
-		this.m.setBuffer( 0, state[2], 1 );
+		this.m.setBuffer( 0, state[2] );
 		this.l = state[3];
 		this.s = state[4];
 		this.call_stack = state[5];
@@ -328,5 +339,9 @@ var runtime = {
 	// Utilities for signed arithmetic
 	U2S: U2S,
 	S2U: S2U
-	
+
+/* DEBUG */
 };
+/* ELSEDEBUG
+,
+/* ENDDEBUG */

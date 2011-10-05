@@ -1,10 +1,13 @@
 /*
- * Z-Machine UI
- *
- * Copyright (c) 2011 The ifvms.js team
- * Licenced under the BSD
- * http://github.com/curiousdannii/ifvms.js
- */
+
+Z-Machine UI
+============
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+
+*/
 
 /*
 	

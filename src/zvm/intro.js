@@ -71,4 +71,29 @@ S2U = function( value )
 	return value & 0xFFFF;
 },
 
+// Header extension table
+ExtensionTable = Object.subClass({
+	init: function( e )
+	{
+		var addr = e.m.getUint16( 0x36 );
+		this.e = e;
+		this.addr = addr;
+		this.count = addr ? e.m.getUint16( addr ) : 0;
+	},
+	data: function( word, value )
+	{
+		var addr = this.addr;
+		if ( !addr || word > this.count )
+		{
+			return 0;
+		}
+		addr += 2 * word;
+		if ( value == undefined )
+		{
+			return this.e.m.getUint16( addr );
+		}
+		this.e.m.setUint16( addr, value );
+	}
+}),
+
 PARCHMENT_SECURITY_OVERRIDE = window.PARCHMENT_SECURITY_OVERRIDE;

@@ -160,8 +160,8 @@ var disassemble = function( engine )
 		if ( opcode_class.printer )
 		{
 			temp = engine.text.decode( pc );
-			operands.push( engine.text.escape( temp[0] ) );
-			pc += temp[1];
+			operands.push( engine.text.escape( temp ) );
+			pc = temp.pc;
 		}
 		
 		// Update the engine's pc
