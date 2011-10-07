@@ -24,24 +24,10 @@ var UI = Object.subClass({
 		this.streams = [ 1, 0, [], 0 ];
 	},
 	
-	// Print text!
-	print: function( text )
+	// Flush the buffer to the orders
+	flush: function()
 	{
-		if ( this.streams[2].length )
-		{
-			this.streams[2][0][1] += text;
-		}
-		else if ( this.streams[0] )
-		{
-			this.buffer += text;
-		}
-	},
-	
-	// Set styles
-	set_style: function( stylebyte )
-	{
-		var styles = this.styles,
-		oldstyles;
+		var oldstyles;
 		
 		// If we have a buffer transfer it to the orders
 		if ( this.buffer != '' )
@@ -54,6 +40,29 @@ var UI = Object.subClass({
 			});
 			this.buffer = '';
 		}
+	},
+	
+	// Print text!
+	print: function( text )
+	{
+		// Stream 3 gets the text first
+		if ( this.streams[2].length )
+		{
+			this.streams[2][0][1] += text;
+		}
+		// Don't print if stream 1 was switched off (why would you do that?!)
+		else if ( this.streams[0] )
+		{
+			this.buffer += text;
+		}
+	},
+	
+	// Set styles
+	set_style: function( stylebyte )
+	{
+		var styles = this.styles;
+		
+		this.flush();
 		
 		// Setting the style to Roman will clear the others
 		if ( stylebyte == 0 )

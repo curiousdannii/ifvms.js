@@ -12,6 +12,7 @@ http://github.com/curiousdannii/ifvms.js
 /*
 	
 TODO:
+	Add a seeded RNG
 	
 */
 
@@ -60,6 +61,22 @@ window.ZVM = Object.subClass( {
 	{
 		var addr = this.objects + 14 * object + parseInt( attribute / 8 );
 		this.m.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
+	},
+	
+	// Access the extension table
+	extension_table: function( word, value )
+	{
+		var addr = this.extension;
+		if ( !addr || word > this.extension_count )
+		{
+			return 0;
+		}
+		addr += 2 * word;
+		if ( value == undefined )
+		{
+			return this.m.getUint16( addr );
+		}
+		this.e.setUint16( addr, value );
 	},
 	
 	// Find the address of a property, or given the previous property, the number of the next
@@ -180,7 +197,7 @@ window.ZVM = Object.subClass( {
 		
 		// Use the default properties table
 		// Remember that properties are 1-indexed
-		return memory.getUint16( this.property_defaults + 2 * ( property - 1 ) );
+		return memory.getUint16( this.properties + 2 * ( property - 1 ) );
 	},
 	
 	// Get the length of a property
@@ -293,6 +310,36 @@ window.ZVM = Object.subClass( {
 		addr = this.find_prop( object, property );
 		
 		( memory.getUint8( addr - 1 ) & 0x40 ? memory.setUint16 : memory.setUint8 )( addr, value );
+	},
+	
+	random: function( range )
+	{
+		var rand;
+		
+		if ( range < 1 )
+		{
+			this.random_state = Math.abs( range );
+			this.random_seq = 0;
+			return 0;
+		}
+		
+		// Pure randomness
+		if ( this.random_state == 0 )
+		{
+			return parseInt( Math.random() * range ) + 1;
+		}
+		// How can we best seed the RNG?
+		
+		// Predictable seed algorithm from the standard's remarks
+		else
+		{
+			this.random_seq++;
+			if ( this.random_seq > this.random_state )
+			{
+				this.random_seq = 1;
+			}
+			return this.random_seq % range;
+		}
 	},
 	
 	// Request line input

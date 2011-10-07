@@ -40,7 +40,8 @@ var ZVM_core = {
 		var memory = ByteArray( this.data ),
 		
 		version = memory.getUint8( 0x00 ),
-		property_defaults = memory.getUint16( 0x0A );
+		property_defaults = memory.getUint16( 0x0A ),
+		extension = memory.getUint16( 0x36 );
 		
 		// Check if the version is supported
 		if ( version != 5 && version != 8 )
@@ -48,32 +49,38 @@ var ZVM_core = {
 			throw new Error( 'Unsupported Z-Machine version: ' + data[0] );
 		}
 		
-		this.m = memory;
-		this.extension_table = new ExtensionTable( this );
 		extend( this, {
 			
-			// Locals and stacks of various kinds
+			// Memory, locals and stacks of various kinds
+			m: memory,
 			s: [],
 			l: [],
 			call_stack: [],
 			undo: [],
 			
+			random_state: 0,
+			
 			// IO stuff
 			orders: [],
-			ui: new UI( this ),
-			text: new Text( this ),
 			
 			// Get some header variables
 			version: version,
 			pc: memory.getUint16( 0x06 ),
-			property_defaults: property_defaults,
+			properties: property_defaults,
 			objects: property_defaults + 112, // 126-14 - if we take this now then we won't need to always decrement the object number
 			globals: memory.getUint16( 0x0C ),
 			staticmem: memory.getUint16( 0x0E ),
+			extension: extension,
+			extension_count: extension ? memory.getUint16( extension ) : 0,
 			
 			// Routine and string packing multiplier
 			packing_multipler: version == 5 ? 4 : 8
 			
+		});
+		// These classes rely too much on the above, so add them after
+		extend( this, {
+			ui: new UI( this ),
+			text: new Text( this )
 		});
 		
 		// Set some other header variables
@@ -147,8 +154,8 @@ var ZVM_core = {
 	{
 		var options = options || {};
 		
-		// Flush the buffer, 0x10 will ensure the styles are unchanged
-		this.ui.set_style( 0x10 );
+		// Flush the buffer
+		this.ui.flush();
 		
 		options.code = code;
 		this.orders.push( options );

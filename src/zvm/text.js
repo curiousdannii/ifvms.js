@@ -12,9 +12,7 @@ http://github.com/curiousdannii/ifvms.js
 /*
 	
 TODO:
-	Abbreviations
-	Custom unicode table
-	Lots of vars not used elsewhere... wrap in a func?
+	I think the dictionary will fail for long strings finishing with a multi-Zchar
 	
 */
 
@@ -31,10 +29,11 @@ Text = Object.subClass({
 		var memory = engine.m,
 		
 		alphabet_addr = memory.getUint16( 0x34 ),
-		i = 0,
-		alphabets,
-		unicode_addr = engine.extension_table.data( 3 ),
-		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
+		unicode_addr = engine.extension_table( 3 ),
+		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ ),
+		abbreviations,
+		abbr_array = [],
+		i = 0, l = 96;
 		
 		this.e = engine;
 		
@@ -47,6 +46,17 @@ Text = Object.subClass({
 		this.make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
 			// Or use the default
 			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
+		
+		// Abbreviations
+		abbreviations = memory.getUint16( 0x18 );
+		if ( abbreviations )
+		{
+			while ( i < l )
+			{
+				abbr_array.push( this.decode( memory.getUint16( abbreviations + 2 * i++ ) * 2 ) );
+			}
+		}
+		this.abbr = abbr_array;
 		
 		// Parse the standard dictionary
 		this.dictionaries = {};
@@ -109,7 +119,7 @@ Text = Object.subClass({
 			word = memory.getUint16( addr );
 			addr += 2;
 			
-			buffer.push( word >> 10, word >> 5, word );
+			buffer.push( word >> 10 & 0x1F, word >> 5 & 0x1F, word & 0x1F );
 			
 			// Stop bit
 			if ( word & 0x8000 )
@@ -121,7 +131,7 @@ Text = Object.subClass({
 		// Process the Z-chars
 		while ( i < buffer.length )
 		{
-			zchar = buffer[i++] & 0x1F;
+			zchar = buffer[i++];
 			
 			// Special chars
 			// Space
@@ -132,6 +142,7 @@ Text = Object.subClass({
 			// Abbreviations
 			else if ( zchar < 4 )
 			{
+				result = result.concat( this.abbr[ 32 * ( zchar - 1 ) + buffer[i++] ] );
 			}
 			// Shift characters
 			else if ( zchar < 6 )
@@ -141,7 +152,7 @@ Text = Object.subClass({
 			// Check for a 10 bit ZSCII character
 			else if ( alphabet == 2 && zchar == 6 )
 			{
-				result.push( (buffer[i++] & 0x1F) << 5 | (buffer[i++] & 0x1F) );
+				result.push( buffer[i++] << 5 | buffer[i++] );
 			}
 			else
 			{
@@ -153,13 +164,17 @@ Text = Object.subClass({
 			alphabet = alphabet < 4 ? 0 : alphabet - 3;
 		}
 		
-		// Cache and return
-		result = new String( this.zscii_to_text( result ) );
-		result.pc = addr;
-		this.e.jit[start_addr] = result;
-		if ( start_addr < this.e.staticmem )
+		// If we haven't finished making the abbreviations table don't convert to text
+		if ( this.abbr )
 		{
-			console.warn( 'Caching a string in dynamic memory: ' + start_addr );
+			// Cache and return. Use String() so that .pc will be preserved
+			result = new String( this.zscii_to_text( result ) );
+			result.pc = addr;
+			this.e.jit[start_addr] = result;
+			if ( start_addr < this.e.staticmem )
+			{
+				console.warn( 'Caching a string in dynamic memory: ' + start_addr );
+			}
 		}
 		return result;
 	},
