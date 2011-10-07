@@ -42,10 +42,17 @@ var ZVM_core = {
 		version = memory.getUint8( 0x00 ),
 		property_defaults = memory.getUint16( 0x0A );
 		
+		// Check if the version is supported
+		if ( version != 5 && version != 8 )
+		{
+			throw new Error( 'Unsupported Z-Machine version: ' + data[0] );
+		}
+		
+		this.m = memory;
+		this.extension_table = new ExtensionTable( this );
 		extend( this, {
 			
-			// Memory, stack and locals
-			m: memory,
+			// Locals and stacks of various kinds
 			s: [],
 			l: [],
 			call_stack: [],
@@ -53,24 +60,20 @@ var ZVM_core = {
 			
 			// IO stuff
 			orders: [],
+			ui: new UI( this ),
+			text: new Text( this ),
 			
 			// Get some header variables
 			version: version,
 			pc: memory.getUint16( 0x06 ),
 			property_defaults: property_defaults,
-			objects: property_defaults + 126,
+			objects: property_defaults + 112, // 126-14 - if we take this now then we won't need to always decrement the object number
 			globals: memory.getUint16( 0x0C ),
 			staticmem: memory.getUint16( 0x0E ),
 			
 			// Routine and string packing multiplier
 			packing_multipler: version == 5 ? 4 : 8
 			
-		});
-		this.extension_table = new ExtensionTable( this );
-		// Separate these classes as they need stuff from above
-		extend( this, {
-			ui: new UI( this ),
-			text: new Text( this )			
 		});
 		
 		// Set some other header variables
