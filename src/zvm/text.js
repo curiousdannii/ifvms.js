@@ -16,16 +16,37 @@ TODO:
 	
 */
 
-var rnewline = /\n/g,
-rformfeed = /\r/g,
-rdoublequote = /"/g,
-rzsciiundefined = /[\x00-\x0C\x0E-\x1F\x7F-\x9A\xFC-\uFFFF]/g,
-rzsciiextras = /[\x9B-\xFB]/g,
-
-// Escape text for JITing
-JITescape = function( text )
-{
-	return text.replace( rnewline, '\\n' ).replace( rdoublequote, '\\"' );
+// Key codes accepted by the Z-Machine
+var ZSCII_keyCodes = {
+	8: 8, // delete/backspace
+	13: 13, // enter
+	27: 27, // escape
+	37: 131, // arrow keys
+	38: 129,
+	39: 132,
+	40: 130,
+	96: 145, // keypad
+	97: 146,
+	98: 147,
+	99: 148,
+	100: 149,
+	101: 150,
+	102: 151,
+	103: 152,
+	104: 153,
+	105: 154,
+	112: 133, // function keys
+	113: 134,
+	114: 135,
+	115: 136,
+	116: 137,
+	117: 138,
+	118: 139,
+	119: 140,
+	120: 141,
+	121: 142,
+	122: 143,
+	123: 144
 },
 
 // A class for managing everything text
@@ -51,7 +72,7 @@ Text = Object.subClass({
 		// Check for a custom unicode table
 		this.make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
 			// Or use the default
-			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
+			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
 		
 		// Abbreviations
 		abbreviations = memory.getUint16( 0x18 );
@@ -95,6 +116,7 @@ Text = Object.subClass({
 		}
 		this.unicode_table = table;
 		this.reverse_unicode_table = reverse;
+		this.unicode_callback = function( charr ) { return String.fromCharCode( table[charr.charCodeAt(0)] || 63 ) };
 	},
 	
 	// Decode Z-chars into Unicode
@@ -189,19 +211,18 @@ Text = Object.subClass({
 	// Are using regex's slower than looping through the array?
 	zscii_to_text: function( array )
 	{
-		var unicode_table = this.unicode_table;
 		// String.fromCharCode can be given an array of numbers if we call apply on it!
 		return String.fromCharCode.apply( this, array )
 			
 			// Now convert the ZSCII to unicode
 			// First remove any undefined codes
-			.replace( rzsciiundefined, '' )
+			.replace( /[\x00-\x0C\x0E-\x1F\x7F-\x9A\xFC-\uFFFF]/g, '' )
 			
 			// Then convert form feeds to new lines
-			.replace( rformfeed, '\n' )
+			.replace( /\r/g, '\n' )
 			
 			// Then replace the extra characters with the ones from the unicode table, or with '?'
-			.replace( rzsciiextras, function( charr ){ return String.fromCharCode( unicode_table[charr.charCodeAt(0)] || 63 ) } );
+			.replace( /[\x9B-\xFB]/g, this.unicode_callback );
 	},
 	
 	// If the second argument is set then don't use the unicode table
@@ -286,5 +307,27 @@ Text = Object.subClass({
 		}
 		// Update the number of found words
 		memory.setUint8( buffer + 1, i );
+	},
+	
+	// Handle key input
+	keyinput: function( data )
+	{
+		var charCode = data.charCode,
+		keyCode = data.keyCode;
+		
+		// Handle keyCodes first
+		if ( ZSCII_keyCodes[keyCode] )
+		{
+			return ZSCII_keyCodes[keyCode];
+		}
+		
+		// Standard ASCII
+		if ( charCode > 31 && charCode < 127 )
+		{
+			return charCode;
+		}
+		
+		// Consult the unicode table or return a '?'
+		return this.reverse_unicode_table[charCode] || 63;
 	}
 });
