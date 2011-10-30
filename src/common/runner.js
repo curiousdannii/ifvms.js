@@ -26,22 +26,22 @@ var Runner = Object.subClass({
 		// Start it up
 		this.inputEvent({
 			code: 'load',
-			data: data
+			data: data,
+			env: io.env
 		});
 	},
 
 	// Handler for output events from the VM
-	outputEvent: function( data )
+	outputEvent: function( orders )
 	{
 		var	engine = this.e,
-		i,
-		orders = data;
+		i = 0;
 		
 		// Send the orders to StructIO
 		this.io.event( orders );
 		
 		// Go through the orders for anything non-StructIO
-		for ( i = 0; i < orders.length; i++ )
+		for ( ; i < orders.length; i++ )
 		{
 			// Quit
 			if ( orders[i].code == 'quit' )

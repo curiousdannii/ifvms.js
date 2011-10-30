@@ -21,7 +21,7 @@ Todo:
 
 */
 
-;;; log( 'bytearray.js: ' + ( window.DataView ? 'Native DataView' : 'Emulating DataView' ) );
+;;; console.log( 'bytearray.js: ' + ( window.DataView ? 'Native DataView' : 'Emulating DataView' ) );
 
 var native_bytearrays = window.DataView,
 

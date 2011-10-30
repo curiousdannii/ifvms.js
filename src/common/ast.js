@@ -21,6 +21,9 @@ TODO:
 	Precalculate simple arith? Here? ZVM.compile?
 	Combine print statements?
 	Use strict mode for new Function()?
+	When we can run through a whole game, test whether using common_func is faster (if its slower then not worth the file size saving)
+	Would changing write() to toString() be simpler and faster? (No need for Operand, no need to check if something has been written already, most times it will even be implicit casting etc)
+	Subclass Operand/Variable from Number?
 	
 */
 
@@ -149,6 +152,33 @@ Stopper = Opcode.subClass({
 	stopper: 1
 }),
 
+// Join multiple branchers together with varying logic conditions
+BrancherLogic = Object.subClass({
+	init: function( ops, code )
+	{
+		this.ops = ops || [];
+		this.code = code || '||';
+	},
+	
+	write: function()
+	{
+		var i = 0,
+		ops = [],
+		op;
+		while ( i < this.ops.length )
+		{
+			op = this.ops[i++];
+			// Accept either Opcodes or further BrancherLogics
+			ops.push(
+				op.func
+					? ( op.iftrue ? '' : '!(' ) + op.func.apply( op, op.operands ) + ( op.iftrue ? '' : ')' )
+					: op.write()
+			);
+		}
+		return ( this.invert ? '(!(' : '(' ) + ops.join( this.code ) + ( this.invert ? '))' : ')' );
+	}
+}),
+
 // Branching opcodes
 Brancher = Opcode.subClass({
 	// Flag for the disassembler
@@ -183,7 +213,7 @@ Brancher = Opcode.subClass({
 		
 		this.result = result + '; return';
 		this.offset = offset;
-		this.ops = [];
+		this.cond = new BrancherLogic();
 		this.labels = [];
 		
 		// Compare with previous statement
@@ -194,7 +224,7 @@ Brancher = Opcode.subClass({
 			if ( /* prev instanceof Brancher && */ prev.offset == offset )
 			{
 				// Goes to same offset so reuse the Brancher arrays
-				this.ops = prev.ops;
+				this.cond = prev.cond;
 				this.labels = prev.labels;
 			}
 			else
@@ -204,7 +234,7 @@ Brancher = Opcode.subClass({
 		}
 		
 		// Push this op and label
-		this.ops.push( this );
+		this.cond.ops.push( this );
 		this.labels.push( this.pc + '/' + this.code );
 	},
 	
@@ -212,7 +242,6 @@ Brancher = Opcode.subClass({
 	write: function()
 	{
 		var i = 0,
-		op,
 		result = this.result;
 		
 		// Account for Contexts
@@ -231,16 +260,8 @@ Brancher = Opcode.subClass({
 			}
 		}
 		
-		// Acount for many possible conditions
-		while ( i < this.ops.length )
-		{
-			op = this.ops[i];
-			this.ops[i++] = ( op.iftrue ? '' : '!(' ) + op.func.apply( op, op.operands ) + ( op.iftrue ? '' : ')' );
-		}
-		
 		// Print out a label for all included branches and the branch itself
-		return '/* ' + this.labels.join() + ' */ ' + this.keyword + ( this.invert ? '(!(' : '(' ) +
-			this.ops.join( '||' ) + ( this.invert ? ')) {' : ') {' ) + result + '}';
+		return '/* ' + this.labels.join() + ' */ ' + this.keyword + this.cond.write() + ' {' + result + '}';
 	}
 }),
 
@@ -371,7 +392,25 @@ opcode_builder = function( Class, func, flags )
 	var flags = flags || {};
 	if ( func )
 	{
-		flags.func = func;
+		/*if ( func.pop )
+		{
+			flags.str = func;
+			flags.func = common_func;
+		}
+		else
+		{*/
+			flags.func = func;
+		//}
 	}
 	return Class.subClass( flags );
 };
+
+// A common for opcodes which basically just need to provide texts
+/*common_func = function()
+{
+	var texts = this.str;
+	if ( texts.length == 2 )
+	{
+		return texts[0] + this.args() + texts[1];
+	}
+};*/

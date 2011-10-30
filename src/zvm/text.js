@@ -21,32 +21,9 @@ var ZSCII_keyCodes = {
 	8: 8, // delete/backspace
 	13: 13, // enter
 	27: 27, // escape
-	37: 131, // arrow keys
-	38: 129,
-	39: 132,
-	40: 130,
-	96: 145, // keypad
-	97: 146,
-	98: 147,
-	99: 148,
-	100: 149,
-	101: 150,
-	102: 151,
-	103: 152,
-	104: 153,
-	105: 154,
-	112: 133, // function keys
-	113: 134,
-	114: 135,
-	115: 136,
-	116: 137,
-	117: 138,
-	118: 139,
-	119: 140,
-	120: 141,
-	121: 142,
-	122: 143,
-	123: 144
+	37: 131, 38: 129, 39: 132, 40: 130, // arrow keys
+	96: 145, 97: 146, 98: 147, 99: 148, 100: 149, 101: 150, 102: 151, 103: 152, 104: 153, 105: 154, // keypad
+	112: 133, 113: 134, 114: 135, 115: 136, 116: 137, 117: 138, 118: 139, 119: 140, 120: 141, 121: 142, 122: 143, 123: 144 // function keys
 },
 
 // A class for managing everything text
@@ -63,6 +40,7 @@ Text = Object.subClass({
 		i = 0, l = 96;
 		
 		this.e = engine;
+		this.maxaddr = memory.getUint16( 0x1A ) * engine.packing_multipler;
 		
 		// Check for custom alphabets
 		this.make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
@@ -80,7 +58,7 @@ Text = Object.subClass({
 		{
 			while ( i < l )
 			{
-				abbr_array.push( this.decode( memory.getUint16( abbreviations + 2 * i++ ) * 2 ) );
+				abbr_array.push( this.decode( memory.getUint16( abbreviations + 2 * i++ ) * 2, 0, 1 ) );
 			}
 		}
 		this.abbr = abbr_array;
@@ -120,7 +98,7 @@ Text = Object.subClass({
 	},
 	
 	// Decode Z-chars into Unicode
-	decode: function( addr, finaladdr )
+	decode: function( addr, length, notext )
 	{
 		var memory = this.e.m,
 		
@@ -138,11 +116,12 @@ Text = Object.subClass({
 			return this.e.jit[addr];
 		}
 		
-		// Don't go past the end of the file if we haven't been given a final address
-		finaladdr = finaladdr || memory.getUint16( 0x1A ) * this.e.packing_multipler;
+		// If we've been given a length, then use it as the finaladdr,
+		// Otherwise don't go past the end of the file
+		length = length ? length + addr : this.maxaddr;
 		
 		// Go through until we've reached the end of the text or a stop bit
-		while ( addr < finaladdr )
+		while ( addr < length )
 		{
 			word = memory.getUint16( addr );
 			addr += 2;
@@ -180,7 +159,10 @@ Text = Object.subClass({
 			// Check for a 10 bit ZSCII character
 			else if ( alphabet == 2 && zchar == 6 )
 			{
-				result.push( buffer[i++] << 5 | buffer[i++] );
+				if ( i + 2 < buffer.length )
+				{
+					result.push( buffer[i++] << 5 | buffer[i++] );
+				}
 			}
 			else
 			{
@@ -192,8 +174,8 @@ Text = Object.subClass({
 			alphabet = alphabet < 4 ? 0 : alphabet - 3;
 		}
 		
-		// If we haven't finished making the abbreviations table don't convert to text
-		if ( this.abbr )
+		// The abbreviations table and dictionary don't want text
+		if ( !notext )
 		{
 			// Cache and return. Use String() so that .pc will be preserved
 			result = new String( this.zscii_to_text( result ) );
@@ -256,11 +238,9 @@ Text = Object.subClass({
 		endaddr,
 		anentry,
 		
-		// Get the word separators and generate a RegExp to tokenise with
-		seperators_len = memory.getUint8( addr++ ),
-		separators = this.zscii_to_text( memory.getBuffer( addr, seperators_len ) );
-		// Match either a separator or something bound by them (max of 9 characters)
-		dict.lexer_pattern = new RegExp( '[' + separators + ']|\\b\\S{1,9}(?=\\S*?(\\b|[' + separators + ']))', 'g' );
+		// Get the word separators
+		seperators_len = memory.getUint8( addr++ );
+		dict.separators = memory.getBuffer( addr, seperators_len );
 		addr += seperators_len;
 		
 		// Go through the dictionary and cache its entries
@@ -269,7 +249,7 @@ Text = Object.subClass({
 		addr += 2;
 		while ( addr < endaddr )
 		{
-			dict[this.decode( addr, addr + 6 )] = addr;
+			dict['' + this.decode( addr, 6, 1 )] = addr;
 			addr += entry_len;
 		}
 		this.dictionaries[addr_start] = dict;
@@ -278,7 +258,7 @@ Text = Object.subClass({
 	},
 	
 	// Tokenise a text
-	tokenise: function( text, buffer, dictionary )
+	tokenise: function( text, buffer, dictionary, flag )
 	{
 		// Use the default dictionary if one wasn't provided
 		dictionary = dictionary || this.dict;
@@ -288,25 +268,64 @@ Text = Object.subClass({
 		
 		var memory = this.e.m,
 		
-		i = 0,
-		max_words = memory.getUint8( buffer ),
-		lexer = dictionary.lexer_pattern,
-		word;
+		i = text + 2,
+		textend = i + memory.getUint8( text + 1 ),
+		letter,
+		separators = dictionary.separators,
+		word = [],
+		words = [],
+		wordstart = i,
+		max_words,
+		wordcount = 0;
 		
-		// Reset the lexer's index
-		lexer.lastIndex = 0;
-		
-		// Go through the text until we either have reached the max number of words, or we can't find any more
-		text = text.toLowerCase();
-		while ( i < max_words && ( word = lexer.exec( text ) ) )
+		// Find the words, separated by the separators, but as well as the separators themselves
+		while ( i < textend )
 		{
-			// Fill out the buffer
-			memory.setUint16( buffer + 2 + i * 4, dictionary[word[0]] || 0 );
-			memory.setUint8( buffer + 4 + i * 4, word[0].length );
-			memory.setUint8( buffer + 5 + i++ * 4, word.index );
+			letter = memory.getUint8( i );
+			if ( letter == 32 || separators.indexOf( letter ) >= 0 )
+			{
+				if ( word.length )
+				{
+					words.push( [word, wordstart] );
+					word = [];
+					wordstart = i + 1;
+				}
+				if ( letter != 32 )
+				{
+					words.push( [letter, i] );
+				}
+			}
+			else
+			{
+				word.push( letter );
+			}
+			i++;
 		}
+		if ( word.length )
+		{
+			words.push( [word, wordstart] );
+		}
+		
+		// Go through the text until we either have reached the max number of words, or we're out of words
+		max_words = Math.min( words.length, memory.getUint8( buffer ) );
+		while ( wordcount < max_words )
+		{
+			word = '' + words[wordcount][0];
+			
+			// If the flag is set then don't overwrite words which weren't found
+			if ( flag && !dictionary[word] )
+			{
+				continue;
+			}
+			
+			// Fill out the buffer
+			memory.setUint16( buffer + 2 + wordcount * 4, dictionary[word] || 0 );
+			memory.setUint8( buffer + 4 + wordcount * 4, word.length );
+			memory.setUint8( buffer + 5 + wordcount * 4, words[wordcount++][1] );
+		}
+		
 		// Update the number of found words
-		memory.setUint8( buffer + 1, i );
+		memory.setUint8( buffer + 1, wordcount );
 	},
 	
 	// Handle key input

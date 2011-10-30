@@ -94,12 +94,6 @@ window.ZVM = Object.subClass( {
 		this_property_byte = memory.getUint8( properties );
 		this_property = this_property_byte & 0x3F;
 		
-		// Simple case: find the first property
-		if ( prev == 0 )
-		{
-			return this_property;
-		}
-		
 		// Run through the properties
 		while (1)
 		{
@@ -232,13 +226,13 @@ window.ZVM = Object.subClass( {
 		var result, offset;
 		if ( varnum == 0 )
 		{
-			result = this.S2U( this.s.pop() + change );
+			result = S2U( this.s.pop() + change );
 			this.s.push( result );
 			return result;
 		}
 		if ( varnum < 16 )
 		{
-			return this.l[varnum - 1] = this.S2U( this.l[varnum - 1] + change );
+			return this.l[varnum - 1] = S2U( this.l[varnum - 1] + change );
 		}
 		else
 		{
@@ -305,6 +299,12 @@ window.ZVM = Object.subClass( {
 		this.ui.print( text );
 	},
 	
+	print_obj: function( obj )
+	{
+		var proptable = this.m.getUint16( this.objects + 14 * obj + 12 );
+		this.print( this.text.decode( proptable + 1, this.m.getUint8( proptable ) * 2 ) );
+	},
+	
 	put_prop: function( object, property, value )
 	{
 		var memory = this.m,
@@ -347,10 +347,10 @@ window.ZVM = Object.subClass( {
 	},
 	
 	// Request line input
-	read: function( text, parse, time, routine, storer )
+	read: function( newpc, text, parse, time, routine, storer )
 	{
 		// Check if not all operands were used
-		if ( arguments.length == 3 )
+		if ( arguments.length == 4 )
 		{
 			storer = time;
 			time = routine = 0;
@@ -366,13 +366,15 @@ window.ZVM = Object.subClass( {
 			routine: routine,
 			storer: storer
 		});
+		
+		this.pc = newpc;
 	},
 	
 	// Request character input
-	read_char: function( one, time, routine, storer )
+	read_char: function( newpc, one, time, routine, storer )
 	{
 		// Check if not all operands were used
-		if ( arguments.length == 2 )
+		if ( arguments.length == 3 )
 		{
 			storer = time;
 			time = routine = 0;
@@ -384,6 +386,8 @@ window.ZVM = Object.subClass( {
 			routine: routine,
 			storer: storer
 		});
+		
+		this.pc = newpc;
 	},
 	
 	remove_obj: function( obj )

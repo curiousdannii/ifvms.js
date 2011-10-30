@@ -12,6 +12,7 @@ http://github.com/curiousdannii/ifvms.js
 /*
 	
 TODO:
+	default background/foreground colours
 	
 */
 
@@ -57,6 +58,10 @@ UI = Object.subClass({
 		this.streams = [ 1, 0, [], 0 ];
 		this.fontbit = engine.m.getUint8( 0x11 ) & 0x02;
 		
+		// Upper window stuff
+		this.currentwin = 0;
+		this.status = []; // Status window orders
+		
 		// Construct the basic windows
 		this.e.orders.push(
 			{
@@ -74,6 +79,35 @@ UI = Object.subClass({
 		);
 	},
 	
+	// Actually clear a window, called by the opcode handler below
+	clear_window: function( window )
+	{
+		this.e.orders.push({
+			code: 'clear',
+			win: window ? 'status' : 'main',
+			css: extend( {}, this.styles )
+		});
+	},
+	
+	erase_window: function( window )
+	{
+		this.flush();
+		if ( window == -1 )
+		{
+			this.split_window( 0 );
+			this.clear_window( 0 );
+		}
+		if ( window == -2 )
+		{
+			this.clear_window( 0 );
+			this.clear_window( 1 );
+		}
+		else
+		{
+			this.clear_window( window );
+		}
+	},
+	
 	// Flush the buffer to the orders
 	flush: function()
 	{
@@ -84,12 +118,39 @@ UI = Object.subClass({
 		{
 			// Copy the styles object so that we won't be affected by later style changes
 			oldstyles = extend( {}, this.styles );
-			this.e.orders.push({
-				code: 'print',
+			( this.currentwin ? this.status : this.e.orders ).push({
+				code: 'stream',
 				css: oldstyles,
+				node: oldstyles.node,
 				text: this.buffer
 			});
 			this.buffer = '';
+		}
+	},
+	
+	// Manage output streams
+	output_stream: function( stream, addr )
+	{
+		stream = U2S( stream );
+		if ( stream == 1 )
+		{
+			this.streams[0] = 1;
+		}
+		if ( stream == -1 )
+		{
+			;;; console.info( 'Disabling stream one - it actually happened!' );
+			this.streams[0] = 0;
+		}
+		if ( stream == 3 )
+		{
+			this.streams[2].unshift( [ addr, '' ] );
+		}
+		if ( stream == -3 )
+		{
+			var data = this.streams[2].shift(),
+			text = this.e.text.text_to_zscii( data[1] );
+			this.e.m.setUint16( data[0], text.length );
+			this.e.m.setBuffer( data[0] + 2, text );
 		}
 	},
 	
@@ -186,29 +247,21 @@ UI = Object.subClass({
 		styles['background-color'] = newbackground;
 	},
 	
-	// Manage output streams
-	output_stream: function( stream, addr )
+	set_window: function( window )
 	{
-		stream = this.e.U2S( stream );
-		if ( stream == 1 )
-		{
-			this.streams[0] = 1;
-		}
-		if ( stream == -1 )
-		{
-			;;; console.info( 'Disabling stream one - it actually happened!' );
-			this.streams[0] = 0;
-		}
-		if ( stream == 3 )
-		{
-			this.streams[2].unshift( [ addr, '' ] );
-		}
-		if ( stream == -3 )
-		{
-			var data = this.streams[2].shift(),
-			text = this.e.text.text_to_zscii( data[1] );
-			this.e.m.setUint16( data[0], text.length );
-			this.e.m.setBuffer( data[0] + 2, text );
-		}
+		this.flush();
+		this.currentwin = window;
+		this.e.orders.push({
+			code: 'find',
+			name: window ? 'status' : 'main'
+		});
+	},
+	
+	split_window: function( lines )
+	{
+		this.status.push({
+			code: "height",
+			lines: lines
+		});
 	}
 });

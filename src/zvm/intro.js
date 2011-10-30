@@ -10,9 +10,17 @@ http://github.com/curiousdannii/ifvms.js
 */
 
 /*
-	
+
+ZVM willfully ignores the standard in these ways:
+	Non-buffered output is not supported
+	Output streams 2 and 4 and input stream 1 are not supported
+	Saving tables is not supported (yet?)
+	No interpreter number or version is set
+
+Any other non-standard behaviour should be considered a bug
+
 TODO:
-	Use a bind function to eliminate needless closures
+	Use a bind function to eliminate needless closures?
 	Make class.js smarter to eliminate function layers
 	Maybe use a custom OBJECT so that any other instance of class.js won't interfere - we would then include it in the compile zvm.js
 	
@@ -31,9 +39,9 @@ if ( ![].indexOf )
 {
 	Array.prototype.indexOf = function( obj, fromIndex )
 	{
-		for ( var i = fromIndex || 0, l = array.length; i < l; i++ )
+		for ( var i = fromIndex || 0, l = this.length; i < l; i++ )
 		{
-			if ( array[i] == obj )
+			if ( this[i] == obj )
 			{
 				return i;
 			}
@@ -52,11 +60,12 @@ var extend = function( old, add )
 	return old;
 },
 
-// Log wrapper
-log = window.console ? function(){ console.log.apply( console, arguments ); } : function(){},
-
-// Short cuts
-//fromCharCode = String.fromCharCode,
+// Console dummy funcs
+console = window.console || {
+	log: function(){},
+	info: function(){},
+	warn: function(){}
+},
 
 // Utilities for 16-bit signed arithmetic
 U2S = function( value )
