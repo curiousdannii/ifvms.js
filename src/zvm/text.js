@@ -17,14 +17,25 @@ TODO:
 */
 
 // Key codes accepted by the Z-Machine
-var ZSCII_keyCodes = {
-	8: 8, // delete/backspace
-	13: 13, // enter
-	27: 27, // escape
-	37: 131, 38: 129, 39: 132, 40: 130, // arrow keys
-	96: 145, 97: 146, 98: 147, 99: 148, 100: 149, 101: 150, 102: 151, 103: 152, 104: 153, 105: 154, // keypad
-	112: 133, 113: 134, 114: 135, 115: 136, 116: 137, 117: 138, 118: 139, 119: 140, 120: 141, 121: 142, 122: 143, 123: 144 // function keys
-},
+var ZSCII_keyCodes = (function(){
+	var keycodes = {
+		8: 8, // delete/backspace
+		13: 13, // enter
+		27: 27, // escape
+		37: 131, 38: 129, 39: 132, 40: 130 // arrow keys
+	},
+	i = 96;
+	while ( i < 106 )
+	{
+		keycodes[i] = 49 + i++; // keypad
+	}
+	i = 112;
+	while ( i < 124 )
+	{
+		keycodes[i] = 21 + i++; // function keys
+	}
+	return keycodes;
+})(),
 
 // A class for managing everything text
 Text = Object.subClass({
@@ -159,7 +170,8 @@ Text = Object.subClass({
 			// Check for a 10 bit ZSCII character
 			else if ( alphabet == 2 && zchar == 6 )
 			{
-				if ( i + 2 < buffer.length )
+				// Check we have enough Z-chars left.
+				if ( i + 1 < buffer.length )
 				{
 					result.push( buffer[i++] << 5 | buffer[i++] );
 				}

@@ -48,11 +48,28 @@ var ZVM_core = {
 			extend( this.env, data.env );
 		}
 		
-		// Load the story file and start the engine
+		// Load the story file
 		if ( data.code == 'load' )
 		{
 			this.data = data.data;
+			return;
+		}
+		
+		if ( data.code == 'restart' )
+		{
 			this.restart();
+		}
+		
+		if ( data.code == 'restore' )
+		{
+			if ( data.data )
+			{
+				this.restore( data.data );
+			}
+			else
+			{
+				this.variable( data.storer, 0 );
+			}
 		}
 		
 		// Handle line input
@@ -108,7 +125,7 @@ var ZVM_core = {
 		// Check if the version is supported
 		if ( version != 5 && version != 8 )
 		{
-			throw new Error( 'Unsupported Z-Machine version: ' + data[0] );
+			throw new Error( 'Unsupported Z-Machine version: ' + version );
 		}
 		
 		// Preserve flags 2 - the fixed pitch bit is surely the lamest part of the Z-Machine spec!
@@ -125,8 +142,6 @@ var ZVM_core = {
 			l: [],
 			call_stack: [],
 			undo: [],
-			
-			random_state: 0,
 			
 			// IO stuff
 			orders: [],
@@ -151,7 +166,18 @@ var ZVM_core = {
 			text: new Text( this )
 		});
 		
-		// Set some other header variables
+		// Update the header
+		this.update_header();
+	},
+	
+	// Update the header after restarting or restoring
+	update_header: function()
+	{
+		var memory = this.m;
+		
+		// Reset the random state
+		this.random_state = 0;
+		
 		// Flags 1: Set bits 0, 2, 3, 4: typographic styles are OK
 		// Set bit 7 only if timed input is supported
 		memory.setUint8( 0x01, 0x1D | ( this.env.timed ? 0x80 : 0 ) );
@@ -167,7 +193,7 @@ var ZVM_core = {
 		// Z Machine Spec revision
 		// For now only set 1.2 if PARCHMENT_SECURITY_OVERRIDE is set, still need to finish 1.1 support!
 		memory.setUint8( 0x32, 1 );
-		memory.setUint8( 0x33, PARCHMENT_SECURITY_OVERRIDE ? 2 : 0 );
+		memory.setUint8( 0x33, this.env.PARCHMENT_SECURITY_OVERRIDE ? 2 : 0 );
 		// Clear flags three, we don't support any of that stuff
 		this.extension_table( 4, 0 );
 	},

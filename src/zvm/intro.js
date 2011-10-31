@@ -75,6 +75,4 @@ U2S = function( value )
 S2U = function( value )
 {
 	return value & 0xFFFF;
-},
-
-PARCHMENT_SECURITY_OVERRIDE = window.PARCHMENT_SECURITY_OVERRIDE;
+};

@@ -152,6 +152,15 @@ Stopper = Opcode.subClass({
 	stopper: 1
 }),
 
+// Pausing opcodes (ie, set the pc at the end of the context
+Pauser = Stopper.subClass({
+	post: function()
+	{
+		this.origfunc = this.func;
+		this.func = function() { return 'e.pc=' + this.next + ';' + this.origfunc.apply( this, arguments ); };
+	}
+}),
+
 // Join multiple branchers together with varying logic conditions
 BrancherLogic = Object.subClass({
 	init: function( ops, code )
