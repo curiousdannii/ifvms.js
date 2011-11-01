@@ -16,13 +16,8 @@ TODO:
 	don't access memory directly
 	@catch
 	@copy_table
-	@encode_text
-	@erase_line
 	@get_cursor
 	@print_table
-	@restart
-	@scan_table
-	@set_font
 	@throw
 	
 */
@@ -109,7 +104,7 @@ opcodes = {
 /* set_colour */ 27: opcode_builder( Opcode, function() { return 'e.ui.set_colour(' + this.args() + ')'; } ),
 /* throw */
 /* jz */ 128: opcode_builder( Brancher, function( a ) { return a.write() + '==0'; } ),
-/* get_sibling */ 129: opcode_builder( BrancherStorer, function( obj ) { return this.storer.write( 'e.get_lilsis(' + obj.write() + ')' ); } ),
+/* get_sibling */ 129: opcode_builder( BrancherStorer, function( obj ) { return this.storer.write( 'e.get_sibling(' + obj.write() + ')' ); } ),
 /* get_child */ 130: opcode_builder( BrancherStorer, function( obj ) { return this.storer.write( 'e.get_child(' + obj.write() + ')' ); } ),
 /* get_parent */ 131: opcode_builder( Storer, function( obj ) { return 'e.get_parent(' + obj.write() + ')'; } ),
 /* get_prop_length */ 132: opcode_builder( Storer, function( a ) { return 'e.get_prop_len(' + a.write() + ')'; } ),
@@ -130,7 +125,7 @@ opcodes = {
 /* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print("' + text + '")'; }, { printer: 1 } ),
 /* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print("' + text + '");e.ret(1)'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
-/* restart */ //183: opcode_builder( Stopper, function() { return 'e.act("restart")'; } ),
+/* restart */ 183: opcode_builder( Stopper, function() { return 'e.act("restart")'; } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'e.ret(' + a.write() + ')'; }, { post: function() { this.operands.push( new Variable( this.e, 0 ) ); } } ),
 /* catch */ //185: opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act("quit")'; } ),
@@ -151,7 +146,7 @@ opcodes = {
 /* set_window */ 235: opcode_builder( Opcode, function() { return 'e.ui.set_window(' + this.args() + ')'; } ),
 /* call_vs2 */ 236: CallerStorer,
 /* erase_window */ 237: opcode_builder( Opcode, function( win ) { return 'e.ui.erase_window(' + win.U2S() + ')'; } ),
-/* erase_line */
+/* erase_line */ 238: opcode_builder( Opcode, function() { return 'if(' + this.args() + '){e.ui.flush();e.ui.status.push({code:"eraseline"})}'; } ),
 /* set_cursor */ 239: opcode_builder( Opcode, function() { return 'e.ui.flush();e.ui.status.push({code:"cursor",to:[' + this.args() + ']})'; } ),
 /* get_cursor */
 /* set_text_style */ 241: opcode_builder( Opcode, function( stylebyte ) { return 'e.ui.set_style(' + stylebyte.write() + ')'; } ),
@@ -160,12 +155,12 @@ opcodes = {
 /* input_stream */ 244: Opcode, // We don't support changing the input stream
 /* sound_effect */ 245: Opcode, // We don't support sounds
 /* read_char */ 246: opcode_builder( Pauser, function() { var storer = this.operands.pop(); return 'e.read_char(' + this.args() + ',' + storer.v + ')'; }, { storer: 1 } ),
-/* scan_table */
+/* scan_table */ 247: opcode_builder( BrancherStorer, function() { return this.storer.write( 'e.scan_table(' + this.args() + ')' ); } ),
 /* not */ 248: opcode_builder( Storer, function( a ) { return 'e.S2U(~' + a.write() + ')'; } ),
 /* call_vn */ 249: Caller,
 /* call_vn2 */ 250: Caller,
 /* tokenise */ 251: opcode_builder( Opcode, function() { return 'e.text.tokenise(' + this.args() + ')'; } ),
-/* encode_text */
+/* encode_text */ 252: opcode_builder( Opcode, function() { return 'e.encode_text(' + this.args() + ')'; } ),
 /* copy_table */
 /* print_table */
 /* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return arg.write() + '<=e.call_stack[0][4]'; } ),
@@ -173,7 +168,7 @@ opcodes = {
 /* restore */ 1001: opcode_builder( Pauser, function( storer ) { return 'e.act("restore",{storer:' + storer.v + '})'; }, { storer: 1 } ),
 /* log_shift */ 1002: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.log_shift(' + a.write() + ',' + b.U2S() + '))'; } ),
 /* art_shift */ 1003: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.art_shift(' + a.U2S() + ',' + b.U2S() + '))'; } ),
-/* set_font */
+/* set_font */ 1004: opcode_builder( Storer, function() { return 'e.ui.set_font(' + this.args() + ')'; } ),
 /* save_undo */ 1009: opcode_builder( Storer, function() { return 'e.save_undo(' + this.next + ',' + this.storer.v + ')'; } ),
 // As the standard says calling this without a save point is illegal, we don't need to actually store anything (but it must still be disassembled)
 /* restore_undo */ 1010: opcode_builder( Opcode, function() { return 'if(e.restore_undo())return'; }, { storer: 1 } ),

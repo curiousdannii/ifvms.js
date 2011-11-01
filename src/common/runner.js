@@ -26,11 +26,11 @@ var Runner = Object.subClass({
 		// Start it up
 		this.inputEvent({
 			code: 'load',
-			data: data,
-			env: io.env
+			data: data
 		});
 		this.inputEvent({
-			code: 'restart'
+			code: 'restart',
+			env: io.env
 		});
 	},
 
@@ -39,7 +39,8 @@ var Runner = Object.subClass({
 	{
 		var	engine = this.e,
 		i = 0,
-		order, code;
+		order, code,
+		sendevent;
 		
 		// Send the orders to StructIO
 		this.io.event( orders );
@@ -50,33 +51,42 @@ var Runner = Object.subClass({
 			order = orders[i];
 			code = order.code;
 			
-			// Quit
 			if ( code == 'quit' )
 			{
 				return;
 			}
 			
-			// Save
 			if ( code == 'save' )
 			{
 				// For now just store the save file here
 				// Later we'll want to talk to the Library
 				this.savefile = order.data;
-				this.inputEvent({});
+				sendevent = 1;
 			}
 			
-			// Restore
+			if ( code == 'restart' )
+			{
+				// Reset the IO structures
+				this.io.target = this.io.container.empty();
+				sendevent = 1;
+			}
+			
 			if ( code == 'restore' )
 			{
 				order.data = this.savefile;
-				this.inputEvent( order );
+				sendevent = 1;
 			}
 			
-			// Tick
+			// Tick - ie, do nothing
 			if ( code == 'tick' )
 			{
-				this.inputEvent({});
+				sendevent = 1;
 			}
+		}
+		
+		if ( sendevent )
+		{
+			this.inputEvent( order );
 		}
 	}
 

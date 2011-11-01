@@ -12,7 +12,6 @@ http://github.com/curiousdannii/ifvms.js
 /*
 	
 TODO:
-	I think the dictionary will fail for long strings finishing with a multi-Zchar
 	
 */
 
@@ -108,7 +107,7 @@ Text = Object.subClass({
 		this.unicode_callback = function( charr ) { return String.fromCharCode( table[charr.charCodeAt(0)] || 63 ) };
 	},
 	
-	// Decode Z-chars into Unicode
+	// Decode Z-chars into ZSCII and then Unicode
 	decode: function( addr, length, notext )
 	{
 		var memory = this.e.m,
@@ -186,7 +185,7 @@ Text = Object.subClass({
 			alphabet = alphabet < 4 ? 0 : alphabet - 3;
 		}
 		
-		// The abbreviations table and dictionary don't want text
+		// The abbreviations table doesn't want text
 		if ( !notext )
 		{
 			// Cache and return. Use String() so that .pc will be preserved
@@ -198,6 +197,65 @@ Text = Object.subClass({
 				console.warn( 'Caching a string in dynamic memory: ' + start_addr );
 			}
 		}
+		return result;
+	},
+	
+	// Encode ZSCII into Z-chars
+	encode: function( zscii )
+	{
+		var alphabets = this.alphabets,
+		zchars = [],
+		i = 0,
+		achar,
+		temp,
+		result = [];
+		
+		// Encode the Z-chars
+		while ( zchars.length < 9 )
+		{
+			achar = zscii[i++];
+			// Space
+			if ( achar == 32 )
+			{
+				zchars.push( 0 );
+			}
+			// Alphabets
+			temp = alphabets[0].indexOf( achar );
+			if ( temp >= 0 )
+			{
+				zchars.push( temp + 6 );
+			}
+			temp = alphabets[1].indexOf( achar );
+			if ( temp >= 0 )
+			{
+				zchars.push( 4, temp + 6 );
+			}
+			temp = alphabets[2].indexOf( achar );
+			if ( temp >= 0 )
+			{
+				zchars.push( 5, temp + 6 );
+			}
+			// 10-bit ZSCII
+			temp = this.reverse_unicode_table[achar];
+			if ( temp )
+			{
+				zchars.push( 5, 6, temp >> 5, temp & 0x1F );
+			}
+			// Pad character
+			if ( achar == undefined )
+			{
+				zchars.push( 5 );
+			}
+		}
+		zchars.length = 9;
+		
+		// Encode to bytes
+		i = 0;
+		while ( i < 9 )
+		{
+			result.push( zchars[i++] << 2 | zchars[i] >> 3, ( zchars[i++] & 0x07 ) << 5 | zchars[i++] );
+		}
+		result[4] |= 0x80;
 		return result;
 	},
 	
@@ -261,7 +319,7 @@ Text = Object.subClass({
 		addr += 2;
 		while ( addr < endaddr )
 		{
-			dict['' + this.decode( addr, 6, 1 )] = addr;
+			dict['' + memory.getBuffer( addr, 6 )] = addr;
 			addr += entry_len;
 		}
 		this.dictionaries[addr_start] = dict;
@@ -322,7 +380,7 @@ Text = Object.subClass({
 		max_words = Math.min( words.length, memory.getUint8( buffer ) );
 		while ( wordcount < max_words )
 		{
-			word = '' + words[wordcount][0];
+			word = this.encode( words[wordcount][0] );
 			
 			// If the flag is set then don't overwrite words which weren't found
 			if ( flag && !dictionary[word] )
@@ -332,7 +390,7 @@ Text = Object.subClass({
 			
 			// Fill out the buffer
 			memory.setUint16( buffer + 2 + wordcount * 4, dictionary[word] || 0 );
-			memory.setUint8( buffer + 4 + wordcount * 4, word.length );
+			memory.setUint8( buffer + 4 + wordcount * 4, words[wordcount][0].length );
 			memory.setUint8( buffer + 5 + wordcount * 4, words[wordcount++][1] );
 		}
 		

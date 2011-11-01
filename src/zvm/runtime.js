@@ -65,6 +65,11 @@ window.ZVM = Object.subClass( {
 		this.m.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
 	},
 	
+	encode_text: function( zscii, length, from, target )
+	{
+		this.m.setBuffer( target, this.text.encode( this.m.getBuffer( zscii + from, length ) ) );
+	},
+	
 	// Access the extension table
 	extension_table: function( word, value )
 	{
@@ -135,42 +140,13 @@ window.ZVM = Object.subClass( {
 		}
 	},
 	
-	// Get the bigger sister object of an object (the one before it in the tree)
-	get_bigsis: function( obj )
-	{
-		var older = this.get_child( this.get_parent( obj ) ),
-		younger;
-		// Simple case: the object is the first child already
-		if ( older == obj )
-		{
-			return 0;
-		}
-		while (1)
-		{
-			younger = this.get_lilsis( older );
-			if ( younger == obj )
-			{
-				return older;
-			}
-			older = younger;
-		}
-	},
-	
-	
 	// Get the first child of an object
 	get_child: function( obj )
 	{
 		return this.m.getUint16( this.objects + 14 * obj + 10 );
 	},
 	
-	get_family: function( obj )
-	{
-		var parent = this.get_parent( obj );
-		return parent ? [ parent, this.get_child( parent ), this.get_lilsis( obj ), this.get_bigsis( obj ) ] : [0];
-	},
-	
-	// I.e., get the sibling of this object
-	get_lilsis: function( obj )
+	get_sibling: function( obj )
 	{
 		return this.m.getUint16( this.objects + 14 * obj + 8 );
 	},
@@ -390,25 +366,39 @@ window.ZVM = Object.subClass( {
 	
 	remove_obj: function( obj )
 	{
-		// Is this the only call to get_family? Fold in here?
-		// Also get_bigsis is only called from get_family
-		var family = this.get_family( obj );
+		var parent = this.get_parent( obj ),
+		older_sibling,
+		younger_sibling,
+		temp_younger;
 		
 		// No parent, do nothing
-		if ( family[0] == 0 )
+		if ( parent == 0 )
 		{
 			return;
 		}
 		
+		older_sibling = this.get_child( parent );
+		younger_sibling = this.get_sibling( obj );
+		
 		// obj is first child
-		if ( family[1] == obj )
+		if ( older_sibling == obj )
 		{
-			this.set_family( obj, 0, family[0], family[2] );
+			this.set_family( obj, 0, parent, younger_sibling );
 		}
-		// obj isn't first child, so fix the bigsis
+		// obj isn't first child, so fix the older sibling
 		else
 		{
-			this.set_family( obj, 0, 0, 0, family[3], family[2] );
+			// Go through the tree until we find the older sibling
+			while ( 1 )
+			{
+				temp_younger = this.get_sibling( older_sibling );
+				if ( temp_younger == obj )
+				{
+					break;
+				}
+				older_sibling = temp_younger;
+			}
+			this.set_family( obj, 0, 0, 0, older_sibling, younger_sibling );
 		}
 	},
 	
@@ -628,6 +618,24 @@ window.ZVM = Object.subClass( {
 			this.call_stack.slice()
 		] );
 		return 1;
+	},
+	
+	scan_table: function( key, addr, length, form )
+	{
+		form = form || 0x82;
+		var memoryfunc = form & 0x80 ? this.m.getUint16 : this.m.getUint8;
+		form &= 0x7F;
+		length = addr + length * form;
+		
+		while ( addr < length )
+		{
+			if ( memoryfunc( addr ) == key )
+			{
+				return addr;
+			}
+			addr += form;
+		}
+		return 0;
 	},
 	
 	set_attr: function( object, attribute )

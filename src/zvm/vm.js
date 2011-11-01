@@ -46,6 +46,7 @@ var ZVM_core = {
 		if ( data.env )
 		{
 			extend( this.env, data.env );
+			// Also need to update the header
 		}
 		
 		// Load the story file
