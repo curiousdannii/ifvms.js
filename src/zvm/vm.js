@@ -37,31 +37,39 @@ var ZVM_core = {
 	inputEvent: function( data )
 	{
 		var memory = this.m,
+		code = data.code,
 		response;
-		
-		// Clear the list of orders
-		this.orders = [];
 		
 		// Update environment variables
 		if ( data.env )
 		{
 			extend( this.env, data.env );
+			
 			// Also need to update the header
+			
+			// Stop if there's no code - we're being sent live updates
+			if ( !code )
+			{
+				return;
+			}
 		}
 		
+		// Clear the list of orders
+		this.orders = [];
+		
 		// Load the story file
-		if ( data.code == 'load' )
+		if ( code == 'load' )
 		{
 			this.data = data.data;
 			return;
 		}
 		
-		if ( data.code == 'restart' )
+		if ( code == 'restart' )
 		{
 			this.restart();
 		}
 		
-		if ( data.code == 'restore' )
+		if ( code == 'restore' )
 		{
 			if ( data.data )
 			{
@@ -74,7 +82,7 @@ var ZVM_core = {
 		}
 		
 		// Handle line input
-		if ( data.code == 'read' )
+		if ( code == 'read' )
 		{
 			// Store the terminating character
 			this.variable( data.storer, data.terminator );
@@ -104,7 +112,7 @@ var ZVM_core = {
 		}
 		
 		// Handle character input
-		if ( data.code == 'char' )
+		if ( code == 'char' )
 		{
 			this.variable( data.storer, this.text.keyinput( data.response ) );
 		}

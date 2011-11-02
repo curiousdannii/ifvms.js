@@ -58,11 +58,36 @@ window.ZVM = Object.subClass( {
 		this.call_stack.unshift( [ next, storer, locals_count, this.s.length, provided_args, old_locals_count ] );
 	},
 	
-	// Object model functions
 	clear_attr: function( object, attribute )
 	{
 		var addr = this.objects + 14 * object + parseInt( attribute / 8 );
 		this.m.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
+	},
+	
+	copy_table: function( first, second, size )
+	{
+		var memory = this.m,
+		i = 0,
+		allowcorrupt = size < 0,
+		temp;
+		size = Math.abs( size );
+		
+		// Simple case, zeroes
+		if ( second == 0 )
+		{
+			while ( i < size )
+			{
+				memory.setUint8( first + i++, 0 );
+			}
+			return;
+		}
+		
+		temp = memory.getBuffer( first, size );
+		memory.setBuffer( second, temp );
+		if ( !allowcorrupt )
+		{
+			memory.setBuffer( first, temp );
+		}
 	},
 	
 	encode_text: function( zscii, length, from, target )
@@ -283,6 +308,19 @@ window.ZVM = Object.subClass( {
 		this.print( this.text.decode( proptable + 1, this.m.getUint8( proptable ) * 2 ) );
 	},
 	
+	print_table: function( zscii, width, height, skip )
+	{
+		height = height || 1;
+		skip = skip || 0;
+		var i = 0;
+		while ( i < height )
+		{
+			this.print( '\n' + this.text.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
+			zscii += width + skip;
+			i++;
+		}
+	},
+	
 	put_prop: function( object, property, value )
 	{
 		var memory = this.m,
@@ -413,7 +451,7 @@ window.ZVM = Object.subClass( {
 		i = 0, j = 0,
 		call_stack = [],
 		newlocals = [],
-		newstack = [];
+		newstack;
 		
 		// Memory chunk
 		this.m.setBuffer( 0, this.data.slice( 0, this.staticmem ) );
@@ -444,10 +482,7 @@ window.ZVM = Object.subClass( {
 		i = 6;
 		// Dummy call frame
 		temp = qstacks[i++] << 8 | qstacks[i++];
-		for ( j = 0; j < temp; j++ )
-		{
-			newstack.push( qstacks[i++] << 8 | qstacks[i++] );
-		}
+		newstack = byte_to_word( qstacks.slice( i, temp ) );
 		// Regular frames
 		while ( i < qstacks.length )
 		{
@@ -465,15 +500,9 @@ window.ZVM = Object.subClass( {
 				temp >>= 1;
 			}
 			temp = qstacks[i++] << 8 | qstacks[i++]; // "eval" stack length
-			for ( j = call_stack[0][2] - 1; j >= 0; j-- )
-			{
-				newlocals.unshift( qstacks[i + j * 2] << 8 | qstacks[i + j * 2 + 1] ); // locals
-			}
+			newlocals = byte_to_word( qstacks.slice( i, i + call_stack[0][2] ) ).concat( newlocals );
 			i += call_stack[0][2] * 2;
-			for ( j = 0; j < temp; j++ )
-			{
-				newstack.push( qstacks[i++] << 8 | qstacks[i++] ); // "eval" stack
-			}
+			newstack = newstack.concat( byte_to_word( qstacks.slice( i, temp ) ) );
 		}
 		this.call_stack = call_stack;
 		this.l = newlocals

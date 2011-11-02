@@ -152,10 +152,13 @@ Stopper = Opcode.subClass({
 	stopper: 1
 }),
 
-// Pausing opcodes (ie, set the pc at the end of the context
+// Pausing opcodes (ie, set the pc at the end of the context)
 Pauser = Stopper.subClass({
+	storer: 1,
+	
 	post: function()
 	{
+		this.storer = this.operands.pop();
 		this.origfunc = this.func;
 		this.func = function() { return 'e.pc=' + this.next + ';' + this.origfunc.apply( this, arguments ); };
 	}
