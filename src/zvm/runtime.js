@@ -66,6 +66,7 @@ window.ZVM = Object.subClass( {
 	
 	copy_table: function( first, second, size )
 	{
+		size = U2S( size );
 		var memory = this.m,
 		i = 0,
 		allowcorrupt = size < 0,
@@ -82,10 +83,17 @@ window.ZVM = Object.subClass( {
 			return;
 		}
 		
-		temp = memory.getBuffer( first, size );
-		memory.setBuffer( second, temp );
-		if ( !allowcorrupt )
+		if ( allowcorrupt )
 		{
+			while ( i < size )
+			{
+				memory.setUint8( second + i, memory.getUint8( first + i++ ) );
+			}
+		}
+		else
+		{
+			temp = memory.getBuffer( first, size );
+			memory.setBuffer( second, temp );
 			memory.setBuffer( first, temp );
 		}
 	},
@@ -295,11 +303,57 @@ window.ZVM = Object.subClass( {
 		return places > 0 ? number << places : number >>> -places;
 	},
 	
-	// Print text
-	// Is this function needed? Replace with a direct call to ui.print()?
+	// Manage output streams
+	output_stream: function( stream, addr )
+	{
+		stream = U2S( stream );
+		if ( stream == 1 )
+		{
+			this.streams[0] = 1;
+		}
+		if ( stream == -1 )
+		{
+			;;; console.info( 'Disabling stream one - it actually happened!' );
+			this.streams[0] = 0;
+		}
+		if ( stream == 3 )
+		{
+			this.streams[2].unshift( [ addr, '' ] );
+		}
+		if ( stream == -3 )
+		{
+			var data = this.streams[2].shift(),
+			text = this.text.text_to_zscii( data[1] );
+			this.m.setUint16( data[0], text.length );
+			this.m.setBuffer( data[0] + 2, text );
+		}
+	},
+	
+	// Print text!
 	print: function( text )
 	{
-		this.ui.print( text );
+		// Stream 3 gets the text first
+		if ( this.streams[2].length )
+		{
+			this.streams[2][0][1] += text;
+		}
+		// Don't print if stream 1 was switched off (why would you do that?!)
+		else if ( this.streams[0] )
+		{
+			// Check if the monospace font bit has changed
+			// Unfortunately, even now Inform changes this bit for the font statement, even though the 1.1 standard depreciated it :(
+			var fontbit = this.m.getUint8( 0x11 ) & 0x02;
+			if ( fontbit != ( this.ui.mono & 0x02 ) )
+			{
+				// Flush if we're actually changing font (ie, the other bits are off)
+				if ( !( this.ui.mono & 0xFD ) )
+				{
+					this.ui.flush();
+				}
+				this.ui.mono ^= 0x02;
+			}
+			this.ui.buffer += text;
+		}
 	},
 	
 	print_obj: function( obj )
@@ -473,7 +527,7 @@ window.ZVM = Object.subClass( {
 		}
 		else
 		{
-			this.m.setBuffer( 0, quetzal.memory );
+			this.m.setBuffer( 0, qmem );
 		}
 		// Preserve flags 1
 		this.m.setUint8( 0x11, flags2 );
@@ -511,7 +565,7 @@ window.ZVM = Object.subClass( {
 		// Update the header
 		this.update_header();
 		
-		// Set the our storer
+		// Set the storer
 		this.variable( this.m.getUint8( pc++ ), 2 );
 		this.pc = pc;
 	},
@@ -542,7 +596,8 @@ window.ZVM = Object.subClass( {
 		
 		// Correct everything again
 		this.pc = call_stack[0];
-		this.l = this.l.slice( call_stack[2] );
+		// With @throw we can now be skipping some call stack frames, so use the old locals length rather than this function's local count
+		this.l = this.l.slice( this.l.length - call_stack[5] );
 		this.s.length = call_stack[3];
 		
 		// Store the result if there is one

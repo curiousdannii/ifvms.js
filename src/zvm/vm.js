@@ -117,6 +117,13 @@ var ZVM_core = {
 			this.variable( data.storer, this.text.keyinput( data.response ) );
 		}
 		
+		// Write the status window's cursor position
+		if ( code == 'get_cursor' )
+		{
+			memory.setUint16( data.addr, data.pos[0] + 1 );
+			memory.setUint16( data.addr + 2, data.pos[1] + 1 );
+		}
+		
 		// Resume normal operation
 		this.run();
 	},
@@ -154,6 +161,7 @@ var ZVM_core = {
 			
 			// IO stuff
 			orders: [],
+			streams: [ 1, 0, [], 0 ],
 			
 			// Get some header variables
 			version: version,
@@ -171,7 +179,7 @@ var ZVM_core = {
 		});
 		// These classes rely too much on the above, so add them after
 		extend( this, {
-			ui: new UI( this ),
+			ui: new ZVMUI( this, memory.getUint8( 0x11 ) & 0x02 ),
 			text: new Text( this )
 		});
 		
@@ -238,12 +246,13 @@ var ZVM_core = {
 	// Compile a JIT routine
 	compile: function()
 	{
-		var context = disassemble( this ),
-		code = context.write();
+		var context = disassemble( this );
 		
 		// Compile the routine with new Function()
 		/* DEBUG */
+			var code = '' + context;
 			console.log( code );
+			// We use eval because Firebug can't profile new Function
 			var func = eval( '(function(e){' + code + '})' );
 			
 			// Extra stuff for debugging
@@ -255,7 +264,7 @@ var ZVM_core = {
 			}
 			this.jit[context.pc] = func;
 		/* ELSEDEBUG
-			this.jit[context.pc] = new Function( 'e', code );
+			this.jit[context.pc] = new Function( 'e', '' + context );
 		/* ENDDEBUG */
 		if ( context.pc < this.staticmem )
 		{

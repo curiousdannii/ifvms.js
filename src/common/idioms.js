@@ -14,13 +14,14 @@ http://github.com/curiousdannii/ifvms.js
 TODO:
 	loops
 		doesn't work yet because of storers before the branch
+		Need loops where the condition is at the end -> do {} while ()
 	break (& continue?)
 	when opcodes are removed, if debug then add a comment
 	The @jump check isn't VM independant
 	
 */
 
-// Block if statements
+// Block if statements / while loops
 var idiom_if_block = function( context, pc )
 {
 	var i = 0,
@@ -100,6 +101,10 @@ var idiom_if_block = function( context, pc )
 		}
 		i++;
 	}
+},
+
+idiom_do_while = function( context )
+{
 };
 
 /* DEBUG */
