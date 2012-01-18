@@ -261,6 +261,7 @@ TODO:
 	{
 		var now = new Date(),
 		pc,
+		result,
 		count = 0;
 		
 		// Stop when ordered to
@@ -272,7 +273,13 @@ TODO:
 			{
 				this.compile();
 			}
-			this.jit[pc]( this );
+			result = this.jit[pc]( this );
+			
+			// Return from a VM func if the JIT function returned a result
+			if ( !isNaN( result ) )
+			{
+				this.ret( result );
+			}
 			
 			// Or if more than five seconds has passed, however only check every 50k times
 			// What's the best time for this?
