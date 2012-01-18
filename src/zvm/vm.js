@@ -103,16 +103,8 @@ TODO:
 				this.restart();
 			}
 			
-			// Successful restore
-			if ( data.data )
-			{
-				this.restore( data.data );
-			}
-			// Failed restore
-			else
-			{
-				this.variable( data.storer, 0 );
-			}
+			// Restore if we have data and it's successful, otherwise store 0
+			( data.data && this.restore( data.data ) ) || this.variable( data.storer, 0 );
 		}
 		
 		// Handle line input
@@ -273,7 +265,7 @@ TODO:
 			{
 				this.compile();
 			}
-			result = this.jit[pc]( this );
+			result = this.jit[pc]( this, this.l );
 			
 			// Return from a VM func if the JIT function returned a result
 			if ( !isNaN( result ) )
@@ -310,7 +302,7 @@ TODO:
 			}
 			// We use eval because Firebug can't profile new Function
 			// The 0, is to make IE8 work. h/t Secrets of the Javascript Ninja
-			var func = eval( '(0,function JIT_' + context.pc + '(e){' + code + '})' );
+			var func = eval( '(0,function JIT_' + context.pc + '(e,l){' + code + '})' );
 			
 			// Extra stuff for debugging
 			func.context = context;
@@ -323,7 +315,7 @@ TODO:
 		}
 		else // DEBUG
 		{
-			this.jit[context.pc] = new Function( 'e', optimise( '' + context ) );
+			this.jit[context.pc] = new Function( 'e', 'l', optimise( '' + context ) );
 		}
 		if ( context.pc < this.staticmem )
 		{

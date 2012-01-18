@@ -429,7 +429,7 @@ RoutineContext = Context.subClass({
 		}
 		
 		// Add in some extra vars and return
-		this.pre.unshift( 'var l=e.l,m=e.m,s=e.s;\n' );
+		this.pre.unshift( 'var t,m=e.m,s=e.s;\n' );
 		return this._super();
 	}
 }),

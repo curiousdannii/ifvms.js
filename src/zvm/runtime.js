@@ -30,29 +30,29 @@ window.ZVM = Object.subClass( {
 	call: function( addr, storer, next, args )
 	{
 		var i,
-		locals_count,
-		old_locals_count = this.l.length,
 		
 		// Keep the number of provided args for @check_arg_count
 		provided_args = args.length;
 		
-		// Get the number of locals and advance the pc
-		this.pc = addr * this.addr_multipler;
-		locals_count = this.m.getUint8( this.pc++ );
-		
-		// Add the locals
-		// Trim args to the count if needed
-		args = args.slice( 0, locals_count );
-		// Add any extras
-		for ( i = args.length; i < locals_count; i++ )
+		// Add extra locals
+		while ( args.length < 15 )
 		{
 			args.push(0);
 		}
-		// Prepend to the locals array
-		this.l = args.concat( this.l );
 		
-		// Push the call stack (well unshift really)
-		this.call_stack.unshift( [ next, storer, locals_count, this.s.length, provided_args, old_locals_count ] );
+		// Get the number of locals and advance the pc
+		this.pc = addr * this.addr_multipler;
+		args.push( provided_args, this.m.getUint8( this.pc++ ) );
+		
+		// Push the call stack
+		this.call_stack.push({
+			next: next,
+			storer: storer,
+			s: this.s.length
+		});
+		
+		// Set the new locals
+		this.l = args.concat( this.l );
 	},
 	
 	clear_attr: function( object, attribute )
@@ -505,16 +505,34 @@ window.ZVM = Object.subClass( {
 	
 	restore: function( data )
 	{
-		var quetzal = new Quetzal( data ),
-		qmem = quetzal.memory,
-		qstacks = quetzal.stacks,
-		pc = quetzal.pc,
+		var quetzal,
+		qmem, qstacks, pc,
 		flags2 = this.m.getUint8( 0x11 ),
 		temp,
 		i = 0, j = 0,
 		call_stack = [],
 		newlocals = [],
+		local_count,
+		provided_locals,
+		this_frame_locals,
 		newstack;
+		
+		// Try to load the Quetzal file
+		try
+		{
+			quetzal = new Quetzal( data );
+		}
+		catch (e)
+		{
+			return 0;
+		}
+		qmem = quetzal.memory;
+		qstacks = quetzal.stacks;
+		pc = quetzal.pc;
+		if ( !qmem || !qstacks || !pc )
+		{
+			return 0;
+		}
 		
 		// Memory chunk
 		this.m.setBuffer( 0, this.data.slice( 0, this.staticmem ) );
@@ -549,22 +567,29 @@ window.ZVM = Object.subClass( {
 		// Regular frames
 		while ( i < qstacks.length )
 		{
-			call_stack.unshift( [
-				qstacks[i++] << 16 | qstacks[i++] << 8 | qstacks[i++], // pc
-				0, 0, newstack.length, 0, newlocals.length
-			] );
-			call_stack[0][1] = qstacks[i] & 0x10 ? -1 : qstacks[i + 1]; // storer
-			call_stack[0][2] = qstacks[i] & 0x0F; // local count
+			call_stack.push({
+				next: qstacks[i++] << 16 | qstacks[i++] << 8 | qstacks[i++],
+				storer: qstacks[i] & 0x10 ? -1 : qstacks[i + 1],
+				s: newstack.length
+			});
+			local_count = qstacks[i] & 0x0F;
 			i += 2;
 			temp = qstacks[i++];
+			provided_locals = 0;
 			while ( temp )
 			{
-				call_stack[0][4]++; // provided_args - this is a stupid way to store it
+				provided_locals++; // provided_args - this is a stupid way to store it
 				temp >>= 1;
 			}
 			temp = qstacks[i++] << 8 | qstacks[i++]; // "eval" stack length
-			newlocals = byte_to_word( qstacks.slice( i, i + call_stack[0][2] ) ).concat( newlocals );
-			i += call_stack[0][2] * 2;
+			this_frame_locals = byte_to_word( qstacks.slice( i, i + local_count ) );
+			while ( this_frame_locals.length < 15 )
+			{
+				this_frame_locals.push(0);
+			}
+			this_frame_locals.push( provided_locals, local_count );
+			newlocals = this_frame_locals.concat( newlocals );
+			i += local_count * 2;
 			newstack = newstack.concat( byte_to_word( qstacks.slice( i, temp ) ) );
 		}
 		this.call_stack = call_stack;
@@ -577,6 +602,7 @@ window.ZVM = Object.subClass( {
 		// Set the storer
 		this.variable( this.m.getUint8( pc++ ), 2 );
 		this.pc = pc;
+		return 1;
 	},
 	
 	restore_undo: function()
@@ -600,19 +626,17 @@ window.ZVM = Object.subClass( {
 	// Return from a routine
 	ret: function( result )
 	{
-		var call_stack = this.call_stack.shift(),
-		storer = call_stack[1];
+		var call_stack = this.call_stack.pop();
 		
 		// Correct everything again
-		this.pc = call_stack[0];
-		// With @throw we can now be skipping some call stack frames, so use the old locals length rather than this function's local count
-		this.l = this.l.slice( this.l.length - call_stack[5] );
-		this.s.length = call_stack[3];
+		this.pc = call_stack.next;
+		this.l = this.l.slice( 17 );
+		this.s.length = call_stack.s;
 		
 		// Store the result if there is one
-		if ( storer >= 0 )
+		if ( call_stack.storer >= 0 )
 		{
-			this.variable( storer, result );
+			this.variable( call_stack.storer, result );
 		}
 	},
 	
@@ -622,14 +646,15 @@ window.ZVM = Object.subClass( {
 		var memory = this.m,
 		stack = this.s,
 		locals = this.l,
+		call_stack = this.call_stack,
 		quetzal = new Quetzal(),
 		compressed_mem = [],
 		i, j,
 		abyte,
 		zeroes = 0,
-		call_stack = this.call_stack.reverse(),
 		frame,
 		stack_len,
+		locals_offset,
 		stacks = [ 0, 0, 0, 0, 0, 0 ]; // Dummy call frame
 		
 		// IFhd chunk
@@ -665,34 +690,34 @@ window.ZVM = Object.subClass( {
 		
 		// Stacks
 		// Finish the dummy call frame
-		stacks.push( call_stack[0][3] >> 8, call_stack[0][3] & 0xFF );
-		for ( j = 0; j < call_stack[0][3]; j++ )
+		stacks.push( call_stack[0].s >> 8, call_stack[0].s & 0xFF );
+		for ( j = 0; j < call_stack[0].s; j++ )
 		{
 			stacks.push( stack[j] >> 8, stack[j] & 0xFF );
 		}
 		for ( i = 0; i < call_stack.length; i++ )
 		{
 			frame = call_stack[i];
-			stack_len = ( call_stack[i + 1] ? call_stack[i + 1][3] : stack.length ) - frame[3];
+			locals_offset = locals.length - 17 * (i + 1);
+			stack_len = ( call_stack[i + 1] ? call_stack[i + 1].s : stack.length ) - frame.s;
 			stacks.push(
-				frame[0] >> 16, frame[0] >> 8 & 0xFF, frame[0] & 0xFF, // pc
-				frame[2] | ( frame[1] < 0 ? 0x10 : 0 ), // locals count and flag for no storer
-				frame[1] < 0 ? 0 : frame[1], // storer
-				( 1 << frame[4] ) - 1, // provided args
+				frame.next >> 16, frame.next >> 8 & 0xFF, frame.next & 0xFF, // pc
+				locals[locals_offset + 16] | ( frame.storer < 0 ? 0x10 : 0 ), // locals count and flag for no storer
+				frame.storer < 0 ? 0 : frame.storer, // storer
+				( 1 << locals[locals_offset + 15] ) - 1, // provided args
 				stack_len >> 8, stack_len & 0xFF // this frame's stack length
 			);
 			// Locals
-			for ( j = locals.length - frame[5] - frame[2]; j < locals.length - frame[5]; j++ )
+			for ( j = locals_offset; j < locals_offset + locals[locals_offset + 16]; j++ )
 			{
 				stacks.push( locals[j] >> 8, locals[j] & 0xFF );
 			}
 			// The stack
-			for ( j = frame[3]; j < frame[3] + stack_len; j++ )
+			for ( j = frame.s; j < frame.s + stack_len; j++ )
 			{
 				stacks.push( stack[j] >> 8, stack[j] & 0xFF );
 			}
 		}
-		call_stack.reverse();
 		quetzal.stacks = stacks;
 		
 		// Send the event
