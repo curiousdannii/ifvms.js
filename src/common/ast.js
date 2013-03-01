@@ -58,6 +58,12 @@ Variable = Operand.subClass({
 	{
 		var variable = this.v;
 		
+		// Indirect
+		if ( this.indirect )
+		{
+			return 'e.indirect(' + variable + ')';
+		}
+		
 		// Stack
 		if ( variable == 0 )
 		{
@@ -65,21 +71,24 @@ Variable = Operand.subClass({
 			return 's.pop()';
 		}
 		// Locals
-		else if ( variable < 16 )
+		if ( --variable < 15 )
 		{
-			return 'l[' + --variable + ']';
+			return 'l[' + variable + ']';
 		}
 		// Globals
-		else
-		{
-			return 'm.getUint16(' + ( this.e.globals + ( variable - 16 ) * 2 ) + ')';
-		}
+		return 'm.getUint16(' + ( this.e.globals + ( variable - 15 ) * 2 ) + ')';
 	},
 	
 	// Store a value
 	store: function( value )
 	{
 		var variable = this.v;
+		
+		// Indirect variable
+		if ( this.indirect )
+		{
+			return 'e.indirect(' + variable + ',' + value + ')';
+		}
 		
 		// BrancherStorers need the value
 		if ( this.returnval )
@@ -94,15 +103,12 @@ Variable = Operand.subClass({
 			return 's.push(' + value + ')';
 		}
 		// Locals
-		else if ( variable < 16 )
+		if ( --variable < 15 )
 		{
-			return 'l[' + --variable + ']=' + value;
+			return 'l[' + variable + ']=' + value;
 		}
 		// Globals
-		else
-		{
-			return 'm.setUint16(' + ( this.e.globals + ( variable - 16 ) * 2 ) + ',' + value + ')';
-		}
+		return 'm.setUint16(' + ( this.e.globals + ( variable - 15 ) * 2 ) + ',' + value + ')';
 	},
 	
 	// Convert an Operand into a signed operand
@@ -234,8 +240,16 @@ Brancher = Opcode.subClass({
 		
 		this.result = result + '; return';
 		this.offset = offset;
-		this.cond = new BrancherLogic();
+		this.cond = new BrancherLogic( [this] );
 		
+		/* DEBUG */
+		// Stop if we must
+		if ( debugflags.noidioms )
+		{
+			return;
+		}
+		/* ENDDEBUG */
+			
 		// Compare with previous statement
 		if ( this.context.ops.length )
 		{
@@ -244,7 +258,7 @@ Brancher = Opcode.subClass({
 			if ( /* prev instanceof Brancher && */ prev.offset == offset )
 			{
 				// Goes to same offset so reuse the Brancher arrays
-				this.cond = prev.cond;
+				this.cond.ops.unshift( prev.cond );
 				this.labels = prev.labels;
 				this.labels.push( this.pc + '/' + this.code );
 			}
@@ -253,9 +267,6 @@ Brancher = Opcode.subClass({
 				this.context.ops.push( prev );
 			}
 		}
-		
-		// Push this op and label
-		this.cond.ops.push( this );
 	},
 	
 	// Write out the brancher

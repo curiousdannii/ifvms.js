@@ -149,7 +149,7 @@ var disassemble = function( engine )
 					// single byte address
 					temp & 0x3F :
 					// word address, but first get the second byte of it
-					( ( temp = (temp << 8) | memory.getUint8(pc++) ) & 0x2000 ? ~0x1FFF : 0 ) | ( temp & 0x1FFF )
+					( temp << 8 | memory.getUint8( pc++ ) ) << 18 >> 18
 			] );
 		}
 		
@@ -158,7 +158,7 @@ var disassemble = function( engine )
 		{
 			// Decode and escape text for JITing
 			temp = engine.text.decode( pc );
-			operands.push( temp.replace( /\n/g, '\\n' ).replace( /"/g, '\\"' ) );
+			operands.push( temp.replace( /\\/g, '\\\\' ).replace( /\n/g, '\\n' ).replace( /"/g, '\\"' ) );
 			pc = temp.pc;
 		}
 		
@@ -172,6 +172,10 @@ var disassemble = function( engine )
 		temp = 0;
 		if ( context.targets.indexOf( pc ) >= 0 )
 		{
+			/* DEBUG */
+			// Skip if we must
+			if ( !debugflags.noidioms )
+			/* ENDDEBUG */
 			temp = idiom_if_block( context, pc );
 		}
 		
