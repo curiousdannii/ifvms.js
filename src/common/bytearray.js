@@ -30,7 +30,7 @@ ByteArray = native_bytearrays ?
 	// Converts the data to a buffer and then initiates a DataView on it
 	function( data )
 	{
-		var buffer = new ArrayBuffer( data ),
+		var buffer = new ArrayBuffer( data );
 		data = new DataView( buffer );
 		data.buffer = buffer;
 		return data;

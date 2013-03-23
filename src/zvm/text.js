@@ -233,7 +233,7 @@ Text = Object.subClass({
 		}
 		
 		// Cache and return. Use String() so that .pc will be preserved
-		result = new String( this.zscii_to_text( result, resulttexts ) );
+		result = String( this.zscii_to_text( result, resulttexts ) );
 		result.pc = addr;
 		this.e.jit[start_addr] = result;
 		if ( !nowarn && start_addr < this.e.staticmem )
@@ -347,10 +347,8 @@ Text = Object.subClass({
 		
 		addr_start = addr,
 		dict = {},
-		seperators_len,
 		entry_len,
 		endaddr,
-		anentry,
 		
 		// Get the word separators
 		seperators_len = memory.getUint8( addr++ );

@@ -250,7 +250,7 @@ TODO:
 	// Run
 	run: function()
 	{
-		var now = new Date,
+		var now = new Date(),
 		pc,
 		count = 0;
 		
@@ -267,7 +267,7 @@ TODO:
 			
 			// Or if more than five seconds has passed, however only check every 50k times
 			// What's the best time for this?
-			if ( ++count % 50000 == 0 && ( (new Date) - now ) > 5000 )
+			if ( ++count % 50000 == 0 && ( (new Date()) - now ) > 5000 )
 			{
 				this.act( 'tick' );
 				return;
@@ -315,7 +315,7 @@ TODO:
 	// Return control to the ZVM runner to perform some action
 	act: function( code, options )
 	{
-		var options = options || {};
+		options = options || {};
 		
 		// Flush the buffer
 		this.ui.flush();

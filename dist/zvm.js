@@ -193,7 +193,7 @@ ByteArray = native_bytearrays ?
 	// Converts the data to a buffer and then initiates a DataView on it
 	function( data )
 	{
-		var buffer = new ArrayBuffer( data ),
+		var buffer = new ArrayBuffer( data );
 		data = new DataView( buffer );
 		data.buffer = buffer;
 		return data;
@@ -426,9 +426,9 @@ BrancherLogic = Object.subClass({
 			op = this.ops[i++];
 			// Accept either Opcodes or further BrancherLogics
 			ops.push(
-				op.func
-					? ( op.iftrue ? '' : '!(' ) + op.func.apply( op, op.operands ) + ( op.iftrue ? '' : ')' )
-					: op
+				op.func ?
+					( op.iftrue ? '' : '!(' ) + op.func.apply( op, op.operands ) + ( op.iftrue ? '' : ')' ) :
+					op
 			);
 		}
 		return ( this.invert ? '(!(' : '(' ) + ops.join( this.code ) + ( this.invert ? '))' : ')' );
@@ -501,8 +501,7 @@ Brancher = Opcode.subClass({
 	// Write out the brancher
 	toString: function()
 	{
-		var i = 0,
-		result = this.result;
+		var result = this.result;
 		
 		// Account for Contexts
 		if ( result instanceof Context )
@@ -578,12 +577,16 @@ Caller = Stopper.subClass({
 	toString: function()
 	{
 		// Debug: include label if possible
-		/* DEBUG */
+		if ( DEBUG )
+		{
 			var addr = '' + this.operands.shift(),
 			targetname = window.vm_functions && parseInt( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
 			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])' + targetname;
-		/* ENDDEBUG */
-		return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])';
+		}
+		else
+		{
+			return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])';
+		}
 	}
 }),
 
@@ -614,13 +617,19 @@ Context = Object.subClass({
 	
 	toString: function()
 	{
-		// Indent the spacer further if needed
-		;;; if ( this.context ) { this.spacer = this.context.spacer + '  '; }
-		// DEBUG: Pretty print!
-		;;; return this.pre.join( '' ) + ( this.ops.length > 1 ? this.spacer : '' ) + this.ops.join( ';\n' + this.spacer ) + this.post.join( '' );
-		
-		// Return the code
-		return this.pre.join( '' ) + this.ops.join( ';' ) + this.post.join( '' );
+		if ( DEBUG )
+		{
+			// Indent the spacer further if needed
+			if ( this.context ) { this.spacer = this.context.spacer + '  '; }
+			// DEBUG: Pretty print!
+			return this.pre.join( '' ) + ( this.ops.length > 1 ? this.spacer : '' ) + this.ops.join( ';\n' + this.spacer ) + this.post.join( '' );
+			
+		}
+		else
+		{
+			// Return the code
+			return this.pre.join( '' ) + this.ops.join( ';' ) + this.post.join( '' );
+		}
 	}
 }),
 
@@ -644,7 +653,7 @@ RoutineContext = Context.subClass({
 // Easily build a new opcode from a class
 opcode_builder = function( Class, func, flags )
 {
-	var flags = flags || {};
+	flags = flags || {};
 	if ( func )
 	{
 		/*if ( func.pop )
@@ -980,7 +989,7 @@ Text = Object.subClass({
 		}
 		
 		// Cache and return. Use String() so that .pc will be preserved
-		result = new String( this.zscii_to_text( result, resulttexts ) );
+		result = String( this.zscii_to_text( result, resulttexts ) );
 		result.pc = addr;
 		this.e.jit[start_addr] = result;
 		if ( !nowarn && start_addr < this.e.staticmem )
@@ -1094,10 +1103,8 @@ Text = Object.subClass({
 		
 		addr_start = addr,
 		dict = {},
-		seperators_len,
 		entry_len,
 		endaddr,
-		anentry,
 		
 		// Get the word separators
 		seperators_len = memory.getUint8( addr++ );
@@ -1845,25 +1852,24 @@ var idiom_if_block = function( context, pc )
 		}
 		i++;
 	}
-},
-
-idiom_do_while = function( context )
-{
 };
 
-/* DEBUG */
-
-// Update the contexts of new contexts
-// Only needed for pretty printing
-var update_contexts = function( ops, context )
+/*idiom_do_while = function( context )
 {
-	for ( var i = 0; i < ops.length; i++ )
+};*/
+
+if ( DEBUG )
+{
+	// Update the contexts of new contexts
+	// Only needed for pretty printing
+	var update_contexts = function( ops, context )
 	{
-		ops[i].context = context;
-	}
-};
-
-/* ENDDEBUG */
+		for ( var i = 0; i < ops.length; i++ )
+		{
+			ops[i].context = context;
+		}
+	};
+}
 /*
 
 Z-Machine disassembler - disassembles zcode into an AST
@@ -2232,7 +2238,7 @@ window.ZVM = Object.subClass( {
 	},
 	
 	// 1.2 spec @gestalt
-	gestalt: function( id, arg )
+	gestalt: function( id /*, arg*/ )
 	{
 		switch ( id )
 		{
@@ -2462,8 +2468,6 @@ window.ZVM = Object.subClass( {
 	
 	random: function( range )
 	{
-		var rand;
-		
 		// Switch to a seeded RNG (or switch off if range == 0)
 		if ( range < 1 )
 		{
@@ -2634,7 +2638,7 @@ window.ZVM = Object.subClass( {
 			newstack = newstack.concat( byte_to_word( qstacks.slice( i, temp ) ) );
 		}
 		this.call_stack = call_stack;
-		this.l = newlocals
+		this.l = newlocals;
 		this.s = newstack;
 		
 		// Update the header
@@ -3126,7 +3130,7 @@ TODO:
 	// Run
 	run: function()
 	{
-		var now = new Date,
+		var now = new Date(),
 		pc,
 		count = 0;
 		
@@ -3143,7 +3147,7 @@ TODO:
 			
 			// Or if more than five seconds has passed, however only check every 50k times
 			// What's the best time for this?
-			if ( ++count % 50000 == 0 && ( (new Date) - now ) > 5000 )
+			if ( ++count % 50000 == 0 && ( (new Date()) - now ) > 5000 )
 			{
 				this.act( 'tick' );
 				return;
@@ -3191,7 +3195,7 @@ TODO:
 	// Return control to the ZVM runner to perform some action
 	act: function( code, options )
 	{
-		var options = options || {};
+		options = options || {};
 		
 		// Flush the buffer
 		this.ui.flush();

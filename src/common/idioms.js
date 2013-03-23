@@ -101,22 +101,21 @@ var idiom_if_block = function( context, pc )
 		}
 		i++;
 	}
-},
-
-idiom_do_while = function( context )
-{
 };
 
-/* DEBUG */
-
-// Update the contexts of new contexts
-// Only needed for pretty printing
-var update_contexts = function( ops, context )
+/*idiom_do_while = function( context )
 {
-	for ( var i = 0; i < ops.length; i++ )
+};*/
+
+if ( DEBUG )
+{
+	// Update the contexts of new contexts
+	// Only needed for pretty printing
+	var update_contexts = function( ops, context )
 	{
-		ops[i].context = context;
-	}
-};
-
-/* ENDDEBUG */
+		for ( var i = 0; i < ops.length; i++ )
+		{
+			ops[i].context = context;
+		}
+	};
+}

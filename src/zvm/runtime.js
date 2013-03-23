@@ -165,7 +165,7 @@ window.ZVM = Object.subClass( {
 	},
 	
 	// 1.2 spec @gestalt
-	gestalt: function( id, arg )
+	gestalt: function( id /*, arg*/ )
 	{
 		switch ( id )
 		{
@@ -395,8 +395,6 @@ window.ZVM = Object.subClass( {
 	
 	random: function( range )
 	{
-		var rand;
-		
 		// Switch to a seeded RNG (or switch off if range == 0)
 		if ( range < 1 )
 		{
@@ -567,7 +565,7 @@ window.ZVM = Object.subClass( {
 			newstack = newstack.concat( byte_to_word( qstacks.slice( i, temp ) ) );
 		}
 		this.call_stack = call_stack;
-		this.l = newlocals
+		this.l = newlocals;
 		this.s = newstack;
 		
 		// Update the header

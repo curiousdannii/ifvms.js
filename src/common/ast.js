@@ -197,9 +197,9 @@ BrancherLogic = Object.subClass({
 			op = this.ops[i++];
 			// Accept either Opcodes or further BrancherLogics
 			ops.push(
-				op.func
-					? ( op.iftrue ? '' : '!(' ) + op.func.apply( op, op.operands ) + ( op.iftrue ? '' : ')' )
-					: op
+				op.func ?
+					( op.iftrue ? '' : '!(' ) + op.func.apply( op, op.operands ) + ( op.iftrue ? '' : ')' ) :
+					op
 			);
 		}
 		return ( this.invert ? '(!(' : '(' ) + ops.join( this.code ) + ( this.invert ? '))' : ')' );
@@ -272,8 +272,7 @@ Brancher = Opcode.subClass({
 	// Write out the brancher
 	toString: function()
 	{
-		var i = 0,
-		result = this.result;
+		var result = this.result;
 		
 		// Account for Contexts
 		if ( result instanceof Context )
@@ -349,12 +348,16 @@ Caller = Stopper.subClass({
 	toString: function()
 	{
 		// Debug: include label if possible
-		/* DEBUG */
+		if ( DEBUG )
+		{
 			var addr = '' + this.operands.shift(),
 			targetname = window.vm_functions && parseInt( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
 			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])' + targetname;
-		/* ENDDEBUG */
-		return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])';
+		}
+		else
+		{
+			return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])';
+		}
 	}
 }),
 
@@ -385,13 +388,19 @@ Context = Object.subClass({
 	
 	toString: function()
 	{
-		// Indent the spacer further if needed
-		;;; if ( this.context ) { this.spacer = this.context.spacer + '  '; }
-		// DEBUG: Pretty print!
-		;;; return this.pre.join( '' ) + ( this.ops.length > 1 ? this.spacer : '' ) + this.ops.join( ';\n' + this.spacer ) + this.post.join( '' );
-		
-		// Return the code
-		return this.pre.join( '' ) + this.ops.join( ';' ) + this.post.join( '' );
+		if ( DEBUG )
+		{
+			// Indent the spacer further if needed
+			if ( this.context ) { this.spacer = this.context.spacer + '  '; }
+			// DEBUG: Pretty print!
+			return this.pre.join( '' ) + ( this.ops.length > 1 ? this.spacer : '' ) + this.ops.join( ';\n' + this.spacer ) + this.post.join( '' );
+			
+		}
+		else
+		{
+			// Return the code
+			return this.pre.join( '' ) + this.ops.join( ';' ) + this.post.join( '' );
+		}
 	}
 }),
 
@@ -415,7 +424,7 @@ RoutineContext = Context.subClass({
 // Easily build a new opcode from a class
 opcode_builder = function( Class, func, flags )
 {
-	var flags = flags || {};
+	flags = flags || {};
 	if ( func )
 	{
 		/*if ( func.pop )
