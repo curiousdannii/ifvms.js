@@ -3,9 +3,9 @@
 ZVM - the ifvms.js implementation of the Z-Machine
 ==================================================
 
-Built: BUILDDATE
+Built: <%= grunt.template.today('yyyy-mm-dd') %>
 
-Copyright (c) 2012 The ifvms.js team
+Copyright (c) 2011-<%= grunt.template.today('yyyy') %> The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 

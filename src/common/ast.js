@@ -3,7 +3,7 @@
 Abstract syntax trees for IF VMs
 ================================
 
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 

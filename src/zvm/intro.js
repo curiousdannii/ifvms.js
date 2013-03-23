@@ -3,7 +3,7 @@
 ZVM intro - various functions and compatibility fixes
 =====================================================
 
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -29,7 +29,4 @@ TODO:
 // Wrap all of ZVM in a closure/namespace, and enable strict mode
 (function( window, undefined ){ 'use strict';
 
-// In debug mode close the closure now
-;;; })();
-
-;;; var ZVM = 1, GVM = 0;
+;;; var DEBUG = 1, ZVM = 1, GVM = 0;

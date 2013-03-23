@@ -3,7 +3,7 @@
 The Z-Machine VM for versions 5 and 8
 =====================================
 
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -20,10 +20,7 @@ TODO:
 	
 */
 
-// The VM itself!
-/* DEBUG */
-var ZVM_core = {
-/* ENDDEBUG */
+// See runtime.js for the first half!
 	
 	init: function()
 	{
@@ -341,8 +338,4 @@ var ZVM_core = {
 		this.outputEvent( this.orders );
 	}
 
-/* DEBUG */
-};
-/* ELSEDEBUG
 });
-/* ENDDEBUG */

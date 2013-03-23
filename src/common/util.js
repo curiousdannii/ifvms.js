@@ -3,7 +3,7 @@
 Common untility functions
 =================================================
 
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -96,7 +96,7 @@ optimise_obj = function( obj, funcnames )
 	extend( obj, window['eval']( '({' + newfuncs.join() + '})' ) );
 };
 
-/* DEBUG */
+if ( DEBUG ) {
 
 // Debug flags
 var debugflags = {},
@@ -114,4 +114,4 @@ if ( parchment && parchment.options && parchment.options.debug )
 	get_debug_flags( parchment.options.debug );
 }
 
-/* ENDDEBUG */
+} // ENDDEBUG

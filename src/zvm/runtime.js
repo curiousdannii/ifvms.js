@@ -3,7 +3,7 @@
 Z-Machine runtime functions
 ===========================
 
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -18,12 +18,8 @@ TODO:
 	
 */
 
-// When building just create the class directly from runtime.js and vm.js, no need for these vars
-/* DEBUG */
-var runtime = {
-/* ELSEDEBUG
+// This object is incomplete; see vm.js for the second half!
 window.ZVM = Object.subClass( {
-/* ENDDEBUG */
 	
 	art_shift: function( number, places )
 	{
@@ -810,10 +806,4 @@ window.ZVM = Object.subClass( {
 	
 	// Utilities for signed arithmetic
 	U2S: U2S,
-	S2U: S2U
-
-/* DEBUG */
-};
-/* ELSEDEBUG
-,
-/* ENDDEBUG */
+	S2U: S2U,
