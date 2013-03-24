@@ -31,10 +31,18 @@ TODO:
 		};
 		
 		// Optimise our own functions
-		/* DEBUG */
-		if ( !debugflags.nooptimise )
-		/* ENDDEBUG */
+		if ( DEBUG )
+		{
+			// Skip if we must
+			if ( !debugflags.nooptimise )
+			{
+				optimise_obj( this, ['find_prop'] );
+			}
+		}
+		else
+		{
 			optimise_obj( this, ['find_prop'] );
+		}
 	},
 	
 	// An input event, or some other event from the runner
@@ -49,12 +57,13 @@ TODO:
 		{
 			extend( this.env, data.env );
 			
-			/* DEBUG */
-			if ( data.env.debug )
+			if ( DEBUG )
 			{
-				get_debug_flags( data.env.debug ); 
+				if ( data.env.debug )
+				{
+					get_debug_flags( data.env.debug ); 
+				}
 			}
-			/* ENDDEBUG */
 			
 			// Also need to update the header
 			
@@ -281,7 +290,8 @@ TODO:
 		var context = disassemble( this );
 		
 		// Compile the routine with new Function()
-		/* DEBUG */
+		if ( DEBUG )
+		{
 			var code = '' + context;
 			if ( !debugflags.nooptimise )
 			{
@@ -303,9 +313,11 @@ TODO:
 				func.name = context.name;
 			}
 			this.jit[context.pc] = func;
-		/* ELSEDEBUG
+		}
+		else // DEBUG
+		{
 			this.jit[context.pc] = new Function( 'e', optimise( '' + context ) );
-		/* ENDDEBUG */
+		}
 		if ( context.pc < this.staticmem )
 		{
 			console.warn( 'Caching a JIT function in dynamic memory: ' + context.pc );

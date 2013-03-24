@@ -21,7 +21,10 @@ Todo:
 
 */
 
-;;; console.log( 'bytearray.js: ' + ( window.DataView ? 'Native DataView' : 'Emulating DataView' ) );
+if ( DEBUG )
+{
+	console.log( 'bytearray.js: ' + ( window.DataView ? 'Native DataView' : 'Emulating DataView' ) );
+}
 
 //var native_bytearrays = window.DataView,
 var native_bytearrays = 0,
@@ -42,7 +45,8 @@ ByteArray = native_bytearrays ?
 		// Copy the passed in array
 		data = data.slice();
 		
-		/* ZVM */ if ( ZVM ) {
+		if ( ZVM )
+		{
 			return extend( data, {
 				data: data,
 				getUint8: function( index ) { return data[index]; },
@@ -60,7 +64,8 @@ ByteArray = native_bytearrays ?
 					}
 				}
 			} );
-		} /* ENDZVM */
-		/* GVM */ if ( GVM ) {
-		} /* ENDGVM */
+		} 
+		else if ( GVM )
+		{
+		}
 	};

@@ -80,10 +80,11 @@ Text = Object.subClass({
 		this.parse_dict( this.dict );
 		
 		// Optimise our own functions
-		/* DEBUG */
-		//if ( !debugflags.nooptimise )
-		//	optimise_obj( this, 'TEXT' );
-		/* ENDDEBUG */
+		/*if ( DEBUG )
+		{
+			if ( !debugflags.nooptimise )
+			optimise_obj( this, 'TEXT' );
+		}*/
 	},
 	
 	// Generate alphabets

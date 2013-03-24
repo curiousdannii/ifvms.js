@@ -27,7 +27,10 @@ TODO:
 */
 
 // Find a routine's name
-;;; var find_func_name = function( pc ) { while ( !vm_functions[pc] && pc > 0 ) { pc--; } return vm_functions[pc]; };
+if ( DEBUG )
+{
+	var find_func_name = function( pc ) { while ( !vm_functions[pc] && pc > 0 ) { pc--; } return vm_functions[pc]; };
+}
 
 // Generic/constant operand
 // Value is a constant
@@ -242,13 +245,14 @@ Brancher = Opcode.subClass({
 		this.offset = offset;
 		this.cond = new BrancherLogic( [this] );
 		
-		/* DEBUG */
-		// Stop if we must
-		if ( debugflags.noidioms )
+		if ( DEBUG )
 		{
-			return;
+			// Stop if we must
+			if ( debugflags.noidioms )
+			{
+				return;
+			}
 		}
-		/* ENDDEBUG */
 			
 		// Compare with previous statement
 		if ( this.context.ops.length )
@@ -278,7 +282,10 @@ Brancher = Opcode.subClass({
 		if ( result instanceof Context )
 		{
 			// Update the context to be a child of this context
-			;;; result.context = this.context;
+			if ( DEBUG )
+			{
+				result.context = this.context;
+			}
 			
 			result = result + ( result.stopper ? '; return' : '' );
 			
@@ -286,7 +293,10 @@ Brancher = Opcode.subClass({
 			if ( this.result.ops.length > 1 )
 			{
 				result = '\n' + result + '\n';
-				;;; result += this.context.spacer;
+				if ( DEBUG )
+				{
+					result += this.context.spacer;
+				}
 			}
 		}
 		
@@ -383,7 +393,10 @@ Context = Object.subClass({
 		this.ops = [];
 		this.post = [];
 		this.targets = []; // Branch targets
-		;;; this.spacer = '';
+		if ( DEBUG )
+		{
+			this.spacer = '';
+		}
 	},
 	
 	toString: function()
@@ -409,10 +422,11 @@ RoutineContext = Context.subClass({
 	toString: function()
 	{
 		// Debug: If we have routine names, find this one's name
-		/* DEBUG */
+		if ( DEBUG )
+		{
 			var name = window.vm_functions && find_func_name( this.pc );
 			if ( name ) { this.pre.unshift( '/* ' + name + ' */\n' ); }
-		/* ENDDEBUG */
+		}
 		
 		// Add in some extra vars and return
 		this.pre.unshift( 'var l=e.l,m=e.m,s=e.s;\n' );

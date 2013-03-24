@@ -3,7 +3,7 @@
 ZVM - the ifvms.js implementation of the Z-Machine
 ==================================================
 
-Built: 2013-03-23
+Built: 2013-03-24
 
 Copyright (c) 2011-2013 The ifvms.js team
 BSD licenced
@@ -40,9 +40,16 @@ TODO:
 */
  
 // Wrap all of ZVM in a closure/namespace, and enable strict mode
-(function( window, undefined ){ 'use strict';
+(function( window, undefined )
+{
+	'use strict';
 
-;;; var DEBUG = 1, ZVM = 1, GVM = 0;
+	/* jshint latedef: false */
+	if ( typeof DEBUG === 'undefined' )
+	{
+		var DEBUG = 1, ZVM = 1, GVM = 0;
+	}
+	/* jshint latedef: true */
 
 /*
 
@@ -132,11 +139,14 @@ optimise_obj = function( obj, funcnames )
 		if ( funcnames.indexOf( funcname ) >= 0 )
 		{
 			funcparts = /function\s*\(([^(]*)\)\s*\{([\s\S]+)\}/.exec( '' + obj[funcname] );
-			/* DEBUG */
+			if ( DEBUG )
+			{
 				newfuncs.push( funcname + ':function ' + funcname + '(' + funcparts[1] + '){' + optimise( funcparts[2] ) + '}' );
-			/* ELSEDEBUG
+			}
+			else
+			{
 				newfuncs.push( funcname + ':function(' + funcparts[1] + '){' + optimise( funcparts[2] ) + '}' );
-			/* ENDDEBUG */
+			}
 		}
 	}
 	extend( obj, window['eval']( '({' + newfuncs.join() + '})' ) );
@@ -144,21 +154,21 @@ optimise_obj = function( obj, funcnames )
 
 if ( DEBUG ) {
 
-// Debug flags
-var debugflags = {},
-get_debug_flags = function( data )
-{
-	data = data.split( ',' );
-	var i = 0;
-	while ( i < data.length )
+	// Debug flags
+	var debugflags = {},
+	get_debug_flags = function( data )
 	{
-		debugflags[data[i++]] = 1; 
+		data = data.split( ',' );
+		var i = 0;
+		while ( i < data.length )
+		{
+			debugflags[data[i++]] = 1; 
+		}
+	};
+	if ( parchment && parchment.options && parchment.options.debug )
+	{
+		get_debug_flags( parchment.options.debug );
 	}
-};
-if ( parchment && parchment.options && parchment.options.debug )
-{
-	get_debug_flags( parchment.options.debug );
-}
 
 } // ENDDEBUG
 /*
@@ -184,7 +194,10 @@ Todo:
 
 */
 
-;;; console.log( 'bytearray.js: ' + ( window.DataView ? 'Native DataView' : 'Emulating DataView' ) );
+if ( DEBUG )
+{
+	console.log( 'bytearray.js: ' + ( window.DataView ? 'Native DataView' : 'Emulating DataView' ) );
+}
 
 //var native_bytearrays = window.DataView,
 var native_bytearrays = 0,
@@ -205,7 +218,8 @@ ByteArray = native_bytearrays ?
 		// Copy the passed in array
 		data = data.slice();
 		
-		/* ZVM */ if ( ZVM ) {
+		if ( ZVM )
+		{
 			return extend( data, {
 				data: data,
 				getUint8: function( index ) { return data[index]; },
@@ -223,9 +237,10 @@ ByteArray = native_bytearrays ?
 					}
 				}
 			} );
-		} /* ENDZVM */
-		/* GVM */ if ( GVM ) {
-		} /* ENDGVM */
+		} 
+		else if ( GVM )
+		{
+		}
 	};
 /*
 
@@ -256,7 +271,10 @@ TODO:
 */
 
 // Find a routine's name
-;;; var find_func_name = function( pc ) { while ( !vm_functions[pc] && pc > 0 ) { pc--; } return vm_functions[pc]; };
+if ( DEBUG )
+{
+	var find_func_name = function( pc ) { while ( !vm_functions[pc] && pc > 0 ) { pc--; } return vm_functions[pc]; };
+}
 
 // Generic/constant operand
 // Value is a constant
@@ -471,13 +489,14 @@ Brancher = Opcode.subClass({
 		this.offset = offset;
 		this.cond = new BrancherLogic( [this] );
 		
-		/* DEBUG */
-		// Stop if we must
-		if ( debugflags.noidioms )
+		if ( DEBUG )
 		{
-			return;
+			// Stop if we must
+			if ( debugflags.noidioms )
+			{
+				return;
+			}
 		}
-		/* ENDDEBUG */
 			
 		// Compare with previous statement
 		if ( this.context.ops.length )
@@ -507,7 +526,10 @@ Brancher = Opcode.subClass({
 		if ( result instanceof Context )
 		{
 			// Update the context to be a child of this context
-			;;; result.context = this.context;
+			if ( DEBUG )
+			{
+				result.context = this.context;
+			}
 			
 			result = result + ( result.stopper ? '; return' : '' );
 			
@@ -515,7 +537,10 @@ Brancher = Opcode.subClass({
 			if ( this.result.ops.length > 1 )
 			{
 				result = '\n' + result + '\n';
-				;;; result += this.context.spacer;
+				if ( DEBUG )
+				{
+					result += this.context.spacer;
+				}
 			}
 		}
 		
@@ -612,7 +637,10 @@ Context = Object.subClass({
 		this.ops = [];
 		this.post = [];
 		this.targets = []; // Branch targets
-		;;; this.spacer = '';
+		if ( DEBUG )
+		{
+			this.spacer = '';
+		}
 	},
 	
 	toString: function()
@@ -638,10 +666,11 @@ RoutineContext = Context.subClass({
 	toString: function()
 	{
 		// Debug: If we have routine names, find this one's name
-		/* DEBUG */
+		if ( DEBUG )
+		{
 			var name = window.vm_functions && find_func_name( this.pc );
 			if ( name ) { this.pre.unshift( '/* ' + name + ' */\n' ); }
-		/* ENDDEBUG */
+		}
 		
 		// Add in some extra vars and return
 		this.pre.unshift( 'var l=e.l,m=e.m,s=e.s;\n' );
@@ -683,7 +712,7 @@ opcode_builder = function( Class, func, flags )
 Quetzal Common Save-File Format
 ===============================
 
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -699,7 +728,9 @@ var Quetzal = IFF.subClass({
 		{
 			// Check this is a Quetzal savefile
 			if (this.type != 'IFZS')
+			{
 				throw new Error('Not a Quetzal savefile');
+			}
 
 			// Go through the chunks and extract the useful ones
 			for (var i = 0, l = this.chunks.length; i < l; i++)
@@ -713,7 +744,9 @@ var Quetzal = IFF.subClass({
 					this.compressed = (type == 'CMem');
 				}
 				else if (type == 'Stks')
+				{
 					this.stacks = data;
+				}
 
 				// Story file data
 				else if (type == 'IFhd')
@@ -836,10 +869,11 @@ Text = Object.subClass({
 		this.parse_dict( this.dict );
 		
 		// Optimise our own functions
-		/* DEBUG */
-		//if ( !debugflags.nooptimise )
-		//	optimise_obj( this, 'TEXT' );
-		/* ENDDEBUG */
+		/*if ( DEBUG )
+		{
+			if ( !debugflags.nooptimise )
+			optimise_obj( this, 'TEXT' );
+		}*/
 	},
 	
 	// Generate alphabets
@@ -1292,7 +1326,10 @@ return Object.subClass({
 			fgcolour: engine.env.fgcolour || '#000',
 			bgcolour: engine.env.bgcolour || '#fff'
 		};
-		;;; this.reverse = 0;
+		if ( DEBUG )
+		{
+			this.reverse = 0;
+		}
 		// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
 		this.mono = headerbit;
 		
@@ -1811,7 +1848,10 @@ var idiom_if_block = function( context, pc )
 			sublen = subcontext.ops.length - 1;
 			context.ops.length = i + 1;
 			// This is only needed for pretty printing
-			;;; update_contexts( subcontext.ops, subcontext );
+			if ( DEBUG )
+			{
+				update_contexts( subcontext.ops, subcontext );
+			}
 			
 			// Set that Context as the branch's target, and invert its condition
 			brancher = context.ops[i];
@@ -1831,7 +1871,8 @@ var idiom_if_block = function( context, pc )
 				subcontext.stopper = lastop.stopper;
 			}
 			
-			/* DEBUG */
+			if ( DEBUG )
+			{
 				// Check whether this could be a very complex condition
 				var allbranches = 1;
 				for ( i = 0; i < sublen + 1; i++ )
@@ -1845,7 +1886,7 @@ var idiom_if_block = function( context, pc )
 				{
 					console.info( 'Potential complex condition in ' + context.pc + ' at ' + brancher.pc );
 				}
-			/* ENDDEBUG */
+			}
 			
 			// Return 1 to signal that we can continue past the stopper
 			return 1;
@@ -1958,7 +1999,10 @@ var disassemble = function( engine )
 		// Check for missing opcodes
 		if ( !opcodes[code] )
 		{
-			;;; console.log( '' + context );
+			if ( DEBUG )
+			{
+				console.log( '' + context );
+			}
 			engine.stop = 1;
 			throw new Error( 'Unknown opcode #' + code + ' at pc=' + offset );
 		}
@@ -2044,11 +2088,18 @@ var disassemble = function( engine )
 		temp = 0;
 		if ( context.targets.indexOf( pc ) >= 0 )
 		{
-			/* DEBUG */
-			// Skip if we must
-			if ( !debugflags.noidioms )
-			/* ENDDEBUG */
-			temp = idiom_if_block( context, pc );
+			if ( DEBUG )
+			{
+				// Skip if we must
+				if ( !debugflags.noidioms )
+				{
+					temp = idiom_if_block( context, pc );
+				}
+			}
+			else
+			{
+				temp = idiom_if_block( context, pc );
+			}
 		}
 		
 		// We can't go any further if we have a final stopper :(
@@ -2394,7 +2445,10 @@ window.ZVM = Object.subClass( {
 		}
 		if ( stream == -1 )
 		{
-			;;; console.info( 'Disabling stream one - it actually happened!' );
+			if ( DEBUG )
+			{
+				console.info( 'Disabling stream one - it actually happened!' );
+			}
 			this.streams[0] = 0;
 		}
 		if ( stream == 3 )
@@ -2911,10 +2965,18 @@ TODO:
 		};
 		
 		// Optimise our own functions
-		/* DEBUG */
-		if ( !debugflags.nooptimise )
-		/* ENDDEBUG */
+		if ( DEBUG )
+		{
+			// Skip if we must
+			if ( !debugflags.nooptimise )
+			{
+				optimise_obj( this, ['find_prop'] );
+			}
+		}
+		else
+		{
 			optimise_obj( this, ['find_prop'] );
+		}
 	},
 	
 	// An input event, or some other event from the runner
@@ -2929,12 +2991,13 @@ TODO:
 		{
 			extend( this.env, data.env );
 			
-			/* DEBUG */
-			if ( data.env.debug )
+			if ( DEBUG )
 			{
-				get_debug_flags( data.env.debug ); 
+				if ( data.env.debug )
+				{
+					get_debug_flags( data.env.debug ); 
+				}
 			}
-			/* ENDDEBUG */
 			
 			// Also need to update the header
 			
@@ -3161,7 +3224,8 @@ TODO:
 		var context = disassemble( this );
 		
 		// Compile the routine with new Function()
-		/* DEBUG */
+		if ( DEBUG )
+		{
 			var code = '' + context;
 			if ( !debugflags.nooptimise )
 			{
@@ -3183,9 +3247,11 @@ TODO:
 				func.name = context.name;
 			}
 			this.jit[context.pc] = func;
-		/* ELSEDEBUG
+		}
+		else // DEBUG
+		{
 			this.jit[context.pc] = new Function( 'e', optimise( '' + context ) );
-		/* ENDDEBUG */
+		}
 		if ( context.pc < this.staticmem )
 		{
 			console.warn( 'Caching a JIT function in dynamic memory: ' + context.pc );

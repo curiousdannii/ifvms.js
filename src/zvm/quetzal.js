@@ -3,7 +3,7 @@
 Quetzal Common Save-File Format
 ===============================
 
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -19,7 +19,9 @@ var Quetzal = IFF.subClass({
 		{
 			// Check this is a Quetzal savefile
 			if (this.type != 'IFZS')
+			{
 				throw new Error('Not a Quetzal savefile');
+			}
 
 			// Go through the chunks and extract the useful ones
 			for (var i = 0, l = this.chunks.length; i < l; i++)
@@ -33,7 +35,9 @@ var Quetzal = IFF.subClass({
 					this.compressed = (type == 'CMem');
 				}
 				else if (type == 'Stks')
+				{
 					this.stacks = data;
+				}
 
 				// Story file data
 				else if (type == 'IFhd')

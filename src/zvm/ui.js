@@ -79,7 +79,10 @@ return Object.subClass({
 			fgcolour: engine.env.fgcolour || '#000',
 			bgcolour: engine.env.bgcolour || '#fff'
 		};
-		;;; this.reverse = 0;
+		if ( DEBUG )
+		{
+			this.reverse = 0;
+		}
 		// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
 		this.mono = headerbit;
 		

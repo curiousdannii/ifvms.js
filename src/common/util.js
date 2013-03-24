@@ -86,11 +86,14 @@ optimise_obj = function( obj, funcnames )
 		if ( funcnames.indexOf( funcname ) >= 0 )
 		{
 			funcparts = /function\s*\(([^(]*)\)\s*\{([\s\S]+)\}/.exec( '' + obj[funcname] );
-			/* DEBUG */
+			if ( DEBUG )
+			{
 				newfuncs.push( funcname + ':function ' + funcname + '(' + funcparts[1] + '){' + optimise( funcparts[2] ) + '}' );
-			/* ELSEDEBUG
+			}
+			else
+			{
 				newfuncs.push( funcname + ':function(' + funcparts[1] + '){' + optimise( funcparts[2] ) + '}' );
-			/* ENDDEBUG */
+			}
 		}
 	}
 	extend( obj, window['eval']( '({' + newfuncs.join() + '})' ) );
@@ -98,20 +101,20 @@ optimise_obj = function( obj, funcnames )
 
 if ( DEBUG ) {
 
-// Debug flags
-var debugflags = {},
-get_debug_flags = function( data )
-{
-	data = data.split( ',' );
-	var i = 0;
-	while ( i < data.length )
+	// Debug flags
+	var debugflags = {},
+	get_debug_flags = function( data )
 	{
-		debugflags[data[i++]] = 1; 
+		data = data.split( ',' );
+		var i = 0;
+		while ( i < data.length )
+		{
+			debugflags[data[i++]] = 1; 
+		}
+	};
+	if ( parchment && parchment.options && parchment.options.debug )
+	{
+		get_debug_flags( parchment.options.debug );
 	}
-};
-if ( parchment && parchment.options && parchment.options.debug )
-{
-	get_debug_flags( parchment.options.debug );
-}
 
 } // ENDDEBUG

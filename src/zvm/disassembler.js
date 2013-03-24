@@ -86,7 +86,10 @@ var disassemble = function( engine )
 		// Check for missing opcodes
 		if ( !opcodes[code] )
 		{
-			;;; console.log( '' + context );
+			if ( DEBUG )
+			{
+				console.log( '' + context );
+			}
 			engine.stop = 1;
 			throw new Error( 'Unknown opcode #' + code + ' at pc=' + offset );
 		}
@@ -172,11 +175,18 @@ var disassemble = function( engine )
 		temp = 0;
 		if ( context.targets.indexOf( pc ) >= 0 )
 		{
-			/* DEBUG */
-			// Skip if we must
-			if ( !debugflags.noidioms )
-			/* ENDDEBUG */
-			temp = idiom_if_block( context, pc );
+			if ( DEBUG )
+			{
+				// Skip if we must
+				if ( !debugflags.noidioms )
+				{
+					temp = idiom_if_block( context, pc );
+				}
+			}
+			else
+			{
+				temp = idiom_if_block( context, pc );
+			}
 		}
 		
 		// We can't go any further if we have a final stopper :(

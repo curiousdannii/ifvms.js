@@ -27,6 +27,13 @@ TODO:
 */
  
 // Wrap all of ZVM in a closure/namespace, and enable strict mode
-(function( window, undefined ){ 'use strict';
+(function( window, undefined )
+{
+	'use strict';
 
-;;; var DEBUG = 1, ZVM = 1, GVM = 0;
+	/* jshint latedef: false */
+	if ( typeof DEBUG === 'undefined' )
+	{
+		var DEBUG = 1, ZVM = 1, GVM = 0;
+	}
+	/* jshint latedef: true */

@@ -321,7 +321,10 @@ window.ZVM = Object.subClass( {
 		}
 		if ( stream == -1 )
 		{
-			;;; console.info( 'Disabling stream one - it actually happened!' );
+			if ( DEBUG )
+			{
+				console.info( 'Disabling stream one - it actually happened!' );
+			}
 			this.streams[0] = 0;
 		}
 		if ( stream == 3 )

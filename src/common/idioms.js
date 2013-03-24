@@ -60,7 +60,10 @@ var idiom_if_block = function( context, pc )
 			sublen = subcontext.ops.length - 1;
 			context.ops.length = i + 1;
 			// This is only needed for pretty printing
-			;;; update_contexts( subcontext.ops, subcontext );
+			if ( DEBUG )
+			{
+				update_contexts( subcontext.ops, subcontext );
+			}
 			
 			// Set that Context as the branch's target, and invert its condition
 			brancher = context.ops[i];
@@ -80,7 +83,8 @@ var idiom_if_block = function( context, pc )
 				subcontext.stopper = lastop.stopper;
 			}
 			
-			/* DEBUG */
+			if ( DEBUG )
+			{
 				// Check whether this could be a very complex condition
 				var allbranches = 1;
 				for ( i = 0; i < sublen + 1; i++ )
@@ -94,7 +98,7 @@ var idiom_if_block = function( context, pc )
 				{
 					console.info( 'Potential complex condition in ' + context.pc + ' at ' + brancher.pc );
 				}
-			/* ENDDEBUG */
+			}
 			
 			// Return 1 to signal that we can continue past the stopper
 			return 1;

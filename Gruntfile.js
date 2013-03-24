@@ -33,18 +33,23 @@ module.exports = function( grunt )
 		
 		jshint: {
 			options: {
-				"-W032": false, // Unncessary semicolons
-				"-W041": false, // Use '===' to compare with '0'
-				"-W064": false, // Don't warn about missing new with ByteArray
-				"-W065": false, // Missing radix parameter in parseInt
-				boss: true, // Allow assignments in if, return etc
-				evil: true, // eval() :)
+				// Enforcing options
+				curly: true, // Require brackets for all blocks
 				latedef: true, // require all vars to be defined before being used
 				newcap: true, // require classes to begin with a capital
 				strict: true, // ES5 strict mode
 				undef: true, // all vars must be defined
 				unused: true, // warn for unused vars
 				
+				// Relaxing options
+				"-W041": false, // Use '===' to compare with '0'
+				"-W064": false, // Don't warn about missing new with ByteArray
+				"-W065": false, // Missing radix parameter in parseInt
+				boss: true, // Allow assignments in if, return etc
+				evil: true, // eval() :)
+				funcscope: true, // don't complain about using variables defined inside if statements
+				
+				// Environment
 				browser: true,
 				nonstandard: true,
 				predef: [ 'IFF', 'parchment', 'vm_functions' ],
