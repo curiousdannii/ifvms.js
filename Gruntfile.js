@@ -49,7 +49,7 @@ module.exports = function( grunt )
 				// Environment
 				browser: true,
 				nonstandard: true,
-				predef: [ 'IFF', 'parchment', 'vm_functions' ],
+				predef: [ 'DEBUG', 'ZVM', 'GVM', 'IFF', 'parchment', 'vm_functions' ],
 			},
 			dist: [ 'dist/*.js' ],
 			grunt: {
