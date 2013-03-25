@@ -57,7 +57,7 @@ window.ZVM = Object.subClass( {
 	
 	clear_attr: function( object, attribute )
 	{
-		var addr = this.objects + 14 * object + parseInt( attribute / 8 );
+		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
 	},
 	
@@ -70,7 +70,7 @@ window.ZVM = Object.subClass( {
 		size = Math.abs( size );
 		
 		// Simple case, zeroes
-		if ( second == 0 )
+		if ( second === 0 )
 		{
 			while ( i < size )
 			{
@@ -106,7 +106,7 @@ window.ZVM = Object.subClass( {
 			return 0;
 		}
 		addr += 2 * word;
-		if ( value == undefined )
+		if ( value === undefined )
 		{
 			return this.m.getUint16( addr );
 		}
@@ -132,12 +132,12 @@ window.ZVM = Object.subClass( {
 			this_property = this_property_byte & 0x3F;
 		
 			// Found the previous property, so return this one's number
-			if ( last_property == prev )
+			if ( last_property === prev )
 			{
 				return this_property;
 			}
 			// Found the property! Return it's address
-			if ( this_property == property )
+			if ( this_property === property )
 			{
 				// Must include the offset
 				return properties + ( this_property_byte & 0x80 ? 2 : 1 );
@@ -221,7 +221,7 @@ window.ZVM = Object.subClass( {
 	get_prop_len: function( addr )
 	{
 		// Spec 1.1
-		if ( addr == 0 )
+		if ( addr === 0 )
 		{
 			return 0;
 		}
@@ -232,7 +232,7 @@ window.ZVM = Object.subClass( {
 		if ( value & 0x80 )
 		{
 			value &= 0x3F;
-			return value == 0 ? 64 : value;
+			return value === 0 ? 64 : value;
 		}
 		// One byte size/number
 		return value & 0x40 ? 2 : 1;
@@ -243,19 +243,19 @@ window.ZVM = Object.subClass( {
 	incdec: function( varnum, change )
 	{
 		var result, offset;
-		if ( varnum == 0 )
+		if ( varnum === 0 )
 		{
 			result = S2U( this.s.pop() + change );
 			this.s.push( result );
 			return result;
 		}
-		if ( varnum < 16 )
+		if ( --varnum < 15 )
 		{
-			return this.l[varnum - 1] = S2U( this.l[varnum - 1] + change );
+			return this.l[varnum] = S2U( this.l[varnum] + change );
 		}
 		else
 		{
-			offset = this.globals + ( varnum - 16 ) * 2;
+			offset = this.globals + ( varnum - 15 ) * 2;
 			return this.m.setUint16( offset, this.m.getUint16( offset ) + change );
 		}
 	},
@@ -263,7 +263,7 @@ window.ZVM = Object.subClass( {
 	// Indirect variables
 	indirect: function( variable, value )
 	{
-		if ( variable == 0 )
+		if ( variable === 0 )
 		{
 			if ( arguments.length > 1 )
 			{
@@ -293,7 +293,7 @@ window.ZVM = Object.subClass( {
 		// Account for many arguments
 		while ( i < arguments.length )
 		{
-			if ( arguments[i++] == arguments[0] )
+			if ( arguments[i++] === arguments[0] )
 			{
 				r = 1;
 			}
@@ -303,7 +303,7 @@ window.ZVM = Object.subClass( {
 	
 	jin: function( child, parent )
 	{
-		return this.get_parent( child ) == parent;
+		return this.get_parent( child ) === parent;
 	},
 	
 	log_shift: function( number, places )
@@ -315,11 +315,11 @@ window.ZVM = Object.subClass( {
 	output_stream: function( stream, addr )
 	{
 		stream = U2S( stream );
-		if ( stream == 1 )
+		if ( stream === 1 )
 		{
 			this.streams[0] = 1;
 		}
-		if ( stream == -1 )
+		if ( stream === -1 )
 		{
 			if ( DEBUG )
 			{
@@ -327,11 +327,11 @@ window.ZVM = Object.subClass( {
 			}
 			this.streams[0] = 0;
 		}
-		if ( stream == 3 )
+		if ( stream === 3 )
 		{
 			this.streams[2].unshift( [ addr, '' ] );
 		}
-		if ( stream == -3 )
+		if ( stream === -3 )
 		{
 			var data = this.streams[2].shift(),
 			text = this.text.text_to_zscii( data[1] );
@@ -354,7 +354,7 @@ window.ZVM = Object.subClass( {
 			// Check if the monospace font bit has changed
 			// Unfortunately, even now Inform changes this bit for the font statement, even though the 1.1 standard depreciated it :(
 			var fontbit = this.m.getUint8( 0x11 ) & 0x02;
-			if ( fontbit != ( this.ui.mono & 0x02 ) )
+			if ( fontbit !== ( this.ui.mono & 0x02 ) )
 			{
 				// Flush if we're actually changing font (ie, the other bits are off)
 				if ( !( this.ui.mono & 0xFD ) )
@@ -407,9 +407,9 @@ window.ZVM = Object.subClass( {
 		}
 		
 		// Pure randomness
-		if ( this.random_state == 0 )
+		if ( this.random_state === 0 )
 		{
-			return parseInt( Math.random() * range ) + 1;
+			return ( Math.random() * range ) | 0 + 1;
 		}
 		// How can we best seed the RNG?
 		
@@ -429,7 +429,7 @@ window.ZVM = Object.subClass( {
 	read: function( text, parse, time, routine, storer )
 	{
 		// Check if not all operands were used
-		if ( arguments.length == 3 )
+		if ( arguments.length === 3 )
 		{
 			storer = time;
 			time = routine = 0;
@@ -451,7 +451,7 @@ window.ZVM = Object.subClass( {
 	read_char: function( one, time, routine, storer )
 	{
 		// Check if not all operands were used
-		if ( arguments.length == 2 )
+		if ( arguments.length === 2 )
 		{
 			storer = time;
 			time = routine = 0;
@@ -473,7 +473,7 @@ window.ZVM = Object.subClass( {
 		temp_younger;
 		
 		// No parent, do nothing
-		if ( parent == 0 )
+		if ( parent === 0 )
 		{
 			return;
 		}
@@ -482,7 +482,7 @@ window.ZVM = Object.subClass( {
 		younger_sibling = this.get_sibling( obj );
 		
 		// obj is first child
-		if ( older_sibling == obj )
+		if ( older_sibling === obj )
 		{
 			this.set_family( obj, 0, parent, younger_sibling );
 		}
@@ -493,7 +493,7 @@ window.ZVM = Object.subClass( {
 			while ( 1 )
 			{
 				temp_younger = this.get_sibling( older_sibling );
-				if ( temp_younger == obj )
+				if ( temp_younger === obj )
 				{
 					break;
 				}
@@ -524,7 +524,7 @@ window.ZVM = Object.subClass( {
 			{
 				temp = qmem[i++];
 				// Same memory
-				if ( temp == 0 )
+				if ( temp === 0 )
 				{
 					j += 1 + qmem[i++];
 				}
@@ -581,7 +581,7 @@ window.ZVM = Object.subClass( {
 	
 	restore_undo: function()
 	{
-		if ( this.undo.length == 0 )
+		if ( this.undo.length === 0 )
 		{
 			return 0;
 		}
@@ -643,9 +643,9 @@ window.ZVM = Object.subClass( {
 		for ( i = 0; i < this.staticmem; i++ )
 		{
 			abyte = memory.getUint8( i ) ^ this.data[i];
-			if ( abyte == 0 )
+			if ( abyte === 0 )
 			{
-				if ( ++zeroes == 256 )
+				if ( ++zeroes === 256 )
 				{
 					compressed_mem.push( 0, 255 );
 					zeroes = 0;
@@ -724,7 +724,7 @@ window.ZVM = Object.subClass( {
 		
 		while ( addr < length )
 		{
-			if ( memoryfunc( addr ) == key )
+			if ( memoryfunc( addr ) === key )
 			{
 				return addr;
 			}
@@ -735,7 +735,7 @@ window.ZVM = Object.subClass( {
 	
 	set_attr: function( object, attribute )
 	{
-		var addr = this.objects + 14 * object + parseInt( attribute / 8 );
+		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) | 0x80 >> attribute % 8 );
 	},
 	
@@ -757,19 +757,20 @@ window.ZVM = Object.subClass( {
 	
 	test: function( bitmap, flag )
 	{
-		return bitmap & flag == flag;
+		return bitmap & flag === flag;
 	},
 	
 	test_attr: function( object, attribute )
 	{
-		return ( this.m.getUint8( this.objects + 14 * object + parseInt( attribute / 8 ) ) << attribute % 8 ) & 0x80;
+		return ( this.m.getUint8( this.objects + 14 * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
 	},
 	
 	// Read or write a variable
 	variable: function( variable, value )
 	{
-		var havevalue = value !== undefined;
-		if ( variable == 0 )
+		var havevalue = value !== undefined,
+		offset;
+		if ( variable === 0 )
 		{
 			if ( havevalue )
 			{
@@ -780,26 +781,27 @@ window.ZVM = Object.subClass( {
 				return this.s.pop();
 			}
 		}
-		else if ( variable < 16 )
+		else if ( --variable < 15 )
 		{
 			if ( havevalue )
 			{
-				this.l[variable - 1] = value;
+				this.l[variable] = value;
 			}
 			else
 			{
-				return this.l[variable - 1];
+				return this.l[variable];
 			}
 		}
 		else
 		{
+			offset = this.globals + ( variable - 15 ) * 2;
 			if ( havevalue )
 			{
-				this.m.setUint16( this.globals + ( variable - 16 ) * 2, value );
+				this.m.setUint16( offset, value );
 			}
 			else
 			{
-				this.m.getUint16( this.globals + ( variable - 16 ) * 2 );
+				return this.m.getUint16( offset );
 			}
 		}
 		return value;

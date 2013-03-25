@@ -18,7 +18,7 @@ var Quetzal = IFF.subClass({
 		if (bytes)
 		{
 			// Check this is a Quetzal savefile
-			if (this.type != 'IFZS')
+			if (this.type !== 'IFZS')
 			{
 				throw new Error('Not a Quetzal savefile');
 			}
@@ -29,18 +29,18 @@ var Quetzal = IFF.subClass({
 				var type = this.chunks[i].type, data = this.chunks[i].data;
 
 				// Memory and stack chunks. Overwrites existing data if more than one of each is present!
-				if (type == 'CMem' || type == 'UMem')
+				if (type === 'CMem' || type === 'UMem')
 				{
 					this.memory = data;
-					this.compressed = (type == 'CMem');
+					this.compressed = (type === 'CMem');
 				}
-				else if (type == 'Stks')
+				else if (type === 'Stks')
 				{
 					this.stacks = data;
 				}
 
 				// Story file data
-				else if (type == 'IFhd')
+				else if (type === 'IFhd')
 				{
 					this.release = data.slice(0, 2);
 					this.serial = data.slice(2, 8);

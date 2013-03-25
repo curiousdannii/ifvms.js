@@ -36,11 +36,11 @@ var idiom_if_block = function( context, pc )
 	while ( i < context.ops.length - 1 )
 	{
 		// As long as no other opcodes have an offset property we can skip the instanceof check
-		if ( /* context.ops[i] instanceof Brancher && */ context.ops[i].offset == pc )
+		if ( /* context.ops[i] instanceof Brancher && */ context.ops[i].offset === pc )
 		{
 			// Sometimes Inform makes complex branches, where the only subcontext opcode would be a brancher itself
 			// Join the two branches into one
-			if ( context.ops.length - i == 2 /* && context.ops[i + 1] instanceof Brancher */ && context.ops[i + 1].offset )
+			if ( context.ops.length - i === 2 /* && context.ops[i + 1] instanceof Brancher */ && context.ops[i + 1].offset )
 			{
 				lastop = context.ops.pop();
 				secondlastop = context.ops.pop();
@@ -72,7 +72,7 @@ var idiom_if_block = function( context, pc )
 			
 			// Check if this is actually a loop
 			lastop = subcontext.ops[sublen];
-			if ( lastop.code == 140 && ( U2S( lastop.operands[0].v ) + lastop.next - 2 ) == brancher.pc )
+			if ( lastop.code === 140 && ( U2S( lastop.operands[0].v ) + lastop.next - 2 ) === brancher.pc )
 			{
 				brancher.keyword = 'while';
 				subcontext.ops.pop();
@@ -94,7 +94,7 @@ var idiom_if_block = function( context, pc )
 						allbranches = 0;
 					}
 				}
-				if ( allbranches == 1 )
+				if ( allbranches === 1 )
 				{
 					console.info( 'Potential complex condition in ' + context.pc + ' at ' + brancher.pc );
 				}

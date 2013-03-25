@@ -94,7 +94,7 @@ Text = Object.subClass({
 		i = 0;
 		while ( i < 78 )
 		{
-			alphabets[parseInt( i / 26 )][i % 26] = data[ i++ ];
+			alphabets[( i / 26 ) | 0][i % 26] = data[ i++ ];
 		}
 		// A2->7 is always a newline
 		alphabets[2][1] = 13;
@@ -171,7 +171,7 @@ Text = Object.subClass({
 			
 			// Special chars
 			// Space
-			if ( zchar == 0 )
+			if ( zchar === 0 )
 			{
 				result.push( 32 );
 			}
@@ -187,7 +187,7 @@ Text = Object.subClass({
 				alphabet = zchar;
 			}
 			// Check for a 10 bit ZSCII character
-			else if ( alphabet == 2 && zchar == 6 )
+			else if ( alphabet === 2 && zchar === 6 )
 			{
 				// Check we have enough Z-chars left.
 				if ( i + 1 < buffer.length )
@@ -226,7 +226,7 @@ Text = Object.subClass({
 			alphabet = alphabet < 4 ? 0 : alphabet - 3;
 			
 			// Add to the index if we've had raw unicode
-			if ( ( i % 3 ) == 0 )
+			if ( ( i % 3 ) === 0 )
 			{
 				i += unicodecount;
 				unicodecount = 0;
@@ -234,7 +234,8 @@ Text = Object.subClass({
 		}
 		
 		// Cache and return. Use String() so that .pc will be preserved
-		result = String( this.zscii_to_text( result, resulttexts ) );
+		/* jshint -W053 */ // Don't complain about new String
+		result = new String( this.zscii_to_text( result, resulttexts ) );
 		result.pc = addr;
 		this.e.jit[start_addr] = result;
 		if ( !nowarn && start_addr < this.e.staticmem )
@@ -259,7 +260,7 @@ Text = Object.subClass({
 		{
 			achar = zscii[i++];
 			// Space
-			if ( achar == 32 )
+			if ( achar === 32 )
 			{
 				zchars.push( 0 );
 			}
@@ -282,7 +283,7 @@ Text = Object.subClass({
 				zchars.push( 5, 6, temp >> 5, temp & 0x1F );
 			}
 			// Pad character
-			else if ( achar == undefined )
+			else if ( achar === undefined )
 			{
 				zchars.push( 5 );
 			}
@@ -311,7 +312,7 @@ Text = Object.subClass({
 		{
 			charr = zscii[i++];
 			// Text substitution from abbreviations or 1.1 unicode
-			if ( charr == -1 )
+			if ( charr === -1 )
 			{
 				result += texts[j++];
 			}
@@ -395,7 +396,7 @@ Text = Object.subClass({
 		while ( i < textend )
 		{
 			letter = memory.getUint8( text + i++ );
-			if ( letter == 32 || separators.indexOf( letter ) >= 0 )
+			if ( letter === 32 || separators.indexOf( letter ) >= 0 )
 			{
 				if ( word.length )
 				{
@@ -403,7 +404,7 @@ Text = Object.subClass({
 					wordstart += word.length;
 					word = [];
 				}
-				if ( letter != 32 )
+				if ( letter !== 32 )
 				{
 					words.push( [[letter], wordstart] );
 				}

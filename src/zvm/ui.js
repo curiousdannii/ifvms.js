@@ -24,7 +24,7 @@ var extend = function( old, add )
 	for ( var name in add )
 	{
 		// Don't copy cleared styles
-		if ( add[name] != undefined )
+		if ( add[name] !== undefined )
 		{
 			old[name] = add[name];
 		}
@@ -134,7 +134,7 @@ return Object.subClass({
 			// Messy CSS colour code
 			result = [ parseInt( data[4], 16 ), parseInt( data[5], 16 ), parseInt( data[6], 16 ) ];
 			// Stretch out compact #000 codes to their full size
-			if ( code.length == 4 )
+			if ( code.length === 4 )
 			{
 				result = [ result[0] << 4 | result[0], result[1] << 4 | result[1], result[2] << 4 | result[2] ];
 			}
@@ -146,7 +146,7 @@ return Object.subClass({
 
 	erase_line: function( value )
 	{
-		if ( value == 1 )
+		if ( value === 1 )
 		{
 			this.flush();
 			this.status.push( { code: "eraseline" } );
@@ -160,11 +160,11 @@ return Object.subClass({
 		{
 			this.clear_window();
 		}
-		if ( window == -1 )
+		if ( window === -1 )
 		{
 			this.split_window( 0 );
 		}
-		if ( window == -2 || window == 1 )
+		if ( window === -2 || window === 1 )
 		{
 			this.status.push( { code: "clear" } );
 		}
@@ -176,7 +176,7 @@ return Object.subClass({
 		var order;
 		
 		// If we have a buffer transfer it to the orders
-		if ( this.buffer != '' )
+		if ( this.buffer !== '' )
 		{
 			order = {
 				code: 'stream',
@@ -221,12 +221,12 @@ return Object.subClass({
 	set_font: function( font )
 	{
 		// We only support fonts 1 and 4
-		if ( font != 1 && font != 4 )
+		if ( font !== 1 && font !== 4 )
 		{
 			return 0;
 		}
 		var returnval = this.mono & 0x04 ? 4 : 1;
-		if ( font != returnval )
+		if ( font !== returnval )
 		{
 			this.flush();
 			this.mono ^= 0x04;
@@ -244,7 +244,7 @@ return Object.subClass({
 		this.flush();
 		
 		// Setting the style to Roman will clear the others
-		if ( stylebyte == 0 )
+		if ( stylebyte === 0 )
 		{
 			doreverse = this.reverse;
 			this.reverse = styles['font-weight'] = styles['font-style'] = undefined;
@@ -295,7 +295,7 @@ return Object.subClass({
 			background = temp;
 		}
 		
-		if ( foreground == 0xFFFF )
+		if ( foreground === 0xFFFF )
 		{
 			newforeground = undefined;
 		}
@@ -304,7 +304,7 @@ return Object.subClass({
 			newforeground = convert_true_colour( foreground );
 		}
 		
-		if ( background == 0xFFFF )
+		if ( background === 0xFFFF )
 		{
 			newbackground = undefined;
 		}

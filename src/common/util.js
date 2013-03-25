@@ -16,7 +16,7 @@ if ( ![].indexOf )
 	{
 		for ( var i = fromIndex || 0, l = this.length; i < l; i++ )
 		{
-			if ( this[i] == obj )
+			if ( this[i] === obj )
 			{
 				return i;
 			}

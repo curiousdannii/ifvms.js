@@ -31,9 +31,9 @@ TODO:
 {
 	'use strict';
 
-	/* jshint latedef: false */
+	/* jshint -W004 */ // Don't complain about DEBUG being defined already(?!)
 	if ( typeof DEBUG === 'undefined' )
 	{
-		DEBUG = 1, ZVM = 1, GVM = 0;
+		var DEBUG = 1, ZVM = 1, GVM = 0;
 	}
-	/* jshint latedef: true */
+	/* jshint -W004: true */

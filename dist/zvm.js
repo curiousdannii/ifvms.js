@@ -3,7 +3,7 @@
 ZVM - the ifvms.js implementation of the Z-Machine
 ==================================================
 
-Built: 2013-03-24
+Built: 2013-03-25
 
 Copyright (c) 2011-2013 The ifvms.js team
 BSD licenced
@@ -44,12 +44,12 @@ TODO:
 {
 	'use strict';
 
-	/* jshint latedef: false */
+	/* jshint -W004 */ // Don't complain about DEBUG being defined already(?!)
 	if ( typeof DEBUG === 'undefined' )
 	{
-		DEBUG = 1, ZVM = 1, GVM = 0;
+		var DEBUG = 1, ZVM = 1, GVM = 0;
 	}
-	/* jshint latedef: true */
+	/* jshint -W004: true */
 
 /*
 
@@ -69,7 +69,7 @@ if ( ![].indexOf )
 	{
 		for ( var i = fromIndex || 0, l = this.length; i < l; i++ )
 		{
-			if ( this[i] == obj )
+			if ( this[i] === obj )
 			{
 				return i;
 			}
@@ -312,7 +312,7 @@ Variable = Operand.subClass({
 		}
 		
 		// Stack
-		if ( variable == 0 )
+		if ( variable === 0 )
 		{
 			// If we've been passed a value we're setting a variable
 			return 's.pop()';
@@ -344,7 +344,7 @@ Variable = Operand.subClass({
 		}
 		
 		// Stack
-		if ( variable == 0 )
+		if ( variable === 0 )
 		{
 			// If we've been passed a value we're setting a variable
 			return 's.push(' + value + ')';
@@ -472,7 +472,7 @@ Brancher = Opcode.subClass({
 		this.iftrue = brancher[0];
 		
 		// Process the offset
-		if ( offset == 0 || offset == 1 )
+		if ( offset === 0 || offset === 1 )
 		{
 			result = 'e.ret(' + offset + ')';
 		}
@@ -503,7 +503,7 @@ Brancher = Opcode.subClass({
 		{
 			prev = this.context.ops.pop();
 			// As long as no other opcodes have an offset property we can skip the instanceof check
-			if ( /* prev instanceof Brancher && */ prev.offset == offset )
+			if ( /* prev instanceof Brancher && */ prev.offset === offset )
 			{
 				// Goes to same offset so reuse the Brancher arrays
 				this.cond.ops.unshift( prev.cond );
@@ -605,7 +605,7 @@ Caller = Stopper.subClass({
 		if ( DEBUG )
 		{
 			var addr = '' + this.operands.shift(),
-			targetname = window.vm_functions && parseInt( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
+			targetname = window.vm_functions && !isNaN( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
 			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])' + targetname;
 		}
 		else
@@ -727,7 +727,7 @@ var Quetzal = IFF.subClass({
 		if (bytes)
 		{
 			// Check this is a Quetzal savefile
-			if (this.type != 'IFZS')
+			if (this.type !== 'IFZS')
 			{
 				throw new Error('Not a Quetzal savefile');
 			}
@@ -738,18 +738,18 @@ var Quetzal = IFF.subClass({
 				var type = this.chunks[i].type, data = this.chunks[i].data;
 
 				// Memory and stack chunks. Overwrites existing data if more than one of each is present!
-				if (type == 'CMem' || type == 'UMem')
+				if (type === 'CMem' || type === 'UMem')
 				{
 					this.memory = data;
-					this.compressed = (type == 'CMem');
+					this.compressed = (type === 'CMem');
 				}
-				else if (type == 'Stks')
+				else if (type === 'Stks')
 				{
 					this.stacks = data;
 				}
 
 				// Story file data
-				else if (type == 'IFhd')
+				else if (type === 'IFhd')
 				{
 					this.release = data.slice(0, 2);
 					this.serial = data.slice(2, 8);
@@ -883,7 +883,7 @@ Text = Object.subClass({
 		i = 0;
 		while ( i < 78 )
 		{
-			alphabets[parseInt( i / 26 )][i % 26] = data[ i++ ];
+			alphabets[( i / 26 ) | 0][i % 26] = data[ i++ ];
 		}
 		// A2->7 is always a newline
 		alphabets[2][1] = 13;
@@ -960,7 +960,7 @@ Text = Object.subClass({
 			
 			// Special chars
 			// Space
-			if ( zchar == 0 )
+			if ( zchar === 0 )
 			{
 				result.push( 32 );
 			}
@@ -976,7 +976,7 @@ Text = Object.subClass({
 				alphabet = zchar;
 			}
 			// Check for a 10 bit ZSCII character
-			else if ( alphabet == 2 && zchar == 6 )
+			else if ( alphabet === 2 && zchar === 6 )
 			{
 				// Check we have enough Z-chars left.
 				if ( i + 1 < buffer.length )
@@ -1015,7 +1015,7 @@ Text = Object.subClass({
 			alphabet = alphabet < 4 ? 0 : alphabet - 3;
 			
 			// Add to the index if we've had raw unicode
-			if ( ( i % 3 ) == 0 )
+			if ( ( i % 3 ) === 0 )
 			{
 				i += unicodecount;
 				unicodecount = 0;
@@ -1023,7 +1023,8 @@ Text = Object.subClass({
 		}
 		
 		// Cache and return. Use String() so that .pc will be preserved
-		result = String( this.zscii_to_text( result, resulttexts ) );
+		/* jshint -W053 */ // Don't complain about new String
+		result = new String( this.zscii_to_text( result, resulttexts ) );
 		result.pc = addr;
 		this.e.jit[start_addr] = result;
 		if ( !nowarn && start_addr < this.e.staticmem )
@@ -1048,7 +1049,7 @@ Text = Object.subClass({
 		{
 			achar = zscii[i++];
 			// Space
-			if ( achar == 32 )
+			if ( achar === 32 )
 			{
 				zchars.push( 0 );
 			}
@@ -1071,7 +1072,7 @@ Text = Object.subClass({
 				zchars.push( 5, 6, temp >> 5, temp & 0x1F );
 			}
 			// Pad character
-			else if ( achar == undefined )
+			else if ( achar === undefined )
 			{
 				zchars.push( 5 );
 			}
@@ -1100,7 +1101,7 @@ Text = Object.subClass({
 		{
 			charr = zscii[i++];
 			// Text substitution from abbreviations or 1.1 unicode
-			if ( charr == -1 )
+			if ( charr === -1 )
 			{
 				result += texts[j++];
 			}
@@ -1184,7 +1185,7 @@ Text = Object.subClass({
 		while ( i < textend )
 		{
 			letter = memory.getUint8( text + i++ );
-			if ( letter == 32 || separators.indexOf( letter ) >= 0 )
+			if ( letter === 32 || separators.indexOf( letter ) >= 0 )
 			{
 				if ( word.length )
 				{
@@ -1192,7 +1193,7 @@ Text = Object.subClass({
 					wordstart += word.length;
 					word = [];
 				}
-				if ( letter != 32 )
+				if ( letter !== 32 )
 				{
 					words.push( [[letter], wordstart] );
 				}
@@ -1271,7 +1272,7 @@ var extend = function( old, add )
 	for ( var name in add )
 	{
 		// Don't copy cleared styles
-		if ( add[name] != undefined )
+		if ( add[name] !== undefined )
 		{
 			old[name] = add[name];
 		}
@@ -1381,7 +1382,7 @@ return Object.subClass({
 			// Messy CSS colour code
 			result = [ parseInt( data[4], 16 ), parseInt( data[5], 16 ), parseInt( data[6], 16 ) ];
 			// Stretch out compact #000 codes to their full size
-			if ( code.length == 4 )
+			if ( code.length === 4 )
 			{
 				result = [ result[0] << 4 | result[0], result[1] << 4 | result[1], result[2] << 4 | result[2] ];
 			}
@@ -1393,7 +1394,7 @@ return Object.subClass({
 
 	erase_line: function( value )
 	{
-		if ( value == 1 )
+		if ( value === 1 )
 		{
 			this.flush();
 			this.status.push( { code: "eraseline" } );
@@ -1407,11 +1408,11 @@ return Object.subClass({
 		{
 			this.clear_window();
 		}
-		if ( window == -1 )
+		if ( window === -1 )
 		{
 			this.split_window( 0 );
 		}
-		if ( window == -2 || window == 1 )
+		if ( window === -2 || window === 1 )
 		{
 			this.status.push( { code: "clear" } );
 		}
@@ -1423,7 +1424,7 @@ return Object.subClass({
 		var order;
 		
 		// If we have a buffer transfer it to the orders
-		if ( this.buffer != '' )
+		if ( this.buffer !== '' )
 		{
 			order = {
 				code: 'stream',
@@ -1468,12 +1469,12 @@ return Object.subClass({
 	set_font: function( font )
 	{
 		// We only support fonts 1 and 4
-		if ( font != 1 && font != 4 )
+		if ( font !== 1 && font !== 4 )
 		{
 			return 0;
 		}
 		var returnval = this.mono & 0x04 ? 4 : 1;
-		if ( font != returnval )
+		if ( font !== returnval )
 		{
 			this.flush();
 			this.mono ^= 0x04;
@@ -1491,7 +1492,7 @@ return Object.subClass({
 		this.flush();
 		
 		// Setting the style to Roman will clear the others
-		if ( stylebyte == 0 )
+		if ( stylebyte === 0 )
 		{
 			doreverse = this.reverse;
 			this.reverse = styles['font-weight'] = styles['font-style'] = undefined;
@@ -1542,7 +1543,7 @@ return Object.subClass({
 			background = temp;
 		}
 		
-		if ( foreground == 0xFFFF )
+		if ( foreground === 0xFFFF )
 		{
 			newforeground = undefined;
 		}
@@ -1551,7 +1552,7 @@ return Object.subClass({
 			newforeground = convert_true_colour( foreground );
 		}
 		
-		if ( background == 0xFFFF )
+		if ( background === 0xFFFF )
 		{
 			newbackground = undefined;
 		}
@@ -1641,16 +1642,16 @@ Indirect = Storer.subClass({
 		
 		// Replace the indirect operand with a Variable, and set .indirect if needed
 		operands[0] = new Variable( this.e, op0isVar ? op0 : op0.v );
-		if ( op0isVar || op0.v == 0 )
+		if ( op0isVar || op0.v === 0 )
 		{
 			operands[0].indirect = 1;
 		}
 		
 		// Get the storer
-		this.storer = this.code == 142 ? operands.pop() : operands.shift();
+		this.storer = this.code === 142 ? operands.pop() : operands.shift();
 		
 		// @pull needs an added stack. If for some reason it was compiled with two operands this will break!
-		if ( operands.length == 0 )
+		if ( operands.length === 0 )
 		{
 			operands.push( new Variable( this.e, 0 ) );
 		}
@@ -1678,7 +1679,7 @@ Incdec = Opcode.subClass({
 
 opcodes = {
 	
-/* je */ 1: opcode_builder( Brancher, function() { return arguments.length == 2 ? this.args( '==' ) : 'e.jeq(' + this.args() + ')'; } ),
+/* je */ 1: opcode_builder( Brancher, function() { return arguments.length === 2 ? this.args( '===' ) : 'e.jeq(' + this.args() + ')'; } ),
 /* jl */ 2: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '<' + b.U2S(); } ),
 /* jg */ 3: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '>' + b.U2S(); } ),
 // Too many U2S/S2U for these...
@@ -1707,7 +1708,7 @@ opcodes = {
 /* call_2n */ 26: Caller,
 /* set_colour */ 27: opcode_builder( Opcode, function() { return 'e.ui.set_colour(' + this.args() + ')'; } ),
 /* throw */ 28: opcode_builder( Stopper, function( value, cookie ) { return 'while(e.call_stack.length>' + cookie + '){e.call_stack.shift()}e.ret(' + value + ')'; } ),
-/* jz */ 128: opcode_builder( Brancher, function( a ) { return a + '==0'; } ),
+/* jz */ 128: opcode_builder( Brancher, function( a ) { return a + '===0'; } ),
 /* get_sibling */ 129: opcode_builder( BrancherStorer, function( obj ) { return 'e.get_sibling(' + obj + ')'; } ),
 /* get_child */ 130: opcode_builder( BrancherStorer, function( obj ) { return 'e.get_child(' + obj + ')'; } ),
 /* get_parent */ 131: opcode_builder( Storer, function( obj ) { return 'e.get_parent(' + obj + ')'; } ),
@@ -1824,11 +1825,11 @@ var idiom_if_block = function( context, pc )
 	while ( i < context.ops.length - 1 )
 	{
 		// As long as no other opcodes have an offset property we can skip the instanceof check
-		if ( /* context.ops[i] instanceof Brancher && */ context.ops[i].offset == pc )
+		if ( /* context.ops[i] instanceof Brancher && */ context.ops[i].offset === pc )
 		{
 			// Sometimes Inform makes complex branches, where the only subcontext opcode would be a brancher itself
 			// Join the two branches into one
-			if ( context.ops.length - i == 2 /* && context.ops[i + 1] instanceof Brancher */ && context.ops[i + 1].offset )
+			if ( context.ops.length - i === 2 /* && context.ops[i + 1] instanceof Brancher */ && context.ops[i + 1].offset )
 			{
 				lastop = context.ops.pop();
 				secondlastop = context.ops.pop();
@@ -1860,7 +1861,7 @@ var idiom_if_block = function( context, pc )
 			
 			// Check if this is actually a loop
 			lastop = subcontext.ops[sublen];
-			if ( lastop.code == 140 && ( U2S( lastop.operands[0].v ) + lastop.next - 2 ) == brancher.pc )
+			if ( lastop.code === 140 && ( U2S( lastop.operands[0].v ) + lastop.next - 2 ) === brancher.pc )
 			{
 				brancher.keyword = 'while';
 				subcontext.ops.pop();
@@ -1882,7 +1883,7 @@ var idiom_if_block = function( context, pc )
 						allbranches = 0;
 					}
 				}
-				if ( allbranches == 1 )
+				if ( allbranches === 1 )
 				{
 					console.info( 'Potential complex condition in ' + context.pc + ' at ' + brancher.pc );
 				}
@@ -1958,7 +1959,7 @@ var disassemble = function( engine )
 		code = memory.getUint8( pc++ );
 		
 		// Extended instructions
-		if ( code == 190 )
+		if ( code === 190 )
 		{
 			operands_type = -1;
 			code = memory.getUint8( pc++ ) + 1000;
@@ -2011,13 +2012,13 @@ var disassemble = function( engine )
 		opcode_class = opcodes[code].prototype;
 		
 		// Variable form operand types
-		if ( operands_type == -1 )
+		if ( operands_type === -1 )
 		{
 			operands_type = [];
 			get_var_operand_types( memory.getUint8(pc++), operands_type );
 			
 			// VAR_LONG opcodes have two operand type bytes
-			if ( code == 236 || code == 250 )
+			if ( code === 236 || code === 250 )
 			{
 				get_var_operand_types( memory.getUint8(pc++), operands_type );
 			}
@@ -2029,20 +2030,20 @@ var disassemble = function( engine )
 		while ( temp < operands_type.length )
 		{
 			// Large constant
-			if ( operands_type[temp] == 0 )
+			if ( operands_type[temp] === 0 )
 			{
 				operands.push( new Operand( engine, memory.getUint16(pc) ) );
 				pc += 2;
 			}
 			
 			// Small constant
-			if ( operands_type[temp] == 1 )
+			if ( operands_type[temp] === 1 )
 			{
 				operands.push( new Operand( engine, memory.getUint8(pc++) ) );
 			}
 			
 			// Variable operand
-			if ( operands_type[temp++] == 2 )
+			if ( operands_type[temp++] === 2 )
 			{
 				operands.push( new Variable( engine, memory.getUint8(pc++) ) );
 			}
@@ -2181,7 +2182,7 @@ window.ZVM = Object.subClass( {
 	
 	clear_attr: function( object, attribute )
 	{
-		var addr = this.objects + 14 * object + parseInt( attribute / 8 );
+		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
 	},
 	
@@ -2194,7 +2195,7 @@ window.ZVM = Object.subClass( {
 		size = Math.abs( size );
 		
 		// Simple case, zeroes
-		if ( second == 0 )
+		if ( second === 0 )
 		{
 			while ( i < size )
 			{
@@ -2230,7 +2231,7 @@ window.ZVM = Object.subClass( {
 			return 0;
 		}
 		addr += 2 * word;
-		if ( value == undefined )
+		if ( value === undefined )
 		{
 			return this.m.getUint16( addr );
 		}
@@ -2256,12 +2257,12 @@ window.ZVM = Object.subClass( {
 			this_property = this_property_byte & 0x3F;
 		
 			// Found the previous property, so return this one's number
-			if ( last_property == prev )
+			if ( last_property === prev )
 			{
 				return this_property;
 			}
 			// Found the property! Return it's address
-			if ( this_property == property )
+			if ( this_property === property )
 			{
 				// Must include the offset
 				return properties + ( this_property_byte & 0x80 ? 2 : 1 );
@@ -2345,7 +2346,7 @@ window.ZVM = Object.subClass( {
 	get_prop_len: function( addr )
 	{
 		// Spec 1.1
-		if ( addr == 0 )
+		if ( addr === 0 )
 		{
 			return 0;
 		}
@@ -2356,7 +2357,7 @@ window.ZVM = Object.subClass( {
 		if ( value & 0x80 )
 		{
 			value &= 0x3F;
-			return value == 0 ? 64 : value;
+			return value === 0 ? 64 : value;
 		}
 		// One byte size/number
 		return value & 0x40 ? 2 : 1;
@@ -2367,19 +2368,19 @@ window.ZVM = Object.subClass( {
 	incdec: function( varnum, change )
 	{
 		var result, offset;
-		if ( varnum == 0 )
+		if ( varnum === 0 )
 		{
 			result = S2U( this.s.pop() + change );
 			this.s.push( result );
 			return result;
 		}
-		if ( varnum < 16 )
+		if ( --varnum < 15 )
 		{
-			return this.l[varnum - 1] = S2U( this.l[varnum - 1] + change );
+			return this.l[varnum] = S2U( this.l[varnum] + change );
 		}
 		else
 		{
-			offset = this.globals + ( varnum - 16 ) * 2;
+			offset = this.globals + ( varnum - 15 ) * 2;
 			return this.m.setUint16( offset, this.m.getUint16( offset ) + change );
 		}
 	},
@@ -2387,7 +2388,7 @@ window.ZVM = Object.subClass( {
 	// Indirect variables
 	indirect: function( variable, value )
 	{
-		if ( variable == 0 )
+		if ( variable === 0 )
 		{
 			if ( arguments.length > 1 )
 			{
@@ -2417,7 +2418,7 @@ window.ZVM = Object.subClass( {
 		// Account for many arguments
 		while ( i < arguments.length )
 		{
-			if ( arguments[i++] == arguments[0] )
+			if ( arguments[i++] === arguments[0] )
 			{
 				r = 1;
 			}
@@ -2427,7 +2428,7 @@ window.ZVM = Object.subClass( {
 	
 	jin: function( child, parent )
 	{
-		return this.get_parent( child ) == parent;
+		return this.get_parent( child ) === parent;
 	},
 	
 	log_shift: function( number, places )
@@ -2439,11 +2440,11 @@ window.ZVM = Object.subClass( {
 	output_stream: function( stream, addr )
 	{
 		stream = U2S( stream );
-		if ( stream == 1 )
+		if ( stream === 1 )
 		{
 			this.streams[0] = 1;
 		}
-		if ( stream == -1 )
+		if ( stream === -1 )
 		{
 			if ( DEBUG )
 			{
@@ -2451,11 +2452,11 @@ window.ZVM = Object.subClass( {
 			}
 			this.streams[0] = 0;
 		}
-		if ( stream == 3 )
+		if ( stream === 3 )
 		{
 			this.streams[2].unshift( [ addr, '' ] );
 		}
-		if ( stream == -3 )
+		if ( stream === -3 )
 		{
 			var data = this.streams[2].shift(),
 			text = this.text.text_to_zscii( data[1] );
@@ -2478,7 +2479,7 @@ window.ZVM = Object.subClass( {
 			// Check if the monospace font bit has changed
 			// Unfortunately, even now Inform changes this bit for the font statement, even though the 1.1 standard depreciated it :(
 			var fontbit = this.m.getUint8( 0x11 ) & 0x02;
-			if ( fontbit != ( this.ui.mono & 0x02 ) )
+			if ( fontbit !== ( this.ui.mono & 0x02 ) )
 			{
 				// Flush if we're actually changing font (ie, the other bits are off)
 				if ( !( this.ui.mono & 0xFD ) )
@@ -2531,9 +2532,9 @@ window.ZVM = Object.subClass( {
 		}
 		
 		// Pure randomness
-		if ( this.random_state == 0 )
+		if ( this.random_state === 0 )
 		{
-			return parseInt( Math.random() * range ) + 1;
+			return ( Math.random() * range ) | 0 + 1;
 		}
 		// How can we best seed the RNG?
 		
@@ -2553,7 +2554,7 @@ window.ZVM = Object.subClass( {
 	read: function( text, parse, time, routine, storer )
 	{
 		// Check if not all operands were used
-		if ( arguments.length == 3 )
+		if ( arguments.length === 3 )
 		{
 			storer = time;
 			time = routine = 0;
@@ -2575,7 +2576,7 @@ window.ZVM = Object.subClass( {
 	read_char: function( one, time, routine, storer )
 	{
 		// Check if not all operands were used
-		if ( arguments.length == 2 )
+		if ( arguments.length === 2 )
 		{
 			storer = time;
 			time = routine = 0;
@@ -2597,7 +2598,7 @@ window.ZVM = Object.subClass( {
 		temp_younger;
 		
 		// No parent, do nothing
-		if ( parent == 0 )
+		if ( parent === 0 )
 		{
 			return;
 		}
@@ -2606,7 +2607,7 @@ window.ZVM = Object.subClass( {
 		younger_sibling = this.get_sibling( obj );
 		
 		// obj is first child
-		if ( older_sibling == obj )
+		if ( older_sibling === obj )
 		{
 			this.set_family( obj, 0, parent, younger_sibling );
 		}
@@ -2617,7 +2618,7 @@ window.ZVM = Object.subClass( {
 			while ( 1 )
 			{
 				temp_younger = this.get_sibling( older_sibling );
-				if ( temp_younger == obj )
+				if ( temp_younger === obj )
 				{
 					break;
 				}
@@ -2648,7 +2649,7 @@ window.ZVM = Object.subClass( {
 			{
 				temp = qmem[i++];
 				// Same memory
-				if ( temp == 0 )
+				if ( temp === 0 )
 				{
 					j += 1 + qmem[i++];
 				}
@@ -2705,7 +2706,7 @@ window.ZVM = Object.subClass( {
 	
 	restore_undo: function()
 	{
-		if ( this.undo.length == 0 )
+		if ( this.undo.length === 0 )
 		{
 			return 0;
 		}
@@ -2767,9 +2768,9 @@ window.ZVM = Object.subClass( {
 		for ( i = 0; i < this.staticmem; i++ )
 		{
 			abyte = memory.getUint8( i ) ^ this.data[i];
-			if ( abyte == 0 )
+			if ( abyte === 0 )
 			{
-				if ( ++zeroes == 256 )
+				if ( ++zeroes === 256 )
 				{
 					compressed_mem.push( 0, 255 );
 					zeroes = 0;
@@ -2848,7 +2849,7 @@ window.ZVM = Object.subClass( {
 		
 		while ( addr < length )
 		{
-			if ( memoryfunc( addr ) == key )
+			if ( memoryfunc( addr ) === key )
 			{
 				return addr;
 			}
@@ -2859,7 +2860,7 @@ window.ZVM = Object.subClass( {
 	
 	set_attr: function( object, attribute )
 	{
-		var addr = this.objects + 14 * object + parseInt( attribute / 8 );
+		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) | 0x80 >> attribute % 8 );
 	},
 	
@@ -2881,19 +2882,20 @@ window.ZVM = Object.subClass( {
 	
 	test: function( bitmap, flag )
 	{
-		return bitmap & flag == flag;
+		return bitmap & flag === flag;
 	},
 	
 	test_attr: function( object, attribute )
 	{
-		return ( this.m.getUint8( this.objects + 14 * object + parseInt( attribute / 8 ) ) << attribute % 8 ) & 0x80;
+		return ( this.m.getUint8( this.objects + 14 * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
 	},
 	
 	// Read or write a variable
 	variable: function( variable, value )
 	{
-		var havevalue = value !== undefined;
-		if ( variable == 0 )
+		var havevalue = value !== undefined,
+		offset;
+		if ( variable === 0 )
 		{
 			if ( havevalue )
 			{
@@ -2904,26 +2906,27 @@ window.ZVM = Object.subClass( {
 				return this.s.pop();
 			}
 		}
-		else if ( variable < 16 )
+		else if ( --variable < 15 )
 		{
 			if ( havevalue )
 			{
-				this.l[variable - 1] = value;
+				this.l[variable] = value;
 			}
 			else
 			{
-				return this.l[variable - 1];
+				return this.l[variable];
 			}
 		}
 		else
 		{
+			offset = this.globals + ( variable - 15 ) * 2;
 			if ( havevalue )
 			{
-				this.m.setUint16( this.globals + ( variable - 16 ) * 2, value );
+				this.m.setUint16( offset, value );
 			}
 			else
 			{
-				this.m.getUint16( this.globals + ( variable - 16 ) * 2 );
+				return this.m.getUint16( offset );
 			}
 		}
 		return value;
@@ -3012,24 +3015,24 @@ TODO:
 		this.orders = [];
 		
 		// Load the story file
-		if ( code == 'load' )
+		if ( code === 'load' )
 		{
 			this.data = data.data;
 			return;
 		}
 		
-		if ( code == 'restart' )
+		if ( code === 'restart' )
 		{
 			this.restart();
 		}
 		
-		if ( code == 'save' )
+		if ( code === 'save' )
 		{
 			// Set the result variable, assume success
 			this.variable( data.storer, data.result || 1 );
 		}
 		
-		if ( code == 'restore' )
+		if ( code === 'restore' )
 		{
 			// Restart the VM if we never have before
 			if ( !this.m )
@@ -3050,7 +3053,7 @@ TODO:
 		}
 		
 		// Handle line input
-		if ( code == 'read' )
+		if ( code === 'read' )
 		{
 			// Store the terminating character
 			this.variable( data.storer, data.terminator );
@@ -3080,13 +3083,13 @@ TODO:
 		}
 		
 		// Handle character input
-		if ( code == 'char' )
+		if ( code === 'char' )
 		{
 			this.variable( data.storer, this.text.keyinput( data.response ) );
 		}
 		
 		// Write the status window's cursor position
-		if ( code == 'get_cursor' )
+		if ( code === 'get_cursor' )
 		{
 			memory.setUint16( data.addr, data.pos[0] + 1 );
 			memory.setUint16( data.addr + 2, data.pos[1] + 1 );
@@ -3107,7 +3110,7 @@ TODO:
 		extension = memory.getUint16( 0x36 );
 		
 		// Check if the version is supported
-		if ( version != 5 && version != 8 )
+		if ( version !== 5 && version !== 8 )
 		{
 			throw new Error( 'Unsupported Z-Machine version: ' + version );
 		}
@@ -3142,7 +3145,7 @@ TODO:
 			extension_count: extension ? memory.getUint16( extension ) : 0,
 			
 			// Routine and string multiplier
-			addr_multipler: version == 5 ? 4 : 8
+			addr_multipler: version === 5 ? 4 : 8
 			
 		});
 		// These classes rely too much on the above, so add them after
@@ -3210,7 +3213,7 @@ TODO:
 			
 			// Or if more than five seconds has passed, however only check every 50k times
 			// What's the best time for this?
-			if ( ++count % 50000 == 0 && ( (new Date()) - now ) > 5000 )
+			if ( ++count % 50000 === 0 && ( (new Date()) - now ) > 5000 )
 			{
 				this.act( 'tick' );
 				return;

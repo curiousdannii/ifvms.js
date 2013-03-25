@@ -78,24 +78,24 @@ TODO:
 		this.orders = [];
 		
 		// Load the story file
-		if ( code == 'load' )
+		if ( code === 'load' )
 		{
 			this.data = data.data;
 			return;
 		}
 		
-		if ( code == 'restart' )
+		if ( code === 'restart' )
 		{
 			this.restart();
 		}
 		
-		if ( code == 'save' )
+		if ( code === 'save' )
 		{
 			// Set the result variable, assume success
 			this.variable( data.storer, data.result || 1 );
 		}
 		
-		if ( code == 'restore' )
+		if ( code === 'restore' )
 		{
 			// Restart the VM if we never have before
 			if ( !this.m )
@@ -116,7 +116,7 @@ TODO:
 		}
 		
 		// Handle line input
-		if ( code == 'read' )
+		if ( code === 'read' )
 		{
 			// Store the terminating character
 			this.variable( data.storer, data.terminator );
@@ -146,13 +146,13 @@ TODO:
 		}
 		
 		// Handle character input
-		if ( code == 'char' )
+		if ( code === 'char' )
 		{
 			this.variable( data.storer, this.text.keyinput( data.response ) );
 		}
 		
 		// Write the status window's cursor position
-		if ( code == 'get_cursor' )
+		if ( code === 'get_cursor' )
 		{
 			memory.setUint16( data.addr, data.pos[0] + 1 );
 			memory.setUint16( data.addr + 2, data.pos[1] + 1 );
@@ -173,7 +173,7 @@ TODO:
 		extension = memory.getUint16( 0x36 );
 		
 		// Check if the version is supported
-		if ( version != 5 && version != 8 )
+		if ( version !== 5 && version !== 8 )
 		{
 			throw new Error( 'Unsupported Z-Machine version: ' + version );
 		}
@@ -208,7 +208,7 @@ TODO:
 			extension_count: extension ? memory.getUint16( extension ) : 0,
 			
 			// Routine and string multiplier
-			addr_multipler: version == 5 ? 4 : 8
+			addr_multipler: version === 5 ? 4 : 8
 			
 		});
 		// These classes rely too much on the above, so add them after
@@ -276,7 +276,7 @@ TODO:
 			
 			// Or if more than five seconds has passed, however only check every 50k times
 			// What's the best time for this?
-			if ( ++count % 50000 == 0 && ( (new Date()) - now ) > 5000 )
+			if ( ++count % 50000 === 0 && ( (new Date()) - now ) > 5000 )
 			{
 				this.act( 'tick' );
 				return;

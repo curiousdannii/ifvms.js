@@ -68,7 +68,7 @@ Variable = Operand.subClass({
 		}
 		
 		// Stack
-		if ( variable == 0 )
+		if ( variable === 0 )
 		{
 			// If we've been passed a value we're setting a variable
 			return 's.pop()';
@@ -100,7 +100,7 @@ Variable = Operand.subClass({
 		}
 		
 		// Stack
-		if ( variable == 0 )
+		if ( variable === 0 )
 		{
 			// If we've been passed a value we're setting a variable
 			return 's.push(' + value + ')';
@@ -228,7 +228,7 @@ Brancher = Opcode.subClass({
 		this.iftrue = brancher[0];
 		
 		// Process the offset
-		if ( offset == 0 || offset == 1 )
+		if ( offset === 0 || offset === 1 )
 		{
 			result = 'e.ret(' + offset + ')';
 		}
@@ -259,7 +259,7 @@ Brancher = Opcode.subClass({
 		{
 			prev = this.context.ops.pop();
 			// As long as no other opcodes have an offset property we can skip the instanceof check
-			if ( /* prev instanceof Brancher && */ prev.offset == offset )
+			if ( /* prev instanceof Brancher && */ prev.offset === offset )
 			{
 				// Goes to same offset so reuse the Brancher arrays
 				this.cond.ops.unshift( prev.cond );
@@ -361,7 +361,7 @@ Caller = Stopper.subClass({
 		if ( DEBUG )
 		{
 			var addr = '' + this.operands.shift(),
-			targetname = window.vm_functions && parseInt( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
+			targetname = window.vm_functions && !isNaN( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
 			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])' + targetname;
 		}
 		else

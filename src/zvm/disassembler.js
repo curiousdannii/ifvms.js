@@ -45,7 +45,7 @@ var disassemble = function( engine )
 		code = memory.getUint8( pc++ );
 		
 		// Extended instructions
-		if ( code == 190 )
+		if ( code === 190 )
 		{
 			operands_type = -1;
 			code = memory.getUint8( pc++ ) + 1000;
@@ -98,13 +98,13 @@ var disassemble = function( engine )
 		opcode_class = opcodes[code].prototype;
 		
 		// Variable form operand types
-		if ( operands_type == -1 )
+		if ( operands_type === -1 )
 		{
 			operands_type = [];
 			get_var_operand_types( memory.getUint8(pc++), operands_type );
 			
 			// VAR_LONG opcodes have two operand type bytes
-			if ( code == 236 || code == 250 )
+			if ( code === 236 || code === 250 )
 			{
 				get_var_operand_types( memory.getUint8(pc++), operands_type );
 			}
@@ -116,20 +116,20 @@ var disassemble = function( engine )
 		while ( temp < operands_type.length )
 		{
 			// Large constant
-			if ( operands_type[temp] == 0 )
+			if ( operands_type[temp] === 0 )
 			{
 				operands.push( new Operand( engine, memory.getUint16(pc) ) );
 				pc += 2;
 			}
 			
 			// Small constant
-			if ( operands_type[temp] == 1 )
+			if ( operands_type[temp] === 1 )
 			{
 				operands.push( new Operand( engine, memory.getUint8(pc++) ) );
 			}
 			
 			// Variable operand
-			if ( operands_type[temp++] == 2 )
+			if ( operands_type[temp++] === 2 )
 			{
 				operands.push( new Variable( engine, memory.getUint8(pc++) ) );
 			}

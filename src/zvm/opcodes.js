@@ -39,16 +39,16 @@ Indirect = Storer.subClass({
 		
 		// Replace the indirect operand with a Variable, and set .indirect if needed
 		operands[0] = new Variable( this.e, op0isVar ? op0 : op0.v );
-		if ( op0isVar || op0.v == 0 )
+		if ( op0isVar || op0.v === 0 )
 		{
 			operands[0].indirect = 1;
 		}
 		
 		// Get the storer
-		this.storer = this.code == 142 ? operands.pop() : operands.shift();
+		this.storer = this.code === 142 ? operands.pop() : operands.shift();
 		
 		// @pull needs an added stack. If for some reason it was compiled with two operands this will break!
-		if ( operands.length == 0 )
+		if ( operands.length === 0 )
 		{
 			operands.push( new Variable( this.e, 0 ) );
 		}
@@ -76,7 +76,7 @@ Incdec = Opcode.subClass({
 
 opcodes = {
 	
-/* je */ 1: opcode_builder( Brancher, function() { return arguments.length == 2 ? this.args( '==' ) : 'e.jeq(' + this.args() + ')'; } ),
+/* je */ 1: opcode_builder( Brancher, function() { return arguments.length === 2 ? this.args( '===' ) : 'e.jeq(' + this.args() + ')'; } ),
 /* jl */ 2: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '<' + b.U2S(); } ),
 /* jg */ 3: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '>' + b.U2S(); } ),
 // Too many U2S/S2U for these...
@@ -105,7 +105,7 @@ opcodes = {
 /* call_2n */ 26: Caller,
 /* set_colour */ 27: opcode_builder( Opcode, function() { return 'e.ui.set_colour(' + this.args() + ')'; } ),
 /* throw */ 28: opcode_builder( Stopper, function( value, cookie ) { return 'while(e.call_stack.length>' + cookie + '){e.call_stack.shift()}e.ret(' + value + ')'; } ),
-/* jz */ 128: opcode_builder( Brancher, function( a ) { return a + '==0'; } ),
+/* jz */ 128: opcode_builder( Brancher, function( a ) { return a + '===0'; } ),
 /* get_sibling */ 129: opcode_builder( BrancherStorer, function( obj ) { return 'e.get_sibling(' + obj + ')'; } ),
 /* get_child */ 130: opcode_builder( BrancherStorer, function( obj ) { return 'e.get_child(' + obj + ')'; } ),
 /* get_parent */ 131: opcode_builder( Storer, function( obj ) { return 'e.get_parent(' + obj + ')'; } ),

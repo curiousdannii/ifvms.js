@@ -2,6 +2,8 @@ module.exports = function( grunt )
 {
 	"use strict";
 	
+	/* jshint -W070 */ // Allow trailing commas only in the Gruntfile
+	
 	grunt.initConfig({
 		concat: {
 			options: {
@@ -32,6 +34,7 @@ module.exports = function( grunt )
 			options: {
 				// Enforcing options
 				curly: true, // Require brackets for all blocks
+				eqeqeq: true, // Require === and !==
 				latedef: true, // require all vars to be defined before being used
 				newcap: true, // require classes to begin with a capital
 				strict: true, // ES5 strict mode
@@ -39,9 +42,7 @@ module.exports = function( grunt )
 				unused: true, // warn for unused vars
 				
 				// Relaxing options
-				"-W041": false, // Use '===' to compare with '0'
 				"-W064": false, // Don't warn about missing new with ByteArray
-				"-W065": false, // Missing radix parameter in parseInt
 				boss: true, // Allow assignments in if, return etc
 				evil: true, // eval() :)
 				funcscope: true, // don't complain about using variables defined inside if statements
@@ -49,18 +50,20 @@ module.exports = function( grunt )
 				// Environment
 				browser: true,
 				nonstandard: true,
-				predef: [ 'DEBUG', 'ZVM', 'GVM', 'IFF', 'parchment', 'vm_functions' ],
+				predef: [
+					'DEBUG',
+					'GVM',
+					'IFF',
+					'module',
+					'parchment',
+					'vm_functions',
+					'ZVM',
+				],
 			},
-			dist: [ 'dist/*.js' ],
-			grunt: {
-				options: {
-					node: true,
-					"-W070": false,
-				},
-				files: {
-					src: [ 'Gruntfile.js' ],
-				},
-			},
+			all: [
+				'Gruntfile.js',
+				'dist/*.js'
+			],
 		}
 	});
 
