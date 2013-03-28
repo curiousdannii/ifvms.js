@@ -1,0 +1,262 @@
+From a6474f7a47bea8d7d0792bc5986727404b8a110d Mon Sep 17 00:00:00 2001
+From: Dannii <curiousdannii@gmail.com>
+Date: Thu, 19 Jan 2012 09:18:03 +1000
+Subject: [PATCH 289/290] Callers can now run their routines directly
+
+---
+ src/common/ast.js       | 65 ++++++++++++++++++++++--------------
+ src/zvm/disassembler.js |  8 +++--
+ src/zvm/runtime.js      | 23 ++++++-------
+ src/zvm/vm.js           | 15 ++++++---
+ 4 files changed, 65 insertions(+), 46 deletions(-)
+
+diff --git a/src/common/ast.js b/src/common/ast.js
+index fd51f4d..db55903 100644
+--- a/src/common/ast.js
++++ b/src/common/ast.js
+@@ -15,7 +15,7 @@ All AST nodes must use these functions, even constants
+ (An exception is made for branch addresses and text literals which remain as primitives)
+ toString() functions are used to generate JIT code
+ 
+-Aside from Variable is currently generic and could be used for Glulx too
++Aside from Variable and Caller.toString is currently generic and could be used for Glulx too
+ 
+ TODO:
+ 	Use strict mode for new Function()?
+@@ -23,6 +23,7 @@ TODO:
+ 	Can we eliminate the Operand class?
+ 	Subclass Operand/Variable from Number?
+ 	Replace calls to args() with arguments.join()?
++	Can Callers check at run time whether their JIT functions are safe, without the disassembler going crazy?
+ 	
+ */
+ 
+@@ -227,8 +228,7 @@ Brancher = Opcode.subClass({
+ 	// Process the branch result now
+ 	post: function()
+ 	{
+-		var result,
+-		prev,
++		var prev,
+ 		
+ 		// Calculate the offset
+ 		brancher = this.operands.pop(),
+@@ -238,7 +238,7 @@ Brancher = Opcode.subClass({
+ 		// Process the offset
+ 		if ( offset === 0 || offset === 1 )
+ 		{
+-			result = 'e.ret(' + offset + ')';
++			this.result = 'return ' + offset;
+ 		}
+ 		else
+ 		{
+@@ -246,10 +246,9 @@ Brancher = Opcode.subClass({
+ 			
+ 			// Add this target to this context's list
+ 			this.context.targets.push( offset );
+-			result = 'e.pc=' + offset;
++			this.result = 'e.pc=' + offset + ';return';
+ 		}
+ 		
+-		this.result = result + '; return';
+ 		this.offset = offset;
+ 		this.cond = new BrancherLogic( [this] );
+ 		
+@@ -352,34 +351,50 @@ Storer = Opcode.subClass({
+ }),
+ 
+ // Routine calling opcodes
+-Caller = Stopper.subClass({
++Caller = Opcode.subClass({
+ 	// Fake a result variable
+-	result: { v: -1 },
+-
++	result: {
++		v: -1,
++		store: function( code ) { return code; }
++	},
++	
++	// Check whether we are calling a safe function
++	post: function()
++	{
++		var addr = this.operands.shift(),
++		jitfunc = parseInt( addr ) && this.e.jit[addr * this.e.addr_multipler] || {};
++		this.stopper = !parseInt( addr ) || !jitfunc.safe;
++		this.addr = addr;
++		if ( this.storer )
++		{
++			this.result = this.operands.pop();
++		}
++	},
++	
+ 	// Write out the opcode
+ 	toString: function()
+ 	{
++		var code = this.label() + 't=[' + this.addr + '*' + this.e.addr_multipler + ',['
++			+ this.args() + ( this.operands.length ? ',' : '' ) + Array( 16 - this.operands.length ).join( '0,' ) + this.operands.length + ']];';
++		
+ 		// Debug: include label if possible
+-		/* DEBUG */
+-			var addr = '' + this.operands.shift(),
+-			targetname = window.vm_functions && parseInt( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
+-			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.args() + ']);return' + targetname;
+-		/* ENDDEBUG */
+-		return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + ']);return';
++		;;; code += window.vm_functions && parseInt( this.addr ) ? ' /* ' + find_func_name( this.addr * this.e.addr_multipler ) + '() */ ' : '';
++		
++		// Variable address or not-safe function, we must use call()
++		if ( this.stopper )
++		{
++			return code + 'e.call(t[0],' + this.result.v + ',' + this.next + ',t[1])';
++		}
++		// Safe function, call it directly!
++		else
++		{
++			return code + this.result.store( 'e.jit[t[0]](e,t[1])' );
++		}
+ 	}
+ }),
+ 
+ // Routine calling opcodes, storing the result
+-CallerStorer = Caller.subClass({
+-	// Flag for the disassembler
+-	storer: 1,
+-	
+-	post: function()
+-	{
+-		// We can't let the storer be optimised away here
+-		this.result = this.operands.pop();
+-	}
+-}),
++CallerStorer = Caller.subClass({ storer: 1 }),
+ 
+ // A generic context (a routine, loop body etc)
+ Context = Object.subClass({
+diff --git a/src/zvm/disassembler.js b/src/zvm/disassembler.js
+index d948fdc..557964f 100644
+--- a/src/zvm/disassembler.js
++++ b/src/zvm/disassembler.js
+@@ -20,7 +20,7 @@ TODO:
+ */
+ 
+ // The disassembler function
+-var disassemble = function( engine )
++var disassemble = function( engine, is_routine )
+ {
+ 	var pc, offset, // Set in the loop below
+ 	memory = engine.m,
+@@ -29,6 +29,7 @@ var disassemble = function( engine )
+ 	opcode_class,
+ 	operands_type, // The types of the operands, or -1 for var instructions
+ 	operands,
++	opcode,
+ 	
+ 	// Create the context for this code fragment
+ 	context = new RoutineContext( engine, engine.pc );
+@@ -166,7 +167,8 @@ var disassemble = function( engine )
+ 		engine.pc = pc;
+ 		
+ 		// Create the instruction
+-		context.ops.push( new opcodes[code]( engine, context, code, offset, pc, operands ) );
++		opcode = new opcodes[code]( engine, context, code, offset, pc, operands );
++		context.ops.push( opcode );
+ 		
+ 		// Check for the end of a large if block
+ 		temp = 0;
+@@ -180,7 +182,7 @@ var disassemble = function( engine )
+ 		}
+ 		
+ 		// We can't go any further if we have a final stopper :(
+-		if ( opcode_class.stopper && !temp )
++		if ( opcode.stopper && !temp )
+ 		{
+ 			break;
+ 		}
+diff --git a/src/zvm/runtime.js b/src/zvm/runtime.js
+index dab2c54..be58a77 100644
+--- a/src/zvm/runtime.js
++++ b/src/zvm/runtime.js
+@@ -33,20 +33,8 @@ window.ZVM = Object.subClass( {
+ 	// Call a routine
+ 	call: function( addr, storer, next, args )
+ 	{
+-		var i,
+-		
+-		// Keep the number of provided args for @check_arg_count
+-		provided_args = args.length;
+-		
+-		// Add extra locals
+-		while ( args.length < 15 )
+-		{
+-			args.push(0);
+-		}
+-		
+ 		// Get the number of locals and advance the pc
+-		this.pc = addr * this.addr_multipler;
+-		args.push( provided_args, this.m.getUint8( this.pc++ ) );
++		args.push( this.m.getUint8( addr++ ) );
+ 		
+ 		// Push the call stack
+ 		this.call_stack.push({
+@@ -57,6 +45,15 @@ window.ZVM = Object.subClass( {
+ 		
+ 		// Set the new locals
+ 		this.l = args.concat( this.l );
++		
++		// Pre-compile the routine, telling the disassembler that it is one
++		this.pc = addr;
++		if ( !this.jit[addr] )
++		{
++			this.compile( 1 );
++			// Reset the pc again
++			this.pc = addr;
++		}
+ 	},
+ 	
+ 	clear_attr: function( object, attribute )
+diff --git a/src/zvm/vm.js b/src/zvm/vm.js
+index e301c88..093ff48 100644
+--- a/src/zvm/vm.js
++++ b/src/zvm/vm.js
+@@ -278,9 +278,10 @@ var ZVM_core = {
+ 	},
+ 	
+ 	// Compile a JIT routine
+-	compile: function()
++	compile: function( is_routine )
+ 	{
+-		var context = disassemble( this );
++		var context = disassemble( this, is_routine ),
++		func;
+ 		
+ 		// Compile the routine with new Function()
+ 		if ( DEBUG )
+@@ -294,7 +295,7 @@ var ZVM_core = {
+ 				console.log( code );
+ 			}
+ 			// We use eval because Firebug can't profile new Function
+-			var func = eval( '(function JIT_' + context.pc + '(e,l){' + code + '})' );
++			func = eval( '(function JIT_' + context.pc + '(e,l){' + code + '})' );
+ 			
+ 			// Extra stuff for debugging
+ 			func.context = context;
+@@ -303,10 +304,14 @@ var ZVM_core = {
+ 			{
+ 				func.name = context.name;
+ 			}
+-			this.jit[context.pc] = func;
+ 		/* ELSEDEBUG
+-			this.jit[context.pc] = new Function( 'e', 'l', optimise( '' + context ) );
++			func = new Function( 'e', 'l', optimise( '' + context ) );
+ 		/* ENDDEBUG */
++		
++		func.unsafe = context.unsafe;
++		func.safe = context.safe;
++		this.jit[context.pc] = func;
++		
+ 		if ( context.pc < this.staticmem )
+ 		{
+ 			console.warn( 'Caching a JIT function in dynamic memory: ' + context.pc );
+-- 
+1.8.1.msysgit.1
+

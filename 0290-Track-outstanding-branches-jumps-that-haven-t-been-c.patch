@@ -1,0 +1,337 @@
+From 459332e9b4b18444f481d2091bdcf23fa63c76cf Mon Sep 17 00:00:00 2001
+From: Dannii <curiousdannii@gmail.com>
+Date: Thu, 19 Jan 2012 21:33:15 +1000
+Subject: [PATCH 290/290] Track outstanding branches/jumps that haven't been
+ caught by an idiom
+
+---
+ src/common/ast.js       | 53 ++++++++++++++++++++++++++++++------
+ src/common/idioms.js    | 27 +++++-------------
+ src/zvm/disassembler.js | 21 +++++++++++++-
+ src/zvm/header.txt      |  2 +-
+ src/zvm/opcodes.js      |  6 ++--
+ src/zvm/text.js         |  2 +-
+ src/zvm/vm.js           |  2 +-
+ 7 files changed, 77 insertions(+), 36 deletions(-)
+
+diff --git a/src/common/ast.js b/src/common/ast.js
+index db55903..accbfd9 100644
+--- a/src/common/ast.js
++++ b/src/common/ast.js 
+@@ -191,6 +191,22 @@ Pauser = Stopper.subClass({
+ 	}
+ }),
+ 
++// Jump! Jump!
++Jumper = Stopper.subClass({
++	jumper: 1,
++	optypes: 's',
++	
++	post: function()
++	{
++		this.context.branches++;
++	},
++	
++	func: function( a )
++	{
++		return 'e.pc=' + ( a.store ? a + '+' + ( this.next - 2 ) : U2S( a.v ) + this.next - 2 );
++	}
++}),
++
+ // Join multiple branchers together with varying logic conditions
+ BrancherLogic = Object.subClass({
+ 	init: function( ops, code )
+@@ -229,6 +245,8 @@ Brancher = Opcode.subClass({
+ 	post: function()
+ 	{
+ 		var prev,
++		context = this.context,
++		non_returner = 1,
+ 		
+ 		// Calculate the offset
+ 		brancher = this.operands.pop(),
+@@ -239,19 +257,22 @@ Brancher = Opcode.subClass({
+ 		if ( offset == 0 || offset == 1 )
+ 		{
+ 			this.result = 'return ' + offset;
++			non_returner = 0;
+ 		}
+ 		else
+ 		{
+ 			offset += this.next - 2;
+ 			
+ 			// Add this target to this context's list
+-			this.context.targets.push( offset );
++			context.targets.push( offset );
+ 			this.result = 'e.pc=' + offset + ';return';
+ 		}
+ 		
+ 		this.offset = offset;
+ 		this.cond = new BrancherLogic( [this] );
+ 		
++		context.branches += non_returner;
++		
+ 		/* DEBUG */
+ 		// Stop if we must
+ 		if ( debugflags.noidioms )
+@@ -261,9 +282,9 @@ Brancher = Opcode.subClass({
+ 		/* ENDDEBUG */
+ 			
+ 		// Compare with previous statement
+-		if ( this.context.ops.length )
++		if ( context.ops.length )
+ 		{
+-			prev = this.context.ops.pop();
++			prev = context.ops.pop();
+ 			// As long as no other opcodes have an offset property we can skip the instanceof check
+ 			if ( /* prev instanceof Brancher && */ prev.offset == offset )
+ 			{
+@@ -271,10 +292,12 @@ Brancher = Opcode.subClass({
+ 				this.cond.ops.unshift( prev.cond );
+ 				this.labels = prev.labels;
+ 				this.labels.push( this.pc + '/' + this.code );
++				// Whops, decrease the outstanding branches
++				context.branches -= non_returner;
+ 			}
+ 			else
+ 			{
+-				this.context.ops.push( prev );
++				context.ops.push( prev );
+ 			}
+ 		}
+ 	},
+@@ -362,23 +385,31 @@ Caller = Opcode.subClass({
+ 	post: function()
+ 	{
+ 		var addr = this.operands.shift(),
+-		jitfunc = parseInt( addr ) && this.e.jit[addr * this.e.addr_multipler] || {};
+-		this.stopper = !parseInt( addr ) || !jitfunc.safe;
++		const_addr = parseInt( addr ),
++		multiplier = this.e.addr_multiplier;
++
+ 		this.addr = addr;
+ 		if ( this.storer )
+ 		{
+ 			this.result = this.operands.pop();
+ 		}
++	
++		this.unsafe = !const_addr;
++		this.stopper = !const_addr || !(this.e.jit[addr * multiplier] || {}).safe;
++		if ( const_addr && this.stopper )
++		{
++			this.context.depends.push( addr * multiplier );
++		}
+ 	},
+ 	
+ 	// Write out the opcode
+ 	toString: function()
+ 	{
+-		var code = this.label() + 't=[' + this.addr + '*' + this.e.addr_multipler + ',['
++		var code = this.label() + 't=[' + this.addr + '*' + this.e.addr_multiplier + ',['
+ 			+ this.args() + ( this.operands.length ? ',' : '' ) + Array( 16 - this.operands.length ).join( '0,' ) + this.operands.length + ']];';
+ 		
+ 		// Debug: include label if possible
+-		;;; code += window.vm_functions && parseInt( this.addr ) ? ' /* ' + find_func_name( this.addr * this.e.addr_multipler ) + '() */ ' : '';
++		;;; code += window.vm_functions && parseInt( this.addr ) ? ' /* ' + find_func_name( this.addr * this.e.addr_multiplier ) + '() */ ' : '';
+ 		
+ 		// Variable address or not-safe function, we must use call()
+ 		if ( this.stopper )
+@@ -407,6 +438,7 @@ Context = Object.subClass({
+ 		this.post = [];
+ 		this.targets = []; // Branch targets
+ 		;;; this.spacer = '';
++		this.depends = []; // Dependant routines
+ 	},
+ 	
+ 	toString: function()
+@@ -423,6 +455,9 @@ Context = Object.subClass({
+ 
+ // A routine body
+ RoutineContext = Context.subClass({
++	// The number of outstanding branches (used to determine safety status)
++	branches: 0,
++	
+ 	toString: function()
+ 	{
+ 		// Debug: If we have routine names, find this one's name
+diff --git a/src/common/idioms.js b/src/common/idioms.js
+index 8f5279e..a5599a8 100644
+--- a/src/common/idioms.js
++++ b/src/common/idioms.js
+@@ -3,7 +3,7 @@
+ Inform idioms
+ =============
+ 
+-Copyright (c) 2011 The ifvms.js team
++Copyright (c) 2012 The ifvms.js team
+ BSD licenced
+ http://github.com/curiousdannii/ifvms.js
+  
+@@ -16,8 +16,6 @@ TODO:
+ 		doesn't work yet because of storers before the branch
+ 		Need loops where the condition is at the end -> do {} while ()
+ 	break (& continue?)
+-	when opcodes are removed, if debug then add a comment
+-	The @jump check isn't VM independant
+ 	
+ */
+ 
+@@ -38,6 +36,9 @@ var idiom_if_block = function( context, pc )
+ 		// As long as no other opcodes have an offset property we can skip the instanceof check
+ 		if ( /* context.ops[i] instanceof Brancher && */ context.ops[i].offset == pc )
+ 		{
++			// We're taking care of a brancher, so decrement the outstanding branches count :)
++			context.branches--;
++			
+ 			// Sometimes Inform makes complex branches, where the only subcontext opcode would be a brancher itself
+ 			// Join the two branches into one
+ 			if ( context.ops.length - i == 2 /* && context.ops[i + 1] instanceof Brancher */ && context.ops[i + 1].offset )
+@@ -69,10 +70,12 @@ var idiom_if_block = function( context, pc )
+ 			
+ 			// Check if this is actually a loop
+ 			lastop = subcontext.ops[sublen];
+-			if ( lastop.code == 140 && ( U2S( lastop.operands[0].v ) + lastop.next - 2 ) == brancher.pc )
++			if ( lastop.jumper && ( U2S( lastop.operands[0].v ) + lastop.next - 2 ) == brancher.pc )
+ 			{
+ 				brancher.keyword = 'while';
+ 				subcontext.ops.pop();
++				;;; subcontext.ops.push( '/* Jumper removed by idiom_if_block() */' );
++				context.branches--;
+ 			}
+ 			else
+ 			{
+@@ -80,22 +83,6 @@ var idiom_if_block = function( context, pc )
+ 				subcontext.stopper = lastop.stopper;
+ 			}
+ 			
+-			/* DEBUG */
+-				// Check whether this could be a very complex condition
+-				var allbranches = 1;
+-				for ( i = 0; i < sublen + 1; i++ )
+-				{
+-					if ( !( subcontext.ops[i] instanceof Brancher ) )
+-					{
+-						allbranches = 0;
+-					}
+-				}
+-				if ( allbranches == 1 )
+-				{
+-					console.info( 'Potential complex condition in ' + context.pc + ' at ' + brancher.pc );
+-				}
+-			/* ENDDEBUG */
+-			
+ 			// Return 1 to signal that we can continue past the stopper
+ 			return 1;
+ 		}
+diff --git a/src/zvm/disassembler.js b/src/zvm/disassembler.js
+index 557964f..00e3517 100644
+--- a/src/zvm/disassembler.js
++++ b/src/zvm/disassembler.js
+@@ -3,7 +3,7 @@
+ Z-Machine disassembler - disassembles zcode into an AST
+ =======================================================
+ 
+-Copyright (c) 2011 The ifvms.js team
++Copyright (c) 2012 The ifvms.js team
+ BSD licenced
+ http://github.com/curiousdannii/ifvms.js
+ 
+@@ -170,6 +170,9 @@ var disassemble = function( engine, is_routine )
+ 		opcode = new opcodes[code]( engine, context, code, offset, pc, operands );
+ 		context.ops.push( opcode );
+ 		
++		// Update our safety status
++		context.unsafe |= opcode.unsafe;
++		
+ 		// Check for the end of a large if block
+ 		temp = 0;
+ 		if ( context.targets.indexOf( pc ) >= 0 )
+@@ -188,6 +191,22 @@ var disassemble = function( engine, is_routine )
+ 		}
+ 	}
+ 	
++	// Check whether the context has any outstanding branches
++	if ( context.branches )
++	{
++		;;; console.info( 'Outstanding branches/jumps in ' + context.pc );
++		context.unsafe = 1;
++	}
++	
++	// Safe functions! :D
++	else if ( !context.unsafe && !context.depends.length )
++	{
++		;;; console.info( 'Safe routine: ' + context.pc );
++		context.safe = 1;
++	}
++	
++	// Add the next address and return
++	context.next = pc;
+ 	return context;
+ },
+ 
+diff --git a/src/zvm/header.txt b/src/zvm/header.txt
+index 2a7db13..a7ce947 100644
+--- a/src/zvm/header.txt
++++ b/src/zvm/header.txt
+@@ -5,7 +5,7 @@ ZVM - the ifvms.js implementation of the Z-Machine
+ 
+ Built: BUILDDATE
+ 
+-Copyright (c) 2011 The ifvms.js team
++Copyright (c) 2012 The ifvms.js team
+ BSD licenced
+ http://github.com/curiousdannii/ifvms.js
+ 
+diff --git a/src/zvm/opcodes.js b/src/zvm/opcodes.js
+index 1137f5c..d1e1525 100644
+--- a/src/zvm/opcodes.js
++++ b/src/zvm/opcodes.js
+@@ -3,7 +3,7 @@
+ Z-Machine opcodes
+ =================
+ 
+-Copyright (c) 2011 The ifvms.js team
++Copyright (c) 2012 The ifvms.js team
+ BSD licenced
+ http://github.com/curiousdannii/ifvms.js
+ 
+@@ -115,8 +115,8 @@ opcodes = {
+ /* remove_obj */ 137: opcode_builder( Opcode, function( obj ) { return 'e.remove_obj(' + obj + ')'; } ),
+ /* print_obj */ 138: opcode_builder( Opcode, function( obj ) { return 'e.print_obj(' + obj + ')'; } ),
+ /* ret */ 139: opcode_builder( Stopper, function( a ) { return 'return ' + a; } ),
+-/* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a + '+' + ( this.next - 2 ); }, 's' ),
+-/* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr + '*' + this.e.addr_multipler + '))'; } ),
++/* jump */ 140: Jumper,
++/* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr + '*' + this.e.addr_multiplier + '))'; } ),
+ /* load */ 142: Indirect.subClass( { storer: 1 } ),
+ /* call_1n */ 143: Caller,
+ /* rtrue */ 176: opcode_builder( Stopper, function() { return 'return 1'; } ),
+diff --git a/src/zvm/text.js b/src/zvm/text.js
+index 2b6a1a9..2769323 100644
+--- a/src/zvm/text.js
++++ b/src/zvm/text.js
+@@ -51,7 +51,7 @@ Text = Object.subClass({
+ 		i = 0, l = 96;
+ 		
+ 		this.e = engine;
+-		this.maxaddr = memory.getUint16( 0x1A ) * engine.addr_multipler;
++		this.maxaddr = memory.getUint16( 0x1A ) * engine.addr_multiplier;
+ 		
+ 		// Check for custom alphabets
+ 		this.make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
+diff --git a/src/zvm/vm.js b/src/zvm/vm.js
+index 093ff48..53d5920 100644
+--- a/src/zvm/vm.js
++++ b/src/zvm/vm.js
+@@ -194,7 +194,7 @@ var ZVM_core = {
+ 			extension_count: extension ? memory.getUint16( extension ) : 0,
+ 			
+ 			// Routine and string multiplier
+-			addr_multipler: version == 5 ? 4 : 8
++			addr_multiplier: version == 5 ? 4 : 8
+ 			
+ 		});
+ 		// These classes rely too much on the above, so add them after
+-- 
+1.8.1.msysgit.1
+

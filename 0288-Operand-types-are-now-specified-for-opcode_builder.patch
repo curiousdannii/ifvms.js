@@ -1,0 +1,289 @@
+From 87088477560a4cb43d0cbd98f0f34eade409ab35 Mon Sep 17 00:00:00 2001
+From: Dannii <curiousdannii@gmail.com>
+Date: Wed, 18 Jan 2012 23:29:40 +1000
+Subject: [PATCH 288/290] Operand types are now specified for opcode_builder()
+
+---
+ src/common/ast.js  | 61 +++++++++++++++++++++++++----------------
+ src/zvm/opcodes.js | 52 +++++++++++++++++------------------
+ 2 files changed, 63 insertions(+), 50 deletions(-)
+
+diff --git a/src/common/ast.js b/src/common/ast.js
+index 2581cab..fd51f4d 100644
+--- a/src/common/ast.js
++++ b/src/common/ast.js
+@@ -39,13 +39,7 @@ var Operand = Object.subClass({
+ 	},
+ 	toString: function()
+ 	{
+-		return this.v;
+-	},
+-	
+-	// Convert an Operand into a signed operand
+-	U2S: function()
+-	{
+-		return U2S( this.v );
++		return this.signed ? ' ' + U2S( this.v ) : this.v;
+ 	}
+ }),
+ 
+@@ -56,27 +50,32 @@ Variable = Operand.subClass({
+ 	// Get a value
+ 	toString: function()
+ 	{
+-		var variable = this.v;
++		var variable = this.v,
++		code;
+ 		
+ 		// Indirect
+ 		if ( this.indirect )
+ 		{
+-			return 'e.indirect(' + variable + ')';
++			code = 'e.indirect(' + variable + ')';
+ 		}
+ 		
+ 		// Stack
+-		if ( variable === 0 )
++		else if ( variable === 0 )
+ 		{
+ 			// If we've been passed a value we're setting a variable
+-			return 's.pop()';
++			code = 's.pop()';
+ 		}
+ 		// Locals
+-		if ( --variable < 15 )
++		else if ( --variable < 15 )
+ 		{
+-			return 'l[' + variable + ']';
++			code = 'l[' + variable + ']';
+ 		}
+ 		// Globals
+-		return 'm.getUint16(' + ( this.e.globals + ( variable - 15 ) * 2 ) + ')';
++		else
++		{
++			code = 'm.getUint16(' + ( this.e.globals + ( variable - 15 ) * 2 ) + ')';
++		}
++		return this.signed ? 'e.U2S(' + code + ')' : code;
+ 	},
+ 	
+ 	// Store a value
+@@ -84,6 +83,12 @@ Variable = Operand.subClass({
+ 	{
+ 		var variable = this.v;
+ 		
++		// Account for signed stores
++		if ( this.signed )
++		{
++			value = 'e.S2U(' + value + ')';
++		}
++		
+ 		// Indirect variable
+ 		if ( this.indirect )
+ 		{
+@@ -109,18 +114,14 @@ Variable = Operand.subClass({
+ 		}
+ 		// Globals
+ 		return 'm.setUint16(' + ( this.e.globals + ( variable - 15 ) * 2 ) + ',' + value + ')';
+-	},
+-	
+-	// Convert an Operand into a signed operand
+-	U2S: function()
+-	{
+-		return 'e.U2S(' + this + ')';
+ 	}
+ }),
+ 
+ // Generic opcode
+ // .func() must be set, which returns what .write() will actually return; it is passed the operands as its arguments
+ Opcode = Object.subClass({
++	optypes: '',
++	
+ 	init: function( engine, context, code, pc, next, operands )
+ 	{
+ 		this.e = engine;
+@@ -131,6 +132,15 @@ Opcode = Object.subClass({
+ 		this.next = next;
+ 		this.operands = operands;
+ 		
++		// Set the operand types
++		for ( var i = 0; i < operands.length; i++ )
++		{
++			if ( this.optypes.charAt( i ) == 's' )
++			{
++				operands[i].signed = 1;
++			}
++		}
++		
+ 		// Post-init function (so that they don't all have to call _super)
+ 		if ( this.post )
+ 		{
+@@ -165,6 +175,7 @@ Stopper = Opcode.subClass({
+ // Pausing opcodes (ie, set the pc at the end of the context)
+ Pauser = Stopper.subClass({
+ 	storer: 1,
++	unsafe: 1,
+ 	
+ 	post: function()
+ 	{
+@@ -362,13 +373,13 @@ Caller = Stopper.subClass({
+ 		{
+ 			var addr = '' + this.operands.shift(),
+ 			targetname = window.vm_functions && parseInt( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
+-			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])' + targetname;
++			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.args() + ']);return' + targetname;
+ 		}
+ 		else
+ 		{
+-			return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])';
++			return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + ']);return';
+ 		}
+ 	}
+ }),
+@@ -437,7 +424,7 @@ RoutineContext = Context.subClass({
+ 
+ // Opcode builder
+ // Easily build a new opcode from a class
+-opcode_builder = function( Class, func, flags )
++opcode_builder = function( Class, func, optypes, flags )
+ {
+ 	var flags = flags || {};
+ 	if ( func )
+@@ -428,6 +439,10 @@ opcode_builder = function( Class, func, flags )
+ 			flags.func = func;
+ 		//}
+ 	}
++	if ( optypes )
++	{
++		flags.optypes = optypes;
++	}
+ 	return Class.subClass( flags );
+ };
+ 
+diff --git a/src/zvm/opcodes.js b/src/zvm/opcodes.js
+index 9930695..1137f5c 100644
+--- a/src/zvm/opcodes.js
++++ b/src/zvm/opcodes.js
+@@ -12,7 +12,6 @@ http://github.com/curiousdannii/ifvms.js
+ /*
+ 	
+ TODO:
+-	Abstract out the signed conversions such that they can be eliminated if possible
+ 	don't access memory directly
+ 	
+ */
+@@ -77,11 +76,10 @@ Incdec = Opcode.subClass({
+ opcodes = {
+ 	
+ /* je */ 1: opcode_builder( Brancher, function() { return arguments.length == 2 ? this.args( '==' ) : 'e.jeq(' + this.args() + ')'; } ),
+-/* jl */ 2: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '<' + b.U2S(); } ),
+-/* jg */ 3: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '>' + b.U2S(); } ),
+-// Too many U2S/S2U for these...
+-/* dec_chk */ 4: opcode_builder( Brancher, function( variable, value ) { return 'e.U2S(e.incdec(' + variable + ',-1))<' + value.U2S(); } ),
+-/* inc_chk */ 5: opcode_builder( Brancher, function( variable, value ) { return 'e.U2S(e.incdec(' + variable + ',1))>' + value.U2S(); } ),
++/* jl */ 2: opcode_builder( Brancher, function() { return this.args( '<' ); }, 'ss' ),
++/* jg */ 3: opcode_builder( Brancher, function() { return this.args( '>' ); }, 'ss' ),
++/* dec_chk */ 4: opcode_builder( Brancher, function( variable, value ) { return 'e.U2S(e.incdec(' + variable + ',-1))<' + value; }, 'us' ),
++/* inc_chk */ 5: opcode_builder( Brancher, function( variable, value ) { return 'e.U2S(e.incdec(' + variable + ',1))>' + value; }, 'us' ),
+ /* jin */ 6: opcode_builder( Brancher, function() { return 'e.jin(' + this.args() + ')'; } ),
+ /* test */ 7: opcode_builder( Brancher, function() { return 'e.test(' + this.args() + ')'; } ),
+ /* or */ 8: opcode_builder( Storer, function() { return this.args( '|' ); } ),
+@@ -91,16 +89,16 @@ opcodes = {
+ /* clear_attr */ 12: opcode_builder( Opcode, function() { return 'e.clear_attr(' + this.args() + ')'; } ),
+ /* store */ 13: Indirect,
+ /* insert_obj */ 14: opcode_builder( Opcode, function() { return 'e.insert_obj(' + this.args() + ')'; } ),
+-/* loadw */ 15: opcode_builder( Storer, function( array, index ) { return 'm.getUint16(e.S2U(' + array + '+2*' + index.U2S() + '))'; } ),
+-/* loadb */ 16: opcode_builder( Storer, function( array, index ) { return 'm.getUint8(e.S2U(' + array + '+' + index.U2S() + '))'; } ),
++/* loadw */ 15: opcode_builder( Storer, function() { return 'm.getUint16(e.S2U(' + this.args( '+2*' ) + '))'; }, 'us' ),
++/* loadb */ 16: opcode_builder( Storer, function() { return 'm.getUint8(e.S2U(' + this.args( '+' ) + '))'; }, 'us' ),
+ /* get_prop */ 17: opcode_builder( Storer, function() { return 'e.get_prop(' + this.args() + ')'; } ),
+ /* get_prop_addr */ 18: opcode_builder( Storer, function() { return 'e.find_prop(' + this.args() + ')'; } ),
+ /* get_next_prop */ 19: opcode_builder( Storer, function() { return 'e.find_prop(' + this.args( ',0,' ) + ')'; } ),
+-/* add */ 20: opcode_builder( Storer, function() { return 'e.S2U(' + this.args( '+' ) + ')'; } ),
+-/* sub */ 21: opcode_builder( Storer, function() { return 'e.S2U(' + this.args( '-' ) + ')'; } ),
+-/* mul */ 22: opcode_builder( Storer, function() { return 'e.S2U(' + this.args( '*' ) + ')'; } ),
+-/* div */ 23: opcode_builder( Storer, function( a, b ) { return 'e.S2U(parseInt(' + a.U2S() + '/' + b.U2S() + '))'; } ),
+-/* mod */ 24: opcode_builder( Storer, function( a, b ) { return 'e.S2U(' + a.U2S() + '%' + b.U2S() + ')'; } ),
++/* add */ 20: opcode_builder( Storer, function() { return this.args( '+' ); }, 'uus' ),
++/* sub */ 21: opcode_builder( Storer, function() { return this.args( '-' ); }, 'uus' ),
++/* mul */ 22: opcode_builder( Storer, function() { return this.args( '*' ); }, 'uus' ),
++/* div */ 23: opcode_builder( Storer, function() { return 'parseInt(' + this.args( '/' ) + ')'; }, 'sss' ),
++/* mod */ 24: opcode_builder( Storer, function() { return this.args( '%' ); }, 'sss' ),
+ /* call_2s */ 25: CallerStorer,
+ /* call_2n */ 26: Caller,
+ /* set_colour */ 27: opcode_builder( Opcode, function() { return 'e.ui.set_colour(' + this.args() + ')'; } ),
+@@ -117,37 +115,37 @@ opcodes = {
+ /* remove_obj */ 137: opcode_builder( Opcode, function( obj ) { return 'e.remove_obj(' + obj + ')'; } ),
+ /* print_obj */ 138: opcode_builder( Opcode, function( obj ) { return 'e.print_obj(' + obj + ')'; } ),
+ /* ret */ 139: opcode_builder( Stopper, function( a ) { return 'return ' + a; } ),
+-/* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + ( this.next - 2 ); } ),
++/* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a + '+' + ( this.next - 2 ); }, 's' ),
+ /* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr + '*' + this.e.addr_multipler + '))'; } ),
+ /* load */ 142: Indirect.subClass( { storer: 1 } ),
+ /* call_1n */ 143: Caller,
+ /* rtrue */ 176: opcode_builder( Stopper, function() { return 'return 1'; } ),
+ /* rfalse */ 177: opcode_builder( Stopper, function() { return 'return 0'; } ),
+ // Reconsider a generalised class for @print/@print_ret?
+-/* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print("' + text + '")'; }, { printer: 1 } ),
+-/* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print("' + text + '\\n");return 1'; }, { printer: 1 } ),
++/* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print("' + text + '")'; }, '', { printer: 1 } ),
++/* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print("' + text + '\\n");return 1'; }, '', { printer: 1 } ),
+ /* nop */ 180: Opcode,
+ /* restart */ 183: opcode_builder( Stopper, function() { return 'e.act("restart")'; } ),
+-/* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( new Variable( this.e, 0 ) ); } } ),
++/* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, '', { post: function() { this.operands.push( new Variable( this.e, 0 ) ); } } ),
+ /* catch */ 185: opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
+ /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act("quit")'; } ),
+ /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print("\\n")'; } ),
+ /* verify */ 189: alwaysbranch, // Actually check??
+ /* piracy */ 191: alwaysbranch,
+ /* call_vs */ 224: CallerStorer,
+-/* storew */ 225: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint16(e.S2U(' + array + '+2*' + index.U2S() + '),' + value + ')'; } ),
+-/* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint8(e.S2U(' + array + '+' + index.U2S() + '),' + value + ')'; } ),
++/* storew */ 225: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint16(e.S2U(' + array + '+2*' + index + '),' + value + ')'; }, 'us' ),
++/* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint8(e.S2U(' + array + '+' + index + '),' + value + ')'; }, 'us' ),
+ /* put_prop */ 227: opcode_builder( Opcode, function() { return 'e.put_prop(' + this.args() + ')'; } ),
+ /* aread */ 228: opcode_builder( Pauser, function() { return 'e.read(' + this.args() + ',' + this.storer.v + ')'; } ),
+ /* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(e.text.zscii_to_text([' + a + ']))'; } ),
+-/* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.print(' + a.U2S() + ')'; } ),
+-/* random */ 231: opcode_builder( Storer, function( a ) { return 'e.random(' + a.U2S() + ')'; } ),
+-/* push */ 232: opcode_builder( Storer, simple_func, { post: function() { this.storer = new Variable( this.e, 0 ); }, storer: 0 } ),
++/* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.print(' + a + ')'; }, 's' ),
++/* random */ 231: opcode_builder( Storer, function( a ) { return 'e.random(' + a + ')'; }, 's' ),
++/* push */ 232: opcode_builder( Storer, simple_func, '', { post: function() { this.storer = new Variable( this.e, 0 ); }, storer: 0 } ),
+ /* pull */ 233: Indirect,
+ /* split_window */ 234: opcode_builder( Opcode, function( lines ) { return 'e.ui.split_window(' + lines + ')'; } ),
+ /* set_window */ 235: opcode_builder( Opcode, function( wind ) { return 'e.ui.set_window(' + wind + ')'; } ),
+ /* call_vs2 */ 236: CallerStorer,
+-/* erase_window */ 237: opcode_builder( Opcode, function( win ) { return 'e.ui.erase_window(' + win.U2S() + ')'; } ),
++/* erase_window */ 237: opcode_builder( Opcode, function( win ) { return 'e.ui.erase_window(' + win + ')'; }, 's' ),
+ /* erase_line */ 238: opcode_builder( Opcode, function( a ) { return 'e.ui.erase_line(' + a + ')'; } ),
+ /* set_cursor */ 239: opcode_builder( Opcode, function() { return 'e.ui.set_cursor(' + this.args() + ')'; } ),
+ /* get_cursor */ 240: opcode_builder( Pauser, function( addr ) { return 'e.ui.get_cursor(' + addr + ')'; } ),
+@@ -158,7 +156,7 @@ opcodes = {
+ /* sound_effect */ 245: Opcode, // We don't support sounds
+ /* read_char */ 246: opcode_builder( Pauser, function() { return 'e.read_char(' + this.args() + ',' + this.storer.v + ')'; } ),
+ /* scan_table */ 247: opcode_builder( BrancherStorer, function() { return 'e.scan_table(' + this.args() + ')'; } ),
+-/* not */ 248: opcode_builder( Storer, function( a ) { return 'e.S2U(~' + a + ')'; } ),
++/* not */ 248: opcode_builder( Storer, function( a ) { return '~' + a; }, 'us' ),
+ /* call_vn */ 249: Caller,
+ /* call_vn2 */ 250: Caller,
+ /* tokenise */ 251: opcode_builder( Opcode, function() { return 'e.text.tokenise(' + this.args() + ')'; } ),
+@@ -168,12 +166,12 @@ opcodes = {
+ /* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return arg + '<=l[15]'; } ),
+ /* save */ 1000: opcode_builder( Pauser, function() { return 'e.save(' + ( this.next - 1 ) + ',' + this.storer.v + ')'; } ),
+ /* restore */ 1001: opcode_builder( Pauser, function() { return 'e.act("restore",{storer:' + this.storer.v + '})'; } ),
+-/* log_shift */ 1002: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.log_shift(' + a + ',' + b.U2S() + '))'; } ),
+-/* art_shift */ 1003: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.art_shift(' + a.U2S() + ',' + b.U2S() + '))'; } ),
++/* log_shift */ 1002: opcode_builder( Storer, function() { return 'e.log_shift(' + this.args() + ')'; }, 'uss' ),
++/* art_shift */ 1003: opcode_builder( Storer, function() { return 'e.art_shift(' + this.args() + ')'; }, 'sss' ),
+ /* set_font */ 1004: opcode_builder( Storer, function( font ) { return 'e.ui.set_font(' + font + ')'; } ),
+ /* save_undo */ 1009: opcode_builder( Storer, function() { return 'e.save_undo(' + this.next + ',' + this.storer.v + ')'; } ),
+ // As the standard says calling this without a save point is illegal, we don't need to actually store anything (but it must still be disassembled)
+-/* restore_undo */ 1010: opcode_builder( Opcode, function() { return 'if(e.restore_undo())return'; }, { storer: 1 } ),
++/* restore_undo */ 1010: opcode_builder( Opcode, function() { return 'if(e.restore_undo())return'; }, '', { storer: 1 } ),
+ /* print_unicode */ 1011: opcode_builder( Opcode, function( a ) { return 'e.print(String.fromCharCode(' + a + '))'; } ),
+ // Assume we can print and read all unicode characters rather than actually testing
+ /* check_unicode */ 1012: opcode_builder( Storer, function() { return 3; } ),
+-- 
+1.8.1.msysgit.1
+
