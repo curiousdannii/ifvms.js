@@ -3,7 +3,7 @@
 ZVM - the ifvms.js implementation of the Z-Machine
 ==================================================
 
-Built: 2013-03-25
+Built: 2013-03-28
 
 Copyright (c) 2011-2013 The ifvms.js team
 BSD licenced
@@ -1719,19 +1719,19 @@ opcodes = {
 /* call_1s */ 136: CallerStorer,
 /* remove_obj */ 137: opcode_builder( Opcode, function( obj ) { return 'e.remove_obj(' + obj + ')'; } ),
 /* print_obj */ 138: opcode_builder( Opcode, function( obj ) { return 'e.print_obj(' + obj + ')'; } ),
-/* ret */ 139: opcode_builder( Stopper, function( a ) { return 'e.ret(' + a + ')'; } ),
+/* ret */ 139: opcode_builder( Stopper, function( a ) { return 'return ' + a; } ),
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + ( this.next - 2 ); } ),
 /* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr + '*' + this.e.addr_multipler + '))'; } ),
 /* load */ 142: Indirect.subClass( { storer: 1 } ),
 /* call_1n */ 143: Caller,
-/* rtrue */ 176: opcode_builder( Stopper, function() { return 'e.ret(1)'; } ),
-/* rfalse */ 177: opcode_builder( Stopper, function() { return 'e.ret(0)'; } ),
+/* rtrue */ 176: opcode_builder( Stopper, function() { return 'return 1'; } ),
+/* rfalse */ 177: opcode_builder( Stopper, function() { return 'return 0'; } ),
 // Reconsider a generalised class for @print/@print_ret?
 /* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print("' + text + '")'; }, { printer: 1 } ),
-/* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print("' + text + '\\n");e.ret(1)'; }, { printer: 1 } ),
+/* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print("' + text + '\\n");return 1'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
 /* restart */ 183: opcode_builder( Stopper, function() { return 'e.act("restart")'; } ),
-/* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'e.ret(' + a + ')'; }, { post: function() { this.operands.push( new Variable( this.e, 0 ) ); } } ),
+/* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( new Variable( this.e, 0 ) ); } } ),
 /* catch */ 185: opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act("quit")'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print("\\n")'; } ),
@@ -3198,6 +3198,7 @@ TODO:
 	{
 		var now = new Date(),
 		pc,
+		result,
 		count = 0;
 		
 		// Stop when ordered to
@@ -3209,7 +3210,13 @@ TODO:
 			{
 				this.compile();
 			}
-			this.jit[pc]( this );
+			result = this.jit[pc]( this );
+			
+			// Return from a VM func if the JIT function returned a result
+			if ( !isNaN( result ) )
+			{
+				this.ret( result );
+			}
 			
 			// Or if more than five seconds has passed, however only check every 50k times
 			// What's the best time for this?
