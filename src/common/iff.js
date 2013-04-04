@@ -3,12 +3,12 @@
 Interchange File Format library
 ===============================
 
-Copyright (c) 2008-2011 The Parchment Contributors
+Copyright (c) 2008-2013 The ifvms.js team
 BSD licenced
-http://code.google.com/p/parchment
+http://github.com/curiousdannii/ifvms.js
+(Originally in Parchment)
 
 */
-//(function(){
 
 // Get a 32 bit number from a byte array, and vice versa
 var num_from = function(s, offset)
@@ -34,7 +34,7 @@ text_to_word = function(t)
 
 // IFF file class
 // Parses an IFF file stored in a byte array
-IFF = Object.subClass({
+IFF = Class.subClass({
 	// Parse a byte array or construct an empty IFF file
 	init: function parse_iff(data)
 	{
@@ -43,8 +43,10 @@ IFF = Object.subClass({
 		if (data)
 		{
 			// Check this is an IFF file
-			if (text_from(data, 0) != 'FORM')
+			if (text_from(data, 0) !== 'FORM')
+			{
 				throw new Error("Not an IFF file");
+			}
 
 			// Parse the file
 			this.type = text_from(data, 8);
@@ -54,8 +56,10 @@ IFF = Object.subClass({
 			{
 				var chunk_length = num_from(data, i + 4);
 				if (chunk_length < 0 || (chunk_length + i) > l)
+				{
 					// FIXME: do something sensible here
 					throw new Error("IFF: Chunk out of range");
+				}
 
 				this.chunks.push({
 					type: text_from(data, i),
@@ -64,7 +68,10 @@ IFF = Object.subClass({
 				});
 
 				i += 8 + chunk_length;
-				if (chunk_length % 2) i++;
+				if (chunk_length % 2) 
+				{
+					i++;
+				}
 			}
 		}
 	},
@@ -81,7 +88,9 @@ IFF = Object.subClass({
 			var chunk = this.chunks[i], data = chunk.data, len = data.length;
 			out = out.concat(text_to_word(chunk.type), num_to_word(len), data);
 			if (len % 2)
+			{
 				out.push(0);
+			}
 		}
 
 		// Add the header and return
@@ -94,6 +103,3 @@ IFF.num_from = num_from;
 IFF.num_to_word = num_to_word;
 IFF.text_from = text_from;
 IFF.text_to_word = text_to_word;
-//window.IFF = IFF;
-
-//})();

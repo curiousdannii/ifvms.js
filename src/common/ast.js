@@ -34,7 +34,7 @@ if ( DEBUG )
 
 // Generic/constant operand
 // Value is a constant
-var Operand = Object.subClass({
+var Operand = Class.subClass({
 	init: function( engine, value )
 	{
 		this.e = engine;
@@ -123,7 +123,7 @@ Variable = Operand.subClass({
 
 // Generic opcode
 // .func() must be set, which returns what .write() will actually return; it is passed the operands as its arguments
-Opcode = Object.subClass({
+Opcode = Class.subClass({
 	init: function( engine, context, code, pc, next, operands )
 	{
 		this.e = engine;
@@ -183,7 +183,7 @@ Pauser = Stopper.subClass({
 }),
 
 // Join multiple branchers together with varying logic conditions
-BrancherLogic = Object.subClass({
+BrancherLogic = Class.subClass({
 	init: function( ops, code )
 	{
 		this.ops = ops || [];
@@ -384,7 +384,7 @@ CallerStorer = Caller.subClass({
 }),
 
 // A generic context (a routine, loop body etc)
-Context = Object.subClass({
+Context = Class.subClass({
 	init: function( engine, pc )
 	{
 		this.e = engine;

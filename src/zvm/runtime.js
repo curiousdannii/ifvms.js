@@ -19,7 +19,7 @@ TODO:
 */
 
 // This object is incomplete; see vm.js for the second half!
-window.ZVM = Object.subClass( {
+var ZVM = Class.subClass( {
 	
 	art_shift: function( number, places )
 	{

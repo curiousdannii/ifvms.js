@@ -65,7 +65,7 @@ convert_true_colour = function( colour )
 	return '#' + newcolour;
 };
 
-return Object.subClass({
+return Class.subClass({
 
 	colours: colours,
 		

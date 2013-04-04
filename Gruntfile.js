@@ -14,6 +14,8 @@ module.exports = function( grunt )
 				src: [
 					'src/zvm/header.txt',
 					'src/zvm/intro.js',
+					'src/common/class.js',
+					'src/common/iff.js',
 					'src/common/util.js',
 					'src/common/bytearray.js',
 					'src/common/ast.js',

@@ -38,7 +38,7 @@ var ZSCII_keyCodes = (function(){
 })(),
 
 // A class for managing everything text
-Text = Object.subClass({
+Text = Class.subClass({
 	init: function( engine )
 	{
 		var memory = engine.m,

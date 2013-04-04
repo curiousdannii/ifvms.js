@@ -18,11 +18,6 @@ ZVM willfully ignores the standard in these ways:
 	No interpreter number or version is set
 
 Any other non-standard behaviour should be considered a bug
-
-TODO:
-	Use a bind function to eliminate needless closures?
-	Make class.js smarter to eliminate function layers
-	Maybe use a custom OBJECT so that any other instance of class.js won't interfere - we would then include it in the compile zvm.js
 	
 */
  

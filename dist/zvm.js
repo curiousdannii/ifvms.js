@@ -31,11 +31,6 @@ ZVM willfully ignores the standard in these ways:
 	No interpreter number or version is set
 
 Any other non-standard behaviour should be considered a bug
-
-TODO:
-	Use a bind function to eliminate needless closures?
-	Make class.js smarter to eliminate function layers
-	Maybe use a custom OBJECT so that any other instance of class.js won't interfere - we would then include it in the compile zvm.js
 	
 */
  
@@ -55,6 +50,222 @@ if ( DEBUG )
 {
 	'use strict';
 
+/*
+
+Simple JavaScript Inheritance
+=============================
+
+By John Resig
+Released into the public domain?
+http://ejohn.org/blog/simple-javascript-inheritance/
+
+Changes from Dannii: support toString in IE8
+
+*/
+
+/*
+
+TODO:
+	Try copying properties
+	Stop using _super
+	
+*/
+
+var Class = (function(){
+
+var initializing = 0;
+
+// Determine if functions can be serialized
+var fnTest = /\b_super\b/;
+
+var Class = function(){};
+
+// Check whether for in will iterate toString
+var iterate_toString, name;
+for ( name in { toString: 1 } ) { iterate_toString = 1; }
+
+// Create a new Class that inherits from this class
+Class.subClass = function( prop )
+{
+	var _super = this.prototype,
+	proto,
+	name,
+	Class;
+	var prop_toString = !/native code/.test( '' + prop.toString ) && prop.toString;
+	
+	// Make the magical _super() function work
+	var make_super = function( name, fn )
+	{
+		return function()
+		{
+			var tmp = this._super,
+			ret;
+
+			// Add a new ._super() method that is the same method
+			// but on the super-class
+			this._super = _super[name];
+
+			// The method only need to be bound temporarily, so we
+			// remove it when we're done executing
+			ret = fn.apply( this, arguments );       
+			this._super = tmp;
+
+			return ret;
+		};
+	};
+	
+	// Instantiate a base class (but only create the instance,
+	// don't run the init constructor)
+	initializing = 1;
+	/* jshint newcap:false */ // require classes to begin with a capital
+	proto = new this();
+	/* jshint newcap:true */
+	initializing = 0;
+
+	// Copy the properties over onto the new prototype
+	for ( name in prop )
+	{
+		// Check if we're overwriting an existing function
+		proto[name] = typeof prop[name] === "function" && typeof _super[name] === "function" && fnTest.test( prop[name] ) ?
+			make_super( name, prop[name] ) :
+			prop[name];
+	}
+	// Handle toString in IE8
+	if ( !iterate_toString && prop_toString )
+	{
+		proto.toString = fnTest.test( prop_toString ) ? make_super( 'toString', prop_toString ) : prop_toString;
+	}
+
+	// The dummy class constructor
+	Class = proto.init ? function()
+	{
+		// All construction is actually done in the init method
+		if ( !initializing )
+		{
+			this.init.apply( this, arguments );
+		}
+	} : function(){};
+
+	// Populate our constructed prototype object
+	Class.prototype = proto;
+
+	// Enforce the constructor to be what we expect
+	Class.constructor = Class;
+
+	// And make this class extendable
+	Class.subClass = Object.subClass;
+
+	return Class;
+};
+
+return Class;
+
+})();
+/*
+
+Interchange File Format library
+===============================
+
+Copyright (c) 2008-2013 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+(Originally in Parchment)
+
+*/
+
+// Get a 32 bit number from a byte array, and vice versa
+var num_from = function(s, offset)
+{
+	return s[offset] << 24 | s[offset + 1] << 16 | s[offset + 2] << 8 | s[offset + 3];
+},
+
+num_to_word = function(n)
+{
+	return [(n >> 24) & 0xFF, (n >> 16) & 0xFF, (n >> 8) & 0xFF, n & 0xFF];
+},
+
+// Get a 4 byte string ID from a byte array, and vice versa
+text_from = function(s, offset)
+{
+	return String.fromCharCode( s[offset], s[offset + 1], s[offset + 2], s[offset + 3] );
+},
+
+text_to_word = function(t)
+{
+	return [t.charCodeAt(0), t.charCodeAt(1), t.charCodeAt(2), t.charCodeAt(3)];
+},
+
+// IFF file class
+// Parses an IFF file stored in a byte array
+IFF = Class.subClass({
+	// Parse a byte array or construct an empty IFF file
+	init: function parse_iff(data)
+	{
+		this.type = '';
+		this.chunks = [];
+		if (data)
+		{
+			// Check this is an IFF file
+			if (text_from(data, 0) !== 'FORM')
+			{
+				throw new Error("Not an IFF file");
+			}
+
+			// Parse the file
+			this.type = text_from(data, 8);
+
+			var i = 12, l = data.length;
+			while (i < l)
+			{
+				var chunk_length = num_from(data, i + 4);
+				if (chunk_length < 0 || (chunk_length + i) > l)
+				{
+					// FIXME: do something sensible here
+					throw new Error("IFF: Chunk out of range");
+				}
+
+				this.chunks.push({
+					type: text_from(data, i),
+					offset: i,
+					data: data.slice(i + 8, i + 8 + chunk_length)
+				});
+
+				i += 8 + chunk_length;
+				if (chunk_length % 2) 
+				{
+					i++;
+				}
+			}
+		}
+	},
+
+	// Write out the IFF into a byte array
+	write: function write_iff()
+	{
+		// Start with the IFF type
+		var out = text_to_word(this.type);
+
+		// Go through the chunks and write them out
+		for (var i = 0, l = this.chunks.length; i < l; i++)
+		{
+			var chunk = this.chunks[i], data = chunk.data, len = data.length;
+			out = out.concat(text_to_word(chunk.type), num_to_word(len), data);
+			if (len % 2)
+			{
+				out.push(0);
+			}
+		}
+
+		// Add the header and return
+		return text_to_word('FORM').concat(num_to_word(out.length), out);
+	}
+});
+
+// Expose the class and helper functions
+IFF.num_from = num_from;
+IFF.num_to_word = num_to_word;
+IFF.text_from = text_from;
+IFF.text_to_word = text_to_word;
 /*
 
 Common untility functions
@@ -282,7 +493,7 @@ if ( DEBUG )
 
 // Generic/constant operand
 // Value is a constant
-var Operand = Object.subClass({
+var Operand = Class.subClass({
 	init: function( engine, value )
 	{
 		this.e = engine;
@@ -371,7 +582,7 @@ Variable = Operand.subClass({
 
 // Generic opcode
 // .func() must be set, which returns what .write() will actually return; it is passed the operands as its arguments
-Opcode = Object.subClass({
+Opcode = Class.subClass({
 	init: function( engine, context, code, pc, next, operands )
 	{
 		this.e = engine;
@@ -431,7 +642,7 @@ Pauser = Stopper.subClass({
 }),
 
 // Join multiple branchers together with varying logic conditions
-BrancherLogic = Object.subClass({
+BrancherLogic = Class.subClass({
 	init: function( ops, code )
 	{
 		this.ops = ops || [];
@@ -632,7 +843,7 @@ CallerStorer = Caller.subClass({
 }),
 
 // A generic context (a routine, loop body etc)
-Context = Object.subClass({
+Context = Class.subClass({
 	init: function( engine, pc )
 	{
 		this.e = engine;
@@ -831,7 +1042,7 @@ var ZSCII_keyCodes = (function(){
 })(),
 
 // A class for managing everything text
-Text = Object.subClass({
+Text = Class.subClass({
 	init: function( engine )
 	{
 		var memory = engine.m,
@@ -1317,7 +1528,7 @@ convert_true_colour = function( colour )
 	return '#' + newcolour;
 };
 
-return Object.subClass({
+return Class.subClass({
 
 	colours: colours,
 		
@@ -2148,7 +2359,7 @@ TODO:
 */
 
 // This object is incomplete; see vm.js for the second half!
-window.ZVM = Object.subClass( {
+var ZVM = Class.subClass( {
 	
 	art_shift: function( number, places )
 	{
@@ -3309,5 +3520,15 @@ BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
 */
+
+// Export ZVM
+if ( typeof module === "object" && typeof module.exports === "object" )
+{
+	module.exports = ZVM;
+}
+else
+{
+	window.ZVM = ZVM;
+}
 
 })( this );
