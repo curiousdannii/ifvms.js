@@ -64,11 +64,21 @@ module.exports = function( grunt )
 				'Gruntfile.js',
 				'dist/*.js'
 			],
-		}
+		},
+		
+		watch: {
+			src: {
+				files: '<%= concat.zvm.src %>',
+				tasks: [ 'default' ],
+			},
+		},
 	});
 
 	grunt.loadNpmTasks( 'grunt-contrib-concat' );
 	grunt.loadNpmTasks( 'grunt-contrib-jshint' );
+	grunt.loadNpmTasks( 'grunt-contrib-watch' );
 
 	grunt.registerTask( 'default', [ 'concat', 'jshint' ] );
+	
+	grunt.registerTask( 'dev', [ 'watch' ] );
 };

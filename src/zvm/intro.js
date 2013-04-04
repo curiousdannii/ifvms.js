@@ -26,14 +26,18 @@ TODO:
 	
 */
  
+// Define our DEBUG constants
+if ( typeof DEBUG === 'undefined' )
+{
+	DEBUG = true;
+}
+if ( DEBUG )
+{
+	ZVM = true;
+	GVM = false;
+}
+ 
 // Wrap all of ZVM in a closure/namespace, and enable strict mode
 (function( window, undefined )
 {
 	'use strict';
-
-	/* jshint -W004 */ // Don't complain about DEBUG being defined already(?!)
-	if ( typeof DEBUG === 'undefined' )
-	{
-		var DEBUG = 1, ZVM = 1, GVM = 0;
-	}
-	/* jshint -W004: true */

@@ -1,6 +1,6 @@
 {
   "name": "ifvms.js",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "The Interactive Fiction Virtual Machines Suite - in Javascript",
   "author": {
     "name": "The ifvms.js team",
@@ -17,6 +17,7 @@
   "devDependencies": {
     "grunt": "~0.4.1",
     "grunt-contrib-concat": "~0.1.3",
-    "grunt-contrib-jshint": "~0.3.0"
+    "grunt-contrib-jshint": "~0.3.0",
+    "grunt-contrib-watch": "~0.3.1"
   }
 }
