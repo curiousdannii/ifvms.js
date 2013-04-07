@@ -74,9 +74,6 @@ TODO:
 			}
 		}
 		
-		// Clear the list of orders
-		this.orders = [];
-		
 		// Load the story file
 		if ( code === 'load' )
 		{
@@ -118,8 +115,8 @@ TODO:
 		// Handle line input
 		if ( code === 'read' )
 		{
-			// Store the terminating character
-			this.variable( data.storer, data.terminator );
+			// Store the terminating character, or 13 if not provided
+			this.variable( data.storer, isNaN( data.terminator ) ? 13 : data.terminator );
 			
 			// Echo the response (7.1.1.1)
 			response = data.response;
@@ -264,6 +261,9 @@ TODO:
 		result,
 		count = 0;
 		
+		// Clear the list of orders
+		this.orders = [];
+		
 		// Stop when ordered to
 		this.stop = 0;
 		while ( !this.stop )
@@ -354,7 +354,10 @@ TODO:
 		options.code = code;
 		this.orders.push( options );
 		this.stop = 1;
-		this.outputEvent( this.orders );
+		if ( this.outputEvent )
+		{
+			this.outputEvent( this.orders );
+		}
 	}
 
 });

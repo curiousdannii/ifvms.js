@@ -58,6 +58,7 @@ module.exports = function( grunt )
 					'IFF',
 					'module',
 					'parchment',
+					'require',
 					'vm_functions',
 					'ZVM',
 				],
@@ -71,7 +72,7 @@ module.exports = function( grunt )
 		watch: {
 			src: {
 				files: '<%= concat.zvm.src %>',
-				tasks: [ 'default' ],
+				tasks: [ 'buildntest' ],
 			},
 		},
 	});
@@ -79,8 +80,28 @@ module.exports = function( grunt )
 	grunt.loadNpmTasks( 'grunt-contrib-concat' );
 	grunt.loadNpmTasks( 'grunt-contrib-jshint' );
 	grunt.loadNpmTasks( 'grunt-contrib-watch' );
+	grunt.loadNpmTasks( 'grunt-update-submodules' );
+	
+	// Run the Praxix test suite
+	grunt.registerTask( 'testzvm', function()
+	{
+		grunt.log.write( 'Running the Praxix test suite: ' );
+		var bootstrap = require( './dist/bootstrap.js' );
+		var vm = bootstrap.zvm( './tests/tests/praxix.z5', ['all'] );
+		var result = vm.log;
+		if ( /All tests passed./.test( result ) )
+		{
+			grunt.log.write( 'All tests passed!\n' );
+		}
+		else
+		{
+			grunt.log.write( /\d+ tests failed overall:[^$]+/.exec( result )[0] );
+		}
+	});
 
-	grunt.registerTask( 'default', [ 'concat', 'jshint' ] );
+	grunt.registerTask( 'buildntest', [ 'concat', 'jshint', 'testzvm' ] );
+	
+	grunt.registerTask( 'default', [ 'update_submodules', 'buildntest' ] );
 	
 	grunt.registerTask( 'dev', [ 'watch' ] );
 };

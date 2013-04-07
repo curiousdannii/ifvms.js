@@ -96,7 +96,7 @@ optimise_obj = function( obj, funcnames )
 			}
 		}
 	}
-	extend( obj, window['eval']( '({' + newfuncs.join() + '})' ) );
+	extend( obj, eval( '({' + newfuncs.join() + '})' ) );
 };
 
 if ( DEBUG ) {
@@ -112,7 +112,7 @@ if ( DEBUG ) {
 			debugflags[data[i++]] = 1; 
 		}
 	};
-	if ( parchment && parchment.options && parchment.options.debug )
+	if ( typeof parchment !== 'undefined' && parchment.options && parchment.options.debug )
 	{
 		get_debug_flags( parchment.options.debug );
 	}

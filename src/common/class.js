@@ -38,7 +38,7 @@ Class.subClass = function( prop )
 	var _super = this.prototype,
 	proto,
 	name,
-	Class;
+	Klass;
 	var prop_toString = !/native code/.test( '' + prop.toString ) && prop.toString;
 	
 	// Make the magical _super() function work
@@ -85,7 +85,7 @@ Class.subClass = function( prop )
 	}
 
 	// The dummy class constructor
-	Class = proto.init ? function()
+	Klass = proto.init ? function()
 	{
 		// All construction is actually done in the init method
 		if ( !initializing )
@@ -95,15 +95,15 @@ Class.subClass = function( prop )
 	} : function(){};
 
 	// Populate our constructed prototype object
-	Class.prototype = proto;
+	Klass.prototype = proto;
 
 	// Enforce the constructor to be what we expect
-	Class.constructor = Class;
+	Klass.constructor = Klass;
 
 	// And make this class extendable
-	Class.subClass = Object.subClass;
+	Klass.subClass = Class.subClass;
 
-	return Class;
+	return Klass;
 };
 
 return Class;

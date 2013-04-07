@@ -3,7 +3,7 @@
 ZVM - the ifvms.js implementation of the Z-Machine
 ==================================================
 
-Built: 2013-04-04
+Built: 2013-04-07
 
 Copyright (c) 2011-2013 The ifvms.js team
 BSD licenced
@@ -90,7 +90,7 @@ Class.subClass = function( prop )
 	var _super = this.prototype,
 	proto,
 	name,
-	Class;
+	Klass;
 	var prop_toString = !/native code/.test( '' + prop.toString ) && prop.toString;
 	
 	// Make the magical _super() function work
@@ -137,7 +137,7 @@ Class.subClass = function( prop )
 	}
 
 	// The dummy class constructor
-	Class = proto.init ? function()
+	Klass = proto.init ? function()
 	{
 		// All construction is actually done in the init method
 		if ( !initializing )
@@ -147,15 +147,15 @@ Class.subClass = function( prop )
 	} : function(){};
 
 	// Populate our constructed prototype object
-	Class.prototype = proto;
+	Klass.prototype = proto;
 
 	// Enforce the constructor to be what we expect
-	Class.constructor = Class;
+	Klass.constructor = Klass;
 
 	// And make this class extendable
-	Class.subClass = Object.subClass;
+	Klass.subClass = Class.subClass;
 
-	return Class;
+	return Klass;
 };
 
 return Class;
@@ -364,7 +364,7 @@ optimise_obj = function( obj, funcnames )
 			}
 		}
 	}
-	extend( obj, window['eval']( '({' + newfuncs.join() + '})' ) );
+	extend( obj, eval( '({' + newfuncs.join() + '})' ) );
 };
 
 if ( DEBUG ) {
@@ -380,7 +380,7 @@ if ( DEBUG ) {
 			debugflags[data[i++]] = 1; 
 		}
 	};
-	if ( parchment && parchment.options && parchment.options.debug )
+	if ( typeof parchment !== 'undefined' && parchment.options && parchment.options.debug )
 	{
 		get_debug_flags( parchment.options.debug );
 	}
@@ -3226,9 +3226,6 @@ TODO:
 			}
 		}
 		
-		// Clear the list of orders
-		this.orders = [];
-		
 		// Load the story file
 		if ( code === 'load' )
 		{
@@ -3270,8 +3267,8 @@ TODO:
 		// Handle line input
 		if ( code === 'read' )
 		{
-			// Store the terminating character
-			this.variable( data.storer, data.terminator );
+			// Store the terminating character, or 13 if not provided
+			this.variable( data.storer, isNaN( data.terminator ) ? 13 : data.terminator );
 			
 			// Echo the response (7.1.1.1)
 			response = data.response;
@@ -3416,6 +3413,9 @@ TODO:
 		result,
 		count = 0;
 		
+		// Clear the list of orders
+		this.orders = [];
+		
 		// Stop when ordered to
 		this.stop = 0;
 		while ( !this.stop )
@@ -3506,7 +3506,10 @@ TODO:
 		options.code = code;
 		this.orders.push( options );
 		this.stop = 1;
-		this.outputEvent( this.orders );
+		if ( this.outputEvent )
+		{
+			this.outputEvent( this.orders );
+		}
 	}
 
 });
