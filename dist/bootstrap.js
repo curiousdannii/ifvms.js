@@ -84,7 +84,7 @@ function run( vm, walkthrough )
 }
 
 // A simple function to run a particular story, optionally with a list of commands
-module.exports.zvm = function( path, walkthrough )
+exports.zvm = function( path, walkthrough )
 {
 	var fs = require( 'fs' );
 	var ZVM = require( './../dist/zvm.js' );

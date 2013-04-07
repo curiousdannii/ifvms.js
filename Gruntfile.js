@@ -54,6 +54,7 @@ module.exports = function( grunt )
 				nonstandard: true,
 				predef: [
 					'DEBUG',
+					'exports',
 					'GVM',
 					'IFF',
 					'module',

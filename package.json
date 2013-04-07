@@ -1,19 +1,21 @@
 {
-  "name": "ifvms.js",
+  "name": "ifvms",
+  "title": "ifvms.js",
   "version": "0.1.0",
   "description": "The Interactive Fiction Virtual Machines Suite - in Javascript",
-  "author": {
-    "name": "The ifvms.js team",
-    "url": "https://github.com/curiousdannii/ifvms.js/blob/master/CONTRIBUTORS"
-  },
+  "author": "Dannii Willis <curiousdannii@gmail.com>",
   "license": "BSD",
+  "keywords": [ "intfiction", "vm" ],
+  "main": "dist/node.js",
+  "scripts": {
+    "test": "grunt testzvm"
+  },
+  "homepage": "https://github.com/curiousdannii/ifvms.js",
   "repository": {
     "type": "git",
-    "url": "git://github.com/curiousdannii/ifvms.js.git"
+    "url": "https://github.com/curiousdannii/ifvms.js.git"
   },
-  "bugs": {
-    "url": "https://github.com/curiousdannii/ifvms.js/issues"
-  },
+  "bugs": "https://github.com/curiousdannii/ifvms.js/issues",
   "devDependencies": {
     "grunt": "~0.4.1",
     "grunt-contrib-concat": "~0.1.3",
