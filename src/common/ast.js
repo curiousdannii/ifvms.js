@@ -26,12 +26,6 @@ TODO:
 	
 */
 
-// Find a routine's name
-if ( DEBUG )
-{
-	var find_func_name = function( pc ) { while ( !vm_functions[pc] && pc > 0 ) { pc--; } return vm_functions[pc]; };
-}
-
 // Generic/constant operand
 // Value is a constant
 var Operand = Class.subClass({
@@ -357,17 +351,8 @@ Caller = Stopper.subClass({
 	// Write out the opcode
 	toString: function()
 	{
-		// Debug: include label if possible
-		if ( DEBUG )
-		{
-			var addr = '' + this.operands.shift(),
-			targetname = window.vm_functions && !isNaN( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
-			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])' + targetname;
-		}
-		else
-		{
-			return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])';
-		}
+		// TODO: Debug: include label if possible
+		return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])';
 	}
 }),
 
@@ -421,22 +406,17 @@ Context = Class.subClass({
 RoutineContext = Context.subClass({
 	toString: function()
 	{
-		// Debug: If we have routine names, find this one's name
-		if ( DEBUG )
-		{
-			var name = window.vm_functions && find_func_name( this.pc );
-			if ( name ) { this.pre.unshift( '/* ' + name + ' */\n' ); }
-		}
+		// TODO: Debug: If we have routine names, find this one's name
 		
 		// Add in some extra vars and return
 		this.pre.unshift( 'var l=e.l,m=e.m,s=e.s;\n' );
 		return this._super();
 	}
-}),
+});
 
 // Opcode builder
 // Easily build a new opcode from a class
-opcode_builder = function( Class, func, flags )
+function opcode_builder( Class, func, flags )
 {
 	flags = flags || {};
 	if ( func )
@@ -452,7 +432,7 @@ opcode_builder = function( Class, func, flags )
 		//}
 	}
 	return Class.subClass( flags );
-};
+}
 
 // A common for opcodes which basically just need to provide texts
 /*common_func = function()

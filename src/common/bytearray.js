@@ -23,10 +23,10 @@ Todo:
 
 if ( DEBUG )
 {
-	console.log( 'bytearray.js: ' + ( window.DataView ? 'Native DataView' : 'Emulating DataView' ) );
+	console.log( 'bytearray.js: ' + ( typeof DataView !== 'undefined' ? 'Native DataView' : 'Emulating DataView' ) );
 }
 
-//var native_bytearrays = window.DataView,
+//var native_bytearrays = DataView,
 var native_bytearrays = 0,
 
 ByteArray = native_bytearrays ?

@@ -27,7 +27,7 @@ module.exports = function( grunt )
 					'src/zvm/disassembler.js',
 					'src/zvm/runtime.js',
 					'src/zvm/vm.js',
-					'src/zvm/outro.js',
+					'src/common/outro.js',
 				],
 			},
 		},
@@ -51,29 +51,29 @@ module.exports = function( grunt )
 				
 				// Environment
 				browser: true,
+				node: true,
 				nonstandard: true,
-				predef: [
-					'DEBUG',
-					'exports',
-					'GVM',
-					'IFF',
-					'module',
-					'parchment',
-					'require',
-					'vm_functions',
-					'ZVM',
-				],
+				globals: {
+					'DEBUG': true,
+					'GVM': true,
+					'parchment': false,
+					'ZVM': true,
+				},
 			},
-			all: [
+			misc: [
 				'Gruntfile.js',
-				'dist/*.js'
+				'dist/*.js',
+				'!dist/*vm.js',
+			],
+			zvm: [
+				'dist/zvm.js',
 			],
 		},
 		
 		watch: {
 			src: {
 				files: '<%= concat.zvm.src %>',
-				tasks: [ 'buildntest' ],
+				tasks: [ 'zvm' ],
 			},
 		},
 	});
@@ -81,14 +81,13 @@ module.exports = function( grunt )
 	grunt.loadNpmTasks( 'grunt-contrib-concat' );
 	grunt.loadNpmTasks( 'grunt-contrib-jshint' );
 	grunt.loadNpmTasks( 'grunt-contrib-watch' );
-	grunt.loadNpmTasks( 'grunt-update-submodules' );
 	
 	// Run the Praxix test suite
 	grunt.registerTask( 'testzvm', function()
 	{
 		grunt.log.write( 'Running the Praxix test suite: ' );
 		var bootstrap = require( './dist/bootstrap.js' );
-		var vm = bootstrap.zvm( './tests/tests/praxix.z5', ['all'] );
+		var vm = bootstrap.zvm( './node_modules/iftests/tests/praxix.z5', ['all'] );
 		var result = vm.log;
 		if ( /All tests passed./.test( result ) )
 		{
@@ -99,10 +98,10 @@ module.exports = function( grunt )
 			grunt.log.write( /\d+ tests failed overall:[^$]+/.exec( result )[0] );
 		}
 	});
-
-	grunt.registerTask( 'buildntest', [ 'concat', 'jshint', 'testzvm' ] );
 	
-	grunt.registerTask( 'default', [ 'update_submodules', 'buildntest' ] );
+	grunt.registerTask( 'default', [ 'jshint:misc', 'zvm' ] );
 	
 	grunt.registerTask( 'dev', [ 'watch' ] );
+
+	grunt.registerTask( 'zvm', [ 'concat:zvm', 'jshint:zvm', 'testzvm' ] );
 };

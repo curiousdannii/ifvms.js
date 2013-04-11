@@ -60,6 +60,7 @@ function run( vm, walkthrough )
 			// We don't do much, just add it to a string on the vm object
 			if ( order.code === 'stream' )
 			{
+				// Skip status line updates
 				if ( order.to === 'status' )
 				{
 					continue;
@@ -87,7 +88,7 @@ function run( vm, walkthrough )
 exports.zvm = function( path, walkthrough )
 {
 	var fs = require( 'fs' );
-	var ZVM = require( './../dist/zvm.js' );
+	var ZVM = require( './zvm.js' );
 	
 	var data = fs.readFileSync( path, { encoding: 'binary' } );
 	

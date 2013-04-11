@@ -3,7 +3,7 @@
 ZVM - the ifvms.js implementation of the Z-Machine
 ==================================================
 
-Built: 2013-04-07
+Built: 2013-04-11
 
 Copyright (c) 2011-2013 The ifvms.js team
 BSD licenced
@@ -46,9 +46,7 @@ if ( DEBUG )
 }
  
 // Wrap all of ZVM in a closure/namespace, and enable strict mode
-(function( window, undefined )
-{
-	'use strict';
+var ZVM = (function(){ 'use strict';
 
 /*
 
@@ -174,30 +172,30 @@ http://github.com/curiousdannii/ifvms.js
 */
 
 // Get a 32 bit number from a byte array, and vice versa
-var num_from = function(s, offset)
+function num_from(s, offset)
 {
 	return s[offset] << 24 | s[offset + 1] << 16 | s[offset + 2] << 8 | s[offset + 3];
-},
+}
 
-num_to_word = function(n)
+function num_to_word(n)
 {
 	return [(n >> 24) & 0xFF, (n >> 16) & 0xFF, (n >> 8) & 0xFF, n & 0xFF];
-},
+}
 
 // Get a 4 byte string ID from a byte array, and vice versa
-text_from = function(s, offset)
+function text_from(s, offset)
 {
 	return String.fromCharCode( s[offset], s[offset + 1], s[offset + 2], s[offset + 3] );
-},
+}
 
-text_to_word = function(t)
+function text_to_word(t)
 {
 	return [t.charCodeAt(0), t.charCodeAt(1), t.charCodeAt(2), t.charCodeAt(3)];
-},
+}
 
 // IFF file class
 // Parses an IFF file stored in a byte array
-IFF = Class.subClass({
+var IFF = Class.subClass({
 	// Parse a byte array or construct an empty IFF file
 	init: function parse_iff(data)
 	{
@@ -294,34 +292,34 @@ if ( ![].indexOf )
 }
 
 // Utility to extend objects
-var extend = function( old, add )
+function extend( old, add )
 {
 	for ( var name in add )
 	{
 		old[name] = add[name];
 	}
 	return old;
-},
+}
 
 // Console dummy funcs
-console = window.console || {
+var console = typeof console !== 'undefined' ? console : {
 	log: function(){},
 	info: function(){},
 	warn: function(){}
-},
+};
 
 // Utilities for 16-bit signed arithmetic
-U2S = function( value )
+function U2S( value )
 {
 	return value << 16 >> 16;
-},
-S2U = function( value )
+}
+function S2U( value )
 {
 	return value & 0xFFFF;
-},
+}
 
 // Utility to convert from byte arrays to word arrays
-byte_to_word = function( array )
+function byte_to_word( array )
 {
 	var i = 0, l = array.length,
 	result = [];
@@ -330,10 +328,10 @@ byte_to_word = function( array )
 		result[i / 2] = array[i++] << 8 | array[i++];
 	}
 	return result;
-},
+}
 	
 // Perform some micro optimisations
-optimise = function( code )
+function optimise( code )
 {
 	return code
 	
@@ -344,9 +342,9 @@ optimise = function( code )
 	// Bytearray
 	.replace( /([\w.]+)\.getUint8\(([^(]+?)\)/g, '$1[$2]' )
 	.replace( /([\w.]+)\.getUint16\(([^(]+?)\)/g, '($1[$2]<<8|$1[$2+1])' );
-},
+}
 // Optimise some functions of an obj, compiling several at once
-optimise_obj = function( obj, funcnames )
+function optimise_obj( obj, funcnames )
 {
 	var funcname, funcparts, newfuncs = [];
 	for ( funcname in obj )
@@ -365,7 +363,7 @@ optimise_obj = function( obj, funcnames )
 		}
 	}
 	extend( obj, eval( '({' + newfuncs.join() + '})' ) );
-};
+}
 
 if ( DEBUG ) {
 
@@ -411,10 +409,10 @@ Todo:
 
 if ( DEBUG )
 {
-	console.log( 'bytearray.js: ' + ( window.DataView ? 'Native DataView' : 'Emulating DataView' ) );
+	console.log( 'bytearray.js: ' + ( typeof DataView !== 'undefined' ? 'Native DataView' : 'Emulating DataView' ) );
 }
 
-//var native_bytearrays = window.DataView,
+//var native_bytearrays = DataView,
 var native_bytearrays = 0,
 
 ByteArray = native_bytearrays ?
@@ -484,12 +482,6 @@ TODO:
 	Replace calls to args() with arguments.join()?
 	
 */
-
-// Find a routine's name
-if ( DEBUG )
-{
-	var find_func_name = function( pc ) { while ( !vm_functions[pc] && pc > 0 ) { pc--; } return vm_functions[pc]; };
-}
 
 // Generic/constant operand
 // Value is a constant
@@ -816,17 +808,8 @@ Caller = Stopper.subClass({
 	// Write out the opcode
 	toString: function()
 	{
-		// Debug: include label if possible
-		if ( DEBUG )
-		{
-			var addr = '' + this.operands.shift(),
-			targetname = window.vm_functions && !isNaN( addr ) ? ' /* ' + find_func_name( addr * 4 ) + '() */' : '';
-			return this.label() + 'e.call(' + addr + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])' + targetname;
-		}
-		else
-		{
-			return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])';
-		}
+		// TODO: Debug: include label if possible
+		return this.label() + 'e.call(' + this.operands.shift() + ',' + this.result.v + ',' + this.next + ',[' + this.args() + '])';
 	}
 }),
 
@@ -880,22 +863,17 @@ Context = Class.subClass({
 RoutineContext = Context.subClass({
 	toString: function()
 	{
-		// Debug: If we have routine names, find this one's name
-		if ( DEBUG )
-		{
-			var name = window.vm_functions && find_func_name( this.pc );
-			if ( name ) { this.pre.unshift( '/* ' + name + ' */\n' ); }
-		}
+		// TODO: Debug: If we have routine names, find this one's name
 		
 		// Add in some extra vars and return
 		this.pre.unshift( 'var l=e.l,m=e.m,s=e.s;\n' );
 		return this._super();
 	}
-}),
+});
 
 // Opcode builder
 // Easily build a new opcode from a class
-opcode_builder = function( Class, func, flags )
+function opcode_builder( Class, func, flags )
 {
 	flags = flags || {};
 	if ( func )
@@ -911,7 +889,7 @@ opcode_builder = function( Class, func, flags )
 		//}
 	}
 	return Class.subClass( flags );
-};
+}
 
 // A common for opcodes which basically just need to provide texts
 /*common_func = function()
@@ -1482,7 +1460,7 @@ Note: is used by both ZVM and Gnusto. In the case of Gnusto the engine is actual
 var ZVMUI = (function( undefined ){
 
 // Utility to extend objects
-var extend = function( old, add )
+function extend( old, add )
 {
 	for ( var name in add )
 	{
@@ -1493,10 +1471,10 @@ var extend = function( old, add )
 		}
 	}
 	return old;
-},
+}
 
 // Standard colours
-colours = [
+var colours = [
 	0xFFFE,
 	0xFFFF,
 	0x0000,
@@ -1510,10 +1488,10 @@ colours = [
 	0x5AD6,
 	0x4631,
 	0x2D6B
-],
+];
 
 // Convert a 15 bit colour to RGB
-convert_true_colour = function( colour )
+function convert_true_colour( colour )
 {
 	// Stretch the five bits per colour out to 8 bits
 	var newcolour = Math.round( ( colour & 0x1F ) * 8.226 ) << 16
@@ -1526,7 +1504,7 @@ convert_true_colour = function( colour )
 		newcolour = '0' + newcolour;
 	}
 	return '#' + newcolour;
-};
+}
 
 return Class.subClass({
 
@@ -1836,10 +1814,10 @@ TODO:
 */
 
 // Common functions
-var simple_func = function( a ) { return '' + a; },
+function simple_func( a ) { return '' + a; }
 
 // Common opcodes
-alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
+var alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
 
 // Indirect storer opcodes - rather non-generic I'm afraid
 // Not used for inc/dec
@@ -2026,7 +2004,7 @@ TODO:
 */
 
 // Block if statements / while loops
-var idiom_if_block = function( context, pc )
+function idiom_if_block( context, pc )
 {
 	var i = 0,
 	subcontext,
@@ -2109,7 +2087,7 @@ var idiom_if_block = function( context, pc )
 		}
 		i++;
 	}
-};
+}
 
 /*idiom_do_while = function( context )
 {
@@ -2149,7 +2127,7 @@ TODO:
 */
 
 // The disassembler function
-var disassemble = function( engine )
+function disassemble( engine )
 {
 	var pc, offset, // Set in the loop below
 	memory = engine.m,
@@ -2326,17 +2304,17 @@ var disassemble = function( engine )
 	}
 	
 	return context;
-},
+}
 
 // Utility function to unpack the variable form operand types byte
-get_var_operand_types = function( operands_byte, operands_type )
+function get_var_operand_types( operands_byte, operands_type )
 {
 	for ( var i = 0; i < 4; i++ )
 	{
 		operands_type.push( (operands_byte & 0xC0) >> 6 );
 		operands_byte <<= 2;
 	}
-};
+}
 
 /*
 
@@ -2359,7 +2337,7 @@ TODO:
 */
 
 // This object is incomplete; see vm.js for the second half!
-var ZVM = Class.subClass( {
+var VM = Class.subClass( {
 	
 	art_shift: function( number, places )
 	{
@@ -3515,8 +3493,8 @@ TODO:
 });
 /*
 
-ZVM outro
-=========
+VM outro (generic!)
+===================
 
 Copyright (c) 2013 The ifvms.js team
 BSD licenced
@@ -3524,14 +3502,14 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
-// Export ZVM
+// Export the VM in node.js
 if ( typeof module === "object" && typeof module.exports === "object" )
 {
-	module.exports = ZVM;
-}
-else
-{
-	window.ZVM = ZVM;
+	module.exports = VM;
 }
 
-})( this );
+// TODO: Support Web Workers
+
+return VM;
+
+})();

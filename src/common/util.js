@@ -26,34 +26,34 @@ if ( ![].indexOf )
 }
 
 // Utility to extend objects
-var extend = function( old, add )
+function extend( old, add )
 {
 	for ( var name in add )
 	{
 		old[name] = add[name];
 	}
 	return old;
-},
+}
 
 // Console dummy funcs
-console = window.console || {
+var console = typeof console !== 'undefined' ? console : {
 	log: function(){},
 	info: function(){},
 	warn: function(){}
-},
+};
 
 // Utilities for 16-bit signed arithmetic
-U2S = function( value )
+function U2S( value )
 {
 	return value << 16 >> 16;
-},
-S2U = function( value )
+}
+function S2U( value )
 {
 	return value & 0xFFFF;
-},
+}
 
 // Utility to convert from byte arrays to word arrays
-byte_to_word = function( array )
+function byte_to_word( array )
 {
 	var i = 0, l = array.length,
 	result = [];
@@ -62,10 +62,10 @@ byte_to_word = function( array )
 		result[i / 2] = array[i++] << 8 | array[i++];
 	}
 	return result;
-},
+}
 	
 // Perform some micro optimisations
-optimise = function( code )
+function optimise( code )
 {
 	return code
 	
@@ -76,9 +76,9 @@ optimise = function( code )
 	// Bytearray
 	.replace( /([\w.]+)\.getUint8\(([^(]+?)\)/g, '$1[$2]' )
 	.replace( /([\w.]+)\.getUint16\(([^(]+?)\)/g, '($1[$2]<<8|$1[$2+1])' );
-},
+}
 // Optimise some functions of an obj, compiling several at once
-optimise_obj = function( obj, funcnames )
+function optimise_obj( obj, funcnames )
 {
 	var funcname, funcparts, newfuncs = [];
 	for ( funcname in obj )
@@ -97,7 +97,7 @@ optimise_obj = function( obj, funcnames )
 		}
 	}
 	extend( obj, eval( '({' + newfuncs.join() + '})' ) );
-};
+}
 
 if ( DEBUG ) {
 

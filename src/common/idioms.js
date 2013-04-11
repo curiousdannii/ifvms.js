@@ -22,7 +22,7 @@ TODO:
 */
 
 // Block if statements / while loops
-var idiom_if_block = function( context, pc )
+function idiom_if_block( context, pc )
 {
 	var i = 0,
 	subcontext,
@@ -105,7 +105,7 @@ var idiom_if_block = function( context, pc )
 		}
 		i++;
 	}
-};
+}
 
 /*idiom_do_while = function( context )
 {

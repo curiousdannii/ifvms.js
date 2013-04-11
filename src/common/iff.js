@@ -11,30 +11,30 @@ http://github.com/curiousdannii/ifvms.js
 */
 
 // Get a 32 bit number from a byte array, and vice versa
-var num_from = function(s, offset)
+function num_from(s, offset)
 {
 	return s[offset] << 24 | s[offset + 1] << 16 | s[offset + 2] << 8 | s[offset + 3];
-},
+}
 
-num_to_word = function(n)
+function num_to_word(n)
 {
 	return [(n >> 24) & 0xFF, (n >> 16) & 0xFF, (n >> 8) & 0xFF, n & 0xFF];
-},
+}
 
 // Get a 4 byte string ID from a byte array, and vice versa
-text_from = function(s, offset)
+function text_from(s, offset)
 {
 	return String.fromCharCode( s[offset], s[offset + 1], s[offset + 2], s[offset + 3] );
-},
+}
 
-text_to_word = function(t)
+function text_to_word(t)
 {
 	return [t.charCodeAt(0), t.charCodeAt(1), t.charCodeAt(2), t.charCodeAt(3)];
-},
+}
 
 // IFF file class
 // Parses an IFF file stored in a byte array
-IFF = Class.subClass({
+var IFF = Class.subClass({
 	// Parse a byte array or construct an empty IFF file
 	init: function parse_iff(data)
 	{

@@ -1,7 +1,7 @@
 /*
 
-ZVM outro
-=========
+VM outro (generic!)
+===================
 
 Copyright (c) 2013 The ifvms.js team
 BSD licenced
@@ -9,14 +9,14 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
-// Export ZVM
+// Export the VM in node.js
 if ( typeof module === "object" && typeof module.exports === "object" )
 {
-	module.exports = ZVM;
-}
-else
-{
-	window.ZVM = ZVM;
+	module.exports = VM;
 }
 
-})( this );
+// TODO: Support Web Workers
+
+return VM;
+
+})();

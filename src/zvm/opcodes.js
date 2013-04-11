@@ -18,10 +18,10 @@ TODO:
 */
 
 // Common functions
-var simple_func = function( a ) { return '' + a; },
+function simple_func( a ) { return '' + a; }
 
 // Common opcodes
-alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
+var alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
 
 // Indirect storer opcodes - rather non-generic I'm afraid
 // Not used for inc/dec

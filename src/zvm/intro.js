@@ -33,6 +33,4 @@ if ( DEBUG )
 }
  
 // Wrap all of ZVM in a closure/namespace, and enable strict mode
-(function( window, undefined )
-{
-	'use strict';
+var ZVM = (function(){ 'use strict';

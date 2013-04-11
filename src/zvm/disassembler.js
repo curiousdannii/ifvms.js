@@ -20,7 +20,7 @@ TODO:
 */
 
 // The disassembler function
-var disassemble = function( engine )
+function disassemble( engine )
 {
 	var pc, offset, // Set in the loop below
 	memory = engine.m,
@@ -197,14 +197,14 @@ var disassemble = function( engine )
 	}
 	
 	return context;
-},
+}
 
 // Utility function to unpack the variable form operand types byte
-get_var_operand_types = function( operands_byte, operands_type )
+function get_var_operand_types( operands_byte, operands_type )
 {
 	for ( var i = 0; i < 4; i++ )
 	{
 		operands_type.push( (operands_byte & 0xC0) >> 6 );
 		operands_byte <<= 2;
 	}
-};
+}

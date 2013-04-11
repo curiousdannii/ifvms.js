@@ -19,7 +19,7 @@ Note: is used by both ZVM and Gnusto. In the case of Gnusto the engine is actual
 var ZVMUI = (function( undefined ){
 
 // Utility to extend objects
-var extend = function( old, add )
+function extend( old, add )
 {
 	for ( var name in add )
 	{
@@ -30,10 +30,10 @@ var extend = function( old, add )
 		}
 	}
 	return old;
-},
+}
 
 // Standard colours
-colours = [
+var colours = [
 	0xFFFE,
 	0xFFFF,
 	0x0000,
@@ -47,10 +47,10 @@ colours = [
 	0x5AD6,
 	0x4631,
 	0x2D6B
-],
+];
 
 // Convert a 15 bit colour to RGB
-convert_true_colour = function( colour )
+function convert_true_colour( colour )
 {
 	// Stretch the five bits per colour out to 8 bits
 	var newcolour = Math.round( ( colour & 0x1F ) * 8.226 ) << 16
@@ -63,7 +63,7 @@ convert_true_colour = function( colour )
 		newcolour = '0' + newcolour;
 	}
 	return '#' + newcolour;
-};
+}
 
 return Class.subClass({
 
