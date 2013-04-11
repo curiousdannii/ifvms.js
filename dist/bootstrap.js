@@ -88,9 +88,10 @@ function run( vm, walkthrough )
 exports.zvm = function( path, walkthrough )
 {
 	var fs = require( 'fs' );
+	var iconv = require( 'iconv-lite' );
 	var ZVM = require( './zvm.js' );
 	
-	var data = fs.readFileSync( path, { encoding: 'binary' } );
+	var data = iconv.decode( fs.readFileSync( path ), 'latin1' );
 	
 	var vm = new ZVM();
 	vm.inputEvent({
