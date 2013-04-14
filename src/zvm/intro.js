@@ -1,9 +1,11 @@
 /*
 
-ZVM intro - various functions and compatibility fixes
-=====================================================
+ZVM - the ifvms.js Z-Machine
+============================
 
-Copyright (c) 2013 The ifvms.js team
+Built: <%= grunt.template.today('yyyy-mm-dd') %>
+
+Copyright (c) 2011-<%= grunt.template.today('yyyy') %> The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 

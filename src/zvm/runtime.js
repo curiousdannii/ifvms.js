@@ -341,7 +341,7 @@ var VM = Class.subClass( {
 	},
 	
 	// Print text!
-	print: function( text )
+	_print: function( text )
 	{
 		// Stream 3 gets the text first
 		if ( this.streams[2].length )
@@ -367,10 +367,40 @@ var VM = Class.subClass( {
 		}
 	},
 	
-	print_obj: function( obj )
+	// Print many things
+	print: function( type, val )
 	{
-		var proptable = this.m.getUint16( this.objects + 14 * obj + 12 );
-		this.print( this.text.decode( proptable + 1, this.m.getUint8( proptable ) * 2 ) );
+		// Number
+		if ( type === 0 )
+		{
+			val = '' + val;
+		}
+		// Unicode
+		if ( type === 1 )
+		{
+			val = String.fromCharCode( val );
+		}
+		// Text from address
+		if ( type === 2 )
+		{
+			val = this.jit[ val ] || this.text.decode( val );
+		}
+		// Object
+		if ( type === 3 )
+		{
+			var proptable = this.m.getUint16( this.objects + 14 * val + 12 );
+			val = this.text.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
+		}
+		// ZSCII
+		if ( type === 4 )
+		{
+			if ( !this.text.unicode_table[ val ] )
+			{
+				return;
+			}
+			val = this.text.unicode_table[ val ];
+		}
+		this._print( val );
 	},
 	
 	print_table: function( zscii, width, height, skip )
@@ -380,7 +410,7 @@ var VM = Class.subClass( {
 		var i = 0;
 		while ( i < height )
 		{
-			this.print( '\n' + this.text.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
+			this._print( '\n' + this.text.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
 			zscii += width + skip;
 			i++;
 		}
@@ -501,6 +531,67 @@ var VM = Class.subClass( {
 			}
 			this.set_family( obj, 0, 0, 0, older_sibling, younger_sibling );
 		}
+	},
+	
+	// (Re)start the VM
+	restart: function()
+	{
+		// Set up the memory
+		var memory = ByteArray( this.data ),
+		
+		version = memory.getUint8( 0x00 ),
+		addr_multipler = version === 5 ? 4 : 8,
+		property_defaults = memory.getUint16( 0x0A ),
+		extension = memory.getUint16( 0x36 );
+		
+		// Check if the version is supported
+		if ( version !== 5 && version !== 8 )
+		{
+			throw new Error( 'Unsupported Z-Machine version: ' + version );
+		}
+		
+		// Preserve flags 2 - the fixed pitch bit is surely the lamest part of the Z-Machine spec!
+		if ( this.m )
+		{
+			memory.setUint8( 0x11, this.m.getUint8( 0x11 ) );
+		}
+		
+		extend( this, {
+			
+			// Memory, locals and stacks of various kinds
+			m: memory,
+			s: [],
+			l: [],
+			call_stack: [],
+			undo: [],
+			
+			// IO stuff
+			orders: [],
+			streams: [ 1, 0, [], 0 ],
+			
+			// Get some header variables
+			version: version,
+			pc: memory.getUint16( 0x06 ),
+			properties: property_defaults,
+			objects: property_defaults + 112, // 126-14 - if we take this now then we won't need to always decrement the object number
+			globals: memory.getUint16( 0x0C ),
+			staticmem: memory.getUint16( 0x0E ),
+			eof: ( memory.getUint16( 0x1A ) || 65536 ) * addr_multipler,
+			extension: extension,
+			extension_count: extension ? memory.getUint16( extension ) : 0,
+			
+			// Routine and string multiplier
+			addr_multipler: addr_multipler
+			
+		});
+		// These classes rely too much on the above, so add them after
+		extend( this, {
+			ui: new ZVMUI( this, memory.getUint8( 0x11 ) & 0x02 ),
+			text: new Text( this )
+		});
+		
+		// Update the header
+		this.update_header();
 	},
 	
 	restore: function( data )
@@ -763,6 +854,41 @@ var VM = Class.subClass( {
 	test_attr: function( object, attribute )
 	{
 		return ( this.m.getUint8( this.objects + 14 * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
+	},
+	
+	// Update the header after restarting or restoring
+	update_header: function()
+	{
+		var memory = this.m,
+		fgcolour = this.env.fgcolour ? this.ui.convert_RGB( this.env.fgcolour ) : 0xFFFF,
+		bgcolour = this.env.bgcolour ? this.ui.convert_RGB( this.env.bgcolour ) : 0xFFFF;
+		
+		// Reset the random state
+		this.random_state = 0;
+		
+		// Flags 1: Set bits 0, 2, 3, 4: typographic styles are OK
+		// Set bit 7 only if timed input is supported
+		memory.setUint8( 0x01, 0x1D | ( this.env.timed ? 0x80 : 0 ) );
+		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects
+		// This is really a word, but we only care about the lower byte
+		memory.setUint8( 0x11, memory.getUint8( 0x11 ) & 0x57 );
+		// Screen settings
+		memory.setUint8( 0x20, 255 ); // Infinite height
+		memory.setUint8( 0x21, this.env.width );
+		memory.setUint16( 0x22, this.env.width );
+		memory.setUint16( 0x24, 255 );
+		memory.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
+		// Default colours
+		// Math.abs will convert -1 (not found) to 1 (default) which is convenient
+		memory.setUint8( 0x2C, Math.abs( this.ui.colours.indexOf( bgcolour ) ) );
+		memory.setUint8( 0x2D, Math.abs( this.ui.colours.indexOf( fgcolour ) ) );
+		// Z Machine Spec revision
+		memory.setUint16( 0x32, 0x0102 );
+		// Clear flags three, we don't support any of that stuff
+		this.extension_table( 4, 0 );
+		// Default true colours - assume that the 1.1 spec has a typo, it's silly to store the foreground colour twice!
+		this.extension_table( 5, fgcolour );
+		this.extension_table( 6, bgcolour );
 	},
 	
 	// Read or write a variable

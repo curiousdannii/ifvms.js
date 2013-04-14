@@ -9,7 +9,7 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
-// Array.indexOf compatibility
+// Array.indexOf compatibility (Support: IE8)
 if ( ![].indexOf )
 {
 	Array.prototype.indexOf = function( obj, fromIndex )
@@ -23,6 +23,22 @@ if ( ![].indexOf )
 		}
 		return -1;
 	};
+}
+
+// Bind, with compatiblity (Support: IE8)
+function bind( func, obj )
+{
+	if ( Function.prototype.bind )
+	{
+		return func.bind( obj );
+	}
+	else
+	{
+		return function()
+		{
+			func.apply( obj, [].slice.call( arguments ) );
+		};
+	}
 }
 
 // Utility to extend objects

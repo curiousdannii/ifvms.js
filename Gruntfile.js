@@ -12,7 +12,6 @@ module.exports = function( grunt )
 			zvm: {
 				dest: 'dist/zvm.js',
 				src: [
-					'src/zvm/header.txt',
 					'src/zvm/intro.js',
 					'src/common/class.js',
 					'src/common/iff.js',
@@ -89,13 +88,14 @@ module.exports = function( grunt )
 		var bootstrap = require( './dist/bootstrap.js' );
 		var vm = bootstrap.zvm( './node_modules/iftests/tests/praxix.z5', ['all'] );
 		var result = vm.log;
-		if ( /All tests passed./.test( result ) )
+		if ( /All tests passed/.test( result ) )
 		{
-			grunt.log.write( 'All tests passed!\n' );
+			grunt.log.ok( 'All tests passed!\n' );
 		}
 		else
 		{
-			grunt.log.write( /\d+ tests failed overall:[^$]+/.exec( result )[0] );
+			grunt.log.error( /\d+ tests failed overall:[^$\r]+/.exec( result )[0] );
+			grunt.fail.warncount++;
 		}
 	});
 	

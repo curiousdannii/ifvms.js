@@ -159,10 +159,22 @@ function disassemble( engine )
 		// Check for a text literal
 		if ( opcode_class.printer )
 		{
-			// Decode and escape text for JITing
-			temp = engine.text.decode( pc );
-			operands.push( temp.replace( /\\/g, '\\\\' ).replace( /\n/g, '\\n' ).replace( /"/g, '\\"' ) );
-			pc = temp.pc;
+			// Just use the address as an operand, the text will be decoded at run time
+			operands.push( pc );
+			
+			// Continue until we reach the stop bit
+			// (or the end of the file, which will stop memory access errors, even though it must be a malformed storyfile)
+			while ( pc < engine.eof )
+			{
+				temp = memory.getUint16( pc );
+				pc += 2;
+				
+				// Stop bit
+				if ( temp & 0x8000 )
+				{
+					break;
+				}
+			}
 		}
 		
 		// Update the engine's pc

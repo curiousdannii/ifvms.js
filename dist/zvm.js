@@ -1,22 +1,11 @@
 /*
 
-ZVM - the ifvms.js implementation of the Z-Machine
-==================================================
+ZVM - the ifvms.js Z-Machine
+============================
 
-Built: 2013-04-11
+Built: 2013-04-14
 
 Copyright (c) 2011-2013 The ifvms.js team
-BSD licenced
-http://github.com/curiousdannii/ifvms.js
-
-*/
-
-/*
-
-ZVM intro - various functions and compatibility fixes
-=====================================================
-
-Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -275,7 +264,7 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
-// Array.indexOf compatibility
+// Array.indexOf compatibility (Support: IE8)
 if ( ![].indexOf )
 {
 	Array.prototype.indexOf = function( obj, fromIndex )
@@ -289,6 +278,22 @@ if ( ![].indexOf )
 		}
 		return -1;
 	};
+}
+
+// Bind, with compatiblity (Support: IE8)
+function bind( func, obj )
+{
+	if ( Function.prototype.bind )
+	{
+		return func.bind( obj );
+	}
+	else
+	{
+		return function()
+		{
+			func.apply( obj, [].slice.call( arguments ) );
+		};
+	}
 }
 
 // Utility to extend objects
@@ -1027,13 +1032,9 @@ Text = Class.subClass({
 		
 		alphabet_addr = memory.getUint16( 0x34 ),
 		unicode_addr = engine.extension_table( 3 ),
-		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ ),
-		abbreviations,
-		abbr_array = [],
-		i = 0, l = 96;
+		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
 		
 		this.e = engine;
-		this.maxaddr = memory.getUint16( 0x1A ) * engine.addr_multipler;
 		
 		// Check for custom alphabets
 		this.make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
@@ -1044,17 +1045,6 @@ Text = Class.subClass({
 		this.make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
 			// Or use the default
 			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
-		
-		// Abbreviations
-		abbreviations = memory.getUint16( 0x18 );
-		if ( abbreviations )
-		{
-			while ( i < l )
-			{
-				abbr_array.push( this.decode( memory.getUint16( abbreviations + 2 * i++ ) * 2, 0, 1 ) );
-			}
-		}
-		this.abbr = abbr_array;
 		
 		// Parse the standard dictionary
 		this.dictionaries = {};
@@ -1086,8 +1076,8 @@ Text = Class.subClass({
 	// Make the unicode tables
 	make_unicode: function( data )
 	{
-		var table = { 13: '\n' }, // New line conversion
-		reverse = { 10: 13 },
+		var table = { 13: '\r' }, // New line conversion
+		reverse = { 13: 13 },
 		i = 0;
 		while ( i < data.length )
 		{
@@ -1105,20 +1095,20 @@ Text = Class.subClass({
 	},
 	
 	// Decode Z-chars into ZSCII and then Unicode
-	decode: function( addr, length, nowarn )
+	decode: function( addr, length )
 	{
 		var memory = this.e.m,
 		
 		start_addr = addr,
-		word,
+		temp,
 		buffer = [],
 		i = 0,
 		zchar,
 		alphabet = 0,
 		result = [],
 		resulttexts = [],
+		usesabbr,
 		tenbit,
-		tempi,
 		unicodecount = 0;
 		
 		// Check if this one's been cached already
@@ -1129,18 +1119,18 @@ Text = Class.subClass({
 		
 		// If we've been given a length, then use it as the finaladdr,
 		// Otherwise don't go past the end of the file
-		length = length ? length + addr : this.maxaddr;
+		length = length ? length + addr : this.e.eof;
 		
 		// Go through until we've reached the end of the text or a stop bit
 		while ( addr < length )
 		{
-			word = memory.getUint16( addr );
+			temp = memory.getUint16( addr );
 			addr += 2;
 			
-			buffer.push( word >> 10 & 0x1F, word >> 5 & 0x1F, word & 0x1F );
+			buffer.push( temp >> 10 & 0x1F, temp >> 5 & 0x1F, temp & 0x1F );
 			
 			// Stop bit
-			if ( word & 0x8000 )
+			if ( temp & 0x8000 )
 			{
 				break;
 			}
@@ -1160,8 +1150,9 @@ Text = Class.subClass({
 			// Abbreviations
 			else if ( zchar < 4 )
 			{
+				usesabbr = 1;
 				result.push( -1 );
-				resulttexts.push( this.abbr[ 32 * ( zchar - 1 ) + buffer[i++] ] );
+				resulttexts.push( '\uE000+this.abbr(' + ( 32 * ( zchar - 1 ) + buffer[i++] ) + ')+\uE000' );
 			}
 			// Shift characters
 			else if ( zchar < 6 )
@@ -1185,7 +1176,7 @@ Text = Class.subClass({
 					{
 						tenbit -= 767;
 						unicodecount += tenbit;
-						tempi = i;
+						temp = i;
 						i = ( i % 3 ) + 3;
 						while ( tenbit-- )
 						{
@@ -1194,7 +1185,7 @@ Text = Class.subClass({
 							// Set those characters so they won't be decoded again
 							buffer[i++] = buffer[i++] = buffer[i++] = 0x20;
 						}
-						i = tempi;
+						i = temp;
 					}
 				}
 			}
@@ -1215,14 +1206,18 @@ Text = Class.subClass({
 			}
 		}
 		
-		// Cache and return. Use String() so that .pc will be preserved
-		/* jshint -W053 */ // Don't complain about new String
-		result = new String( this.zscii_to_text( result, resulttexts ) );
-		result.pc = addr;
-		this.e.jit[start_addr] = result;
-		if ( !nowarn && start_addr < this.e.staticmem )
+		result = this.zscii_to_text( result, resulttexts );
+		// Abbreviations must be extracted at run time, so return a function instead
+		if ( usesabbr )
 		{
-			console.warn( 'Caching a string in dynamic memory: ' + start_addr );
+			result = {
+				toString: bind( Function( 'return "' + result.replace( /\\/g, '\\\\' ).replace( /"/g, '\\"' ).replace( /\r/g, '\\r' ).replace( /\uE000/g, '"' ) + '"' ), this )
+			};
+		}
+		// Cache and return
+		if ( start_addr >= this.e.staticmem )
+		{
+			this.e.jit[start_addr] = result;
 		}
 		return result;
 	},
@@ -1351,6 +1346,13 @@ Text = Class.subClass({
 		this.dictionaries[addr_start] = dict;
 		
 		return dict;
+	},
+	
+	// Print an abbreviation
+	abbr: function( abbrnum )
+	{
+		var memory = this.e.m;
+		return this.decode( memory.getUint16( memory.getUint16( 0x18 ) + 2 * abbrnum ) * 2 );
 	},
 	
 	// Tokenise a text
@@ -1900,7 +1902,7 @@ opcodes = {
 /* call_2s */ 25: CallerStorer,
 /* call_2n */ 26: Caller,
 /* set_colour */ 27: opcode_builder( Opcode, function() { return 'e.ui.set_colour(' + this.args() + ')'; } ),
-/* throw */ 28: opcode_builder( Stopper, function( value, cookie ) { return 'while(e.call_stack.length>' + cookie + '){e.call_stack.shift()}e.ret(' + value + ')'; } ),
+/* throw */ 28: opcode_builder( Stopper, function( value, cookie ) { return 'while(e.call_stack.length>' + cookie + '){e.call_stack.shift()}return ' + value; } ),
 /* jz */ 128: opcode_builder( Brancher, function( a ) { return a + '===0'; } ),
 /* get_sibling */ 129: opcode_builder( BrancherStorer, function( obj ) { return 'e.get_sibling(' + obj + ')'; } ),
 /* get_child */ 130: opcode_builder( BrancherStorer, function( obj ) { return 'e.get_child(' + obj + ')'; } ),
@@ -1908,26 +1910,26 @@ opcodes = {
 /* get_prop_length */ 132: opcode_builder( Storer, function( a ) { return 'e.get_prop_len(' + a + ')'; } ),
 /* inc */ 133: Incdec,
 /* dec */ 134: Incdec,
-/* print_addr */ 135: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr + '))'; } ),
+/* print_addr */ 135: opcode_builder( Opcode, function( addr ) { return 'e.print(2,' + addr + ')'; } ),
 /* call_1s */ 136: CallerStorer,
 /* remove_obj */ 137: opcode_builder( Opcode, function( obj ) { return 'e.remove_obj(' + obj + ')'; } ),
-/* print_obj */ 138: opcode_builder( Opcode, function( obj ) { return 'e.print_obj(' + obj + ')'; } ),
+/* print_obj */ 138: opcode_builder( Opcode, function( obj ) { return 'e.print(3,' + obj + ')'; } ),
 /* ret */ 139: opcode_builder( Stopper, function( a ) { return 'return ' + a; } ),
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + ( this.next - 2 ); } ),
-/* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(e.text.decode(' + addr + '*' + this.e.addr_multipler + '))'; } ),
+/* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(2,' + addr + '*' + this.e.addr_multipler + ')'; } ),
 /* load */ 142: Indirect.subClass( { storer: 1 } ),
 /* call_1n */ 143: Caller,
 /* rtrue */ 176: opcode_builder( Stopper, function() { return 'return 1'; } ),
 /* rfalse */ 177: opcode_builder( Stopper, function() { return 'return 0'; } ),
 // Reconsider a generalised class for @print/@print_ret?
-/* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print("' + text + '")'; }, { printer: 1 } ),
-/* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print("' + text + '\\n");return 1'; }, { printer: 1 } ),
+/* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print(2,' + text + ')'; }, { printer: 1 } ),
+/* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print(2,' + text + ');e.print(1,13);return 1'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
-/* restart */ 183: opcode_builder( Stopper, function() { return 'e.act("restart")'; } ),
+/* restart */ 183: opcode_builder( Stopper, function() { return 'e.act(183)'; } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( new Variable( this.e, 0 ) ); } } ),
 /* catch */ 185: opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
-/* quit */ 186: opcode_builder( Stopper, function() { return 'e.act("quit")'; } ),
-/* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print("\\n")'; } ),
+/* quit */ 186: opcode_builder( Stopper, function() { return 'e.act(186)'; } ),
+/* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
 /* verify */ 189: alwaysbranch, // Actually check??
 /* piracy */ 191: alwaysbranch,
 /* call_vs */ 224: CallerStorer,
@@ -1935,8 +1937,8 @@ opcodes = {
 /* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint8(e.S2U(' + array + '+' + index.U2S() + '),' + value + ')'; } ),
 /* put_prop */ 227: opcode_builder( Opcode, function() { return 'e.put_prop(' + this.args() + ')'; } ),
 /* aread */ 228: opcode_builder( Pauser, function() { return 'e.read(' + this.args() + ',' + this.storer.v + ')'; } ),
-/* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(e.text.zscii_to_text([' + a + ']))'; } ),
-/* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.print(' + a.U2S() + ')'; } ),
+/* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(4,' + a + ')'; } ),
+/* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.print(0,' + a.U2S() + ')'; } ),
 /* random */ 231: opcode_builder( Storer, function( a ) { return 'e.random(' + a.U2S() + ')'; } ),
 /* push */ 232: opcode_builder( Storer, simple_func, { post: function() { this.storer = new Variable( this.e, 0 ); }, storer: 0 } ),
 /* pull */ 233: Indirect,
@@ -1963,14 +1965,14 @@ opcodes = {
 /* print_table */ 254: opcode_builder( Opcode, function() { return 'e.print_table(' + this.args() + ')'; } ),
 /* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return arg + '<=e.call_stack[0][4]'; } ),
 /* save */ 1000: opcode_builder( Pauser, function() { return 'e.save(' + ( this.next - 1 ) + ',' + this.storer.v + ')'; } ),
-/* restore */ 1001: opcode_builder( Pauser, function() { return 'e.act("restore",{storer:' + this.storer.v + '})'; } ),
+/* restore */ 1001: opcode_builder( Pauser, function() { return 'e.act(1001,' + this.storer.v + ')'; } ),
 /* log_shift */ 1002: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.log_shift(' + a + ',' + b.U2S() + '))'; } ),
 /* art_shift */ 1003: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.art_shift(' + a.U2S() + ',' + b.U2S() + '))'; } ),
 /* set_font */ 1004: opcode_builder( Storer, function( font ) { return 'e.ui.set_font(' + font + ')'; } ),
 /* save_undo */ 1009: opcode_builder( Storer, function() { return 'e.save_undo(' + this.next + ',' + this.storer.v + ')'; } ),
 // As the standard says calling this without a save point is illegal, we don't need to actually store anything (but it must still be disassembled)
 /* restore_undo */ 1010: opcode_builder( Opcode, function() { return 'if(e.restore_undo())return'; }, { storer: 1 } ),
-/* print_unicode */ 1011: opcode_builder( Opcode, function( a ) { return 'e.print(String.fromCharCode(' + a + '))'; } ),
+/* print_unicode */ 1011: opcode_builder( Opcode, function( a ) { return 'e.print(1,' + a + ')'; } ),
 // Assume we can print and read all unicode characters rather than actually testing
 /* check_unicode */ 1012: opcode_builder( Storer, function() { return 3; } ),
 /* set_true_colour */ 1013: opcode_builder( Opcode, function() { return 'e.ui.set_true_colour(' + this.args() + ')'; } ),
@@ -2266,10 +2268,22 @@ function disassemble( engine )
 		// Check for a text literal
 		if ( opcode_class.printer )
 		{
-			// Decode and escape text for JITing
-			temp = engine.text.decode( pc );
-			operands.push( temp.replace( /\\/g, '\\\\' ).replace( /\n/g, '\\n' ).replace( /"/g, '\\"' ) );
-			pc = temp.pc;
+			// Just use the address as an operand, the text will be decoded at run time
+			operands.push( pc );
+			
+			// Continue until we reach the stop bit
+			// (or the end of the file, which will stop memory access errors, even though it must be a malformed storyfile)
+			while ( pc < engine.eof )
+			{
+				temp = memory.getUint16( pc );
+				pc += 2;
+				
+				// Stop bit
+				if ( temp & 0x8000 )
+				{
+					break;
+				}
+			}
 		}
 		
 		// Update the engine's pc
@@ -2659,7 +2673,7 @@ var VM = Class.subClass( {
 	},
 	
 	// Print text!
-	print: function( text )
+	_print: function( text )
 	{
 		// Stream 3 gets the text first
 		if ( this.streams[2].length )
@@ -2685,10 +2699,40 @@ var VM = Class.subClass( {
 		}
 	},
 	
-	print_obj: function( obj )
+	// Print many things
+	print: function( type, val )
 	{
-		var proptable = this.m.getUint16( this.objects + 14 * obj + 12 );
-		this.print( this.text.decode( proptable + 1, this.m.getUint8( proptable ) * 2 ) );
+		// Number
+		if ( type === 0 )
+		{
+			val = '' + val;
+		}
+		// Unicode
+		if ( type === 1 )
+		{
+			val = String.fromCharCode( val );
+		}
+		// Text from address
+		if ( type === 2 )
+		{
+			val = this.jit[ val ] || this.text.decode( val );
+		}
+		// Object
+		if ( type === 3 )
+		{
+			var proptable = this.m.getUint16( this.objects + 14 * val + 12 );
+			val = this.text.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
+		}
+		// ZSCII
+		if ( type === 4 )
+		{
+			if ( !this.text.unicode_table[ val ] )
+			{
+				return;
+			}
+			val = this.text.unicode_table[ val ];
+		}
+		this._print( val );
 	},
 	
 	print_table: function( zscii, width, height, skip )
@@ -2698,7 +2742,7 @@ var VM = Class.subClass( {
 		var i = 0;
 		while ( i < height )
 		{
-			this.print( '\n' + this.text.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
+			this._print( '\n' + this.text.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
 			zscii += width + skip;
 			i++;
 		}
@@ -2819,6 +2863,67 @@ var VM = Class.subClass( {
 			}
 			this.set_family( obj, 0, 0, 0, older_sibling, younger_sibling );
 		}
+	},
+	
+	// (Re)start the VM
+	restart: function()
+	{
+		// Set up the memory
+		var memory = ByteArray( this.data ),
+		
+		version = memory.getUint8( 0x00 ),
+		addr_multipler = version === 5 ? 4 : 8,
+		property_defaults = memory.getUint16( 0x0A ),
+		extension = memory.getUint16( 0x36 );
+		
+		// Check if the version is supported
+		if ( version !== 5 && version !== 8 )
+		{
+			throw new Error( 'Unsupported Z-Machine version: ' + version );
+		}
+		
+		// Preserve flags 2 - the fixed pitch bit is surely the lamest part of the Z-Machine spec!
+		if ( this.m )
+		{
+			memory.setUint8( 0x11, this.m.getUint8( 0x11 ) );
+		}
+		
+		extend( this, {
+			
+			// Memory, locals and stacks of various kinds
+			m: memory,
+			s: [],
+			l: [],
+			call_stack: [],
+			undo: [],
+			
+			// IO stuff
+			orders: [],
+			streams: [ 1, 0, [], 0 ],
+			
+			// Get some header variables
+			version: version,
+			pc: memory.getUint16( 0x06 ),
+			properties: property_defaults,
+			objects: property_defaults + 112, // 126-14 - if we take this now then we won't need to always decrement the object number
+			globals: memory.getUint16( 0x0C ),
+			staticmem: memory.getUint16( 0x0E ),
+			eof: ( memory.getUint16( 0x1A ) || 65536 ) * addr_multipler,
+			extension: extension,
+			extension_count: extension ? memory.getUint16( extension ) : 0,
+			
+			// Routine and string multiplier
+			addr_multipler: addr_multipler
+			
+		});
+		// These classes rely too much on the above, so add them after
+		extend( this, {
+			ui: new ZVMUI( this, memory.getUint8( 0x11 ) & 0x02 ),
+			text: new Text( this )
+		});
+		
+		// Update the header
+		this.update_header();
 	},
 	
 	restore: function( data )
@@ -3083,6 +3188,41 @@ var VM = Class.subClass( {
 		return ( this.m.getUint8( this.objects + 14 * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
 	},
 	
+	// Update the header after restarting or restoring
+	update_header: function()
+	{
+		var memory = this.m,
+		fgcolour = this.env.fgcolour ? this.ui.convert_RGB( this.env.fgcolour ) : 0xFFFF,
+		bgcolour = this.env.bgcolour ? this.ui.convert_RGB( this.env.bgcolour ) : 0xFFFF;
+		
+		// Reset the random state
+		this.random_state = 0;
+		
+		// Flags 1: Set bits 0, 2, 3, 4: typographic styles are OK
+		// Set bit 7 only if timed input is supported
+		memory.setUint8( 0x01, 0x1D | ( this.env.timed ? 0x80 : 0 ) );
+		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects
+		// This is really a word, but we only care about the lower byte
+		memory.setUint8( 0x11, memory.getUint8( 0x11 ) & 0x57 );
+		// Screen settings
+		memory.setUint8( 0x20, 255 ); // Infinite height
+		memory.setUint8( 0x21, this.env.width );
+		memory.setUint16( 0x22, this.env.width );
+		memory.setUint16( 0x24, 255 );
+		memory.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
+		// Default colours
+		// Math.abs will convert -1 (not found) to 1 (default) which is convenient
+		memory.setUint8( 0x2C, Math.abs( this.ui.colours.indexOf( bgcolour ) ) );
+		memory.setUint8( 0x2D, Math.abs( this.ui.colours.indexOf( fgcolour ) ) );
+		// Z Machine Spec revision
+		memory.setUint16( 0x32, 0x0102 );
+		// Clear flags three, we don't support any of that stuff
+		this.extension_table( 4, 0 );
+		// Default true colours - assume that the 1.1 spec has a typo, it's silly to store the foreground colour twice!
+		this.extension_table( 5, fgcolour );
+		this.extension_table( 6, bgcolour );
+	},
+	
 	// Read or write a variable
 	variable: function( variable, value )
 	{
@@ -3250,7 +3390,7 @@ TODO:
 			
 			// Echo the response (7.1.1.1)
 			response = data.response;
-			this.print( response + '\n' );
+			this._print( response + '\n' );
 			
 			// Convert the response to lower case and then to ZSCII
 			response = this.text.text_to_zscii( response.toLowerCase() );
@@ -3287,100 +3427,6 @@ TODO:
 		
 		// Resume normal operation
 		this.run();
-	},
-	
-	// (Re)start the VM
-	restart: function()
-	{
-		// Set up the memory
-		var memory = ByteArray( this.data ),
-		
-		version = memory.getUint8( 0x00 ),
-		property_defaults = memory.getUint16( 0x0A ),
-		extension = memory.getUint16( 0x36 );
-		
-		// Check if the version is supported
-		if ( version !== 5 && version !== 8 )
-		{
-			throw new Error( 'Unsupported Z-Machine version: ' + version );
-		}
-		
-		// Preserve flags 2 - the fixed pitch bit is surely the lamest part of the Z-Machine spec!
-		if ( this.m )
-		{
-			memory.setUint8( 0x11, this.m.getUint8( 0x11 ) );
-		}
-		
-		extend( this, {
-			
-			// Memory, locals and stacks of various kinds
-			m: memory,
-			s: [],
-			l: [],
-			call_stack: [],
-			undo: [],
-			
-			// IO stuff
-			orders: [],
-			streams: [ 1, 0, [], 0 ],
-			
-			// Get some header variables
-			version: version,
-			pc: memory.getUint16( 0x06 ),
-			properties: property_defaults,
-			objects: property_defaults + 112, // 126-14 - if we take this now then we won't need to always decrement the object number
-			globals: memory.getUint16( 0x0C ),
-			staticmem: memory.getUint16( 0x0E ),
-			extension: extension,
-			extension_count: extension ? memory.getUint16( extension ) : 0,
-			
-			// Routine and string multiplier
-			addr_multipler: version === 5 ? 4 : 8
-			
-		});
-		// These classes rely too much on the above, so add them after
-		extend( this, {
-			ui: new ZVMUI( this, memory.getUint8( 0x11 ) & 0x02 ),
-			text: new Text( this )
-		});
-		
-		// Update the header
-		this.update_header();
-	},
-	
-	// Update the header after restarting or restoring
-	update_header: function()
-	{
-		var memory = this.m,
-		fgcolour = this.env.fgcolour ? this.ui.convert_RGB( this.env.fgcolour ) : 0xFFFF,
-		bgcolour = this.env.bgcolour ? this.ui.convert_RGB( this.env.bgcolour ) : 0xFFFF;
-		
-		// Reset the random state
-		this.random_state = 0;
-		
-		// Flags 1: Set bits 0, 2, 3, 4: typographic styles are OK
-		// Set bit 7 only if timed input is supported
-		memory.setUint8( 0x01, 0x1D | ( this.env.timed ? 0x80 : 0 ) );
-		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects
-		// This is really a word, but we only care about the lower byte
-		memory.setUint8( 0x11, memory.getUint8( 0x11 ) & 0x57 );
-		// Screen settings
-		memory.setUint8( 0x20, 255 ); // Infinite height
-		memory.setUint8( 0x21, this.env.width );
-		memory.setUint16( 0x22, this.env.width );
-		memory.setUint16( 0x24, 255 );
-		memory.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
-		// Default colours
-		// Math.abs will convert -1 (not found) to 1 (default) which is convenient
-		memory.setUint8( 0x2C, Math.abs( this.ui.colours.indexOf( bgcolour ) ) );
-		memory.setUint8( 0x2D, Math.abs( this.ui.colours.indexOf( fgcolour ) ) );
-		// Z Machine Spec revision
-		memory.setUint16( 0x32, 0x0102 );
-		// Clear flags three, we don't support any of that stuff
-		this.extension_table( 4, 0 );
-		// Default true colours - assume that the 1.1 spec has a typo, it's silly to store the foreground colour twice!
-		this.extension_table( 5, fgcolour );
-		this.extension_table( 6, bgcolour );
 	},
 	
 	// Run
@@ -3465,6 +3511,21 @@ TODO:
 	act: function( code, options )
 	{
 		options = options || {};
+		
+		// Handle numerical codes from jit-code - these codes are opcode numbers
+		if ( code === 183 )
+		{
+			code = 'restart';
+		}
+		if ( code === 186 )
+		{
+			code = 'quit';
+		}
+		if ( code === 1001 )
+		{
+			code = 'restore';
+			options = { storer: options };
+		}
 		
 		// Flush the buffer
 		this.ui.flush();

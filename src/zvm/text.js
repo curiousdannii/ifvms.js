@@ -45,13 +45,9 @@ Text = Class.subClass({
 		
 		alphabet_addr = memory.getUint16( 0x34 ),
 		unicode_addr = engine.extension_table( 3 ),
-		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ ),
-		abbreviations,
-		abbr_array = [],
-		i = 0, l = 96;
+		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
 		
 		this.e = engine;
-		this.maxaddr = memory.getUint16( 0x1A ) * engine.addr_multipler;
 		
 		// Check for custom alphabets
 		this.make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
@@ -62,17 +58,6 @@ Text = Class.subClass({
 		this.make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
 			// Or use the default
 			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
-		
-		// Abbreviations
-		abbreviations = memory.getUint16( 0x18 );
-		if ( abbreviations )
-		{
-			while ( i < l )
-			{
-				abbr_array.push( this.decode( memory.getUint16( abbreviations + 2 * i++ ) * 2, 0, 1 ) );
-			}
-		}
-		this.abbr = abbr_array;
 		
 		// Parse the standard dictionary
 		this.dictionaries = {};
@@ -104,8 +89,8 @@ Text = Class.subClass({
 	// Make the unicode tables
 	make_unicode: function( data )
 	{
-		var table = { 13: '\n' }, // New line conversion
-		reverse = { 10: 13 },
+		var table = { 13: '\r' }, // New line conversion
+		reverse = { 13: 13 },
 		i = 0;
 		while ( i < data.length )
 		{
@@ -123,20 +108,20 @@ Text = Class.subClass({
 	},
 	
 	// Decode Z-chars into ZSCII and then Unicode
-	decode: function( addr, length, nowarn )
+	decode: function( addr, length )
 	{
 		var memory = this.e.m,
 		
 		start_addr = addr,
-		word,
+		temp,
 		buffer = [],
 		i = 0,
 		zchar,
 		alphabet = 0,
 		result = [],
 		resulttexts = [],
+		usesabbr,
 		tenbit,
-		tempi,
 		unicodecount = 0;
 		
 		// Check if this one's been cached already
@@ -147,18 +132,18 @@ Text = Class.subClass({
 		
 		// If we've been given a length, then use it as the finaladdr,
 		// Otherwise don't go past the end of the file
-		length = length ? length + addr : this.maxaddr;
+		length = length ? length + addr : this.e.eof;
 		
 		// Go through until we've reached the end of the text or a stop bit
 		while ( addr < length )
 		{
-			word = memory.getUint16( addr );
+			temp = memory.getUint16( addr );
 			addr += 2;
 			
-			buffer.push( word >> 10 & 0x1F, word >> 5 & 0x1F, word & 0x1F );
+			buffer.push( temp >> 10 & 0x1F, temp >> 5 & 0x1F, temp & 0x1F );
 			
 			// Stop bit
-			if ( word & 0x8000 )
+			if ( temp & 0x8000 )
 			{
 				break;
 			}
@@ -178,8 +163,9 @@ Text = Class.subClass({
 			// Abbreviations
 			else if ( zchar < 4 )
 			{
+				usesabbr = 1;
 				result.push( -1 );
-				resulttexts.push( this.abbr[ 32 * ( zchar - 1 ) + buffer[i++] ] );
+				resulttexts.push( '\uE000+this.abbr(' + ( 32 * ( zchar - 1 ) + buffer[i++] ) + ')+\uE000' );
 			}
 			// Shift characters
 			else if ( zchar < 6 )
@@ -203,7 +189,7 @@ Text = Class.subClass({
 					{
 						tenbit -= 767;
 						unicodecount += tenbit;
-						tempi = i;
+						temp = i;
 						i = ( i % 3 ) + 3;
 						while ( tenbit-- )
 						{
@@ -212,7 +198,7 @@ Text = Class.subClass({
 							// Set those characters so they won't be decoded again
 							buffer[i++] = buffer[i++] = buffer[i++] = 0x20;
 						}
-						i = tempi;
+						i = temp;
 					}
 				}
 			}
@@ -233,14 +219,18 @@ Text = Class.subClass({
 			}
 		}
 		
-		// Cache and return. Use String() so that .pc will be preserved
-		/* jshint -W053 */ // Don't complain about new String
-		result = new String( this.zscii_to_text( result, resulttexts ) );
-		result.pc = addr;
-		this.e.jit[start_addr] = result;
-		if ( !nowarn && start_addr < this.e.staticmem )
+		result = this.zscii_to_text( result, resulttexts );
+		// Abbreviations must be extracted at run time, so return a function instead
+		if ( usesabbr )
 		{
-			console.warn( 'Caching a string in dynamic memory: ' + start_addr );
+			result = {
+				toString: bind( Function( 'return "' + result.replace( /\\/g, '\\\\' ).replace( /"/g, '\\"' ).replace( /\r/g, '\\r' ).replace( /\uE000/g, '"' ) + '"' ), this )
+			};
+		}
+		// Cache and return
+		if ( start_addr >= this.e.staticmem )
+		{
+			this.e.jit[start_addr] = result;
 		}
 		return result;
 	},
@@ -369,6 +359,13 @@ Text = Class.subClass({
 		this.dictionaries[addr_start] = dict;
 		
 		return dict;
+	},
+	
+	// Print an abbreviation
+	abbr: function( abbrnum )
+	{
+		var memory = this.e.m;
+		return this.decode( memory.getUint16( memory.getUint16( 0x18 ) + 2 * abbrnum ) * 2 );
 	},
 	
 	// Tokenise a text
