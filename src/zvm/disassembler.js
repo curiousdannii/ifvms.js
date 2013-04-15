@@ -166,11 +166,11 @@ function disassemble( engine )
 			// (or the end of the file, which will stop memory access errors, even though it must be a malformed storyfile)
 			while ( pc < engine.eof )
 			{
-				temp = memory.getUint16( pc );
+				temp = memory.getUint8( pc );
 				pc += 2;
 				
 				// Stop bit
-				if ( temp & 0x8000 )
+				if ( temp & 0x80 )
 				{
 					break;
 				}

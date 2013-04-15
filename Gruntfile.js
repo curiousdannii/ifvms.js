@@ -31,6 +31,10 @@ module.exports = function( grunt )
 			},
 		},
 		
+		curl: {
+			'tests/tests.zip': 'https://github.com/curiousdannii/if/archive/gh-pages.zip',
+		},
+		
 		jshint: {
 			options: {
 				// Enforcing options
@@ -75,6 +79,18 @@ module.exports = function( grunt )
 				tasks: [ 'zvm' ],
 			},
 		},
+		
+		unzip: {
+			tests: {
+				router: function ( filepath )
+				{
+					// Put all files directly in tests
+					return require( 'path' ).basename( filepath );
+				},
+				src: 'tests/tests.zip',
+				dest: 'tests/',
+			},
+		},
 	});
 
 	grunt.loadNpmTasks( 'grunt-contrib-concat' );
@@ -84,9 +100,15 @@ module.exports = function( grunt )
 	// Run the Praxix test suite
 	grunt.registerTask( 'testzvm', function()
 	{
+		// Test if the test files have been downloaded yet
+		if ( !require( 'fs' ).existsSync( './tests/praxix.z5' ) )
+		{
+			return grunt.task.run( 'gettests', 'testzvm' );
+		}
+		
 		grunt.log.write( 'Running the Praxix test suite: ' );
 		var bootstrap = require( './dist/bootstrap.js' );
-		var vm = bootstrap.zvm( './node_modules/iftests/tests/praxix.z5', ['all'] );
+		var vm = bootstrap.zvm( './tests/praxix.z5', ['all'] );
 		var result = vm.log;
 		if ( /All tests passed/.test( result ) )
 		{
@@ -99,9 +121,15 @@ module.exports = function( grunt )
 		}
 	});
 	
+	// These must be loaded late because grunt-retro breaks testzvm
+	grunt.loadNpmTasks( 'grunt-curl' );
+	grunt.loadNpmTasks( 'grunt-zip' );
+	
 	grunt.registerTask( 'default', [ 'jshint:misc', 'zvm' ] );
 	
 	grunt.registerTask( 'dev', [ 'watch' ] );
+	
+	grunt.registerTask( 'gettests', [ 'curl', 'unzip' ] );
 
 	grunt.registerTask( 'zvm', [ 'concat:zvm', 'jshint:zvm', 'testzvm' ] );
 };

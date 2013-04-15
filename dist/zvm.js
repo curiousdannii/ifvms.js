@@ -3,7 +3,7 @@
 ZVM - the ifvms.js Z-Machine
 ============================
 
-Built: 2013-04-14
+Built: 2013-04-15
 
 Copyright (c) 2011-2013 The ifvms.js team
 BSD licenced
@@ -2275,11 +2275,11 @@ function disassemble( engine )
 			// (or the end of the file, which will stop memory access errors, even though it must be a malformed storyfile)
 			while ( pc < engine.eof )
 			{
-				temp = memory.getUint16( pc );
+				temp = memory.getUint8( pc );
 				pc += 2;
 				
 				// Stop bit
-				if ( temp & 0x8000 )
+				if ( temp & 0x80 )
 				{
 					break;
 				}
@@ -2742,7 +2742,7 @@ var VM = Class.subClass( {
 		var i = 0;
 		while ( i < height )
 		{
-			this._print( '\n' + this.text.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
+			this._print( '\r' + this.text.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
 			zscii += width + skip;
 			i++;
 		}
@@ -3390,7 +3390,7 @@ TODO:
 			
 			// Echo the response (7.1.1.1)
 			response = data.response;
-			this._print( response + '\n' );
+			this._print( response + '\r' );
 			
 			// Convert the response to lower case and then to ZSCII
 			response = this.text.text_to_zscii( response.toLowerCase() );

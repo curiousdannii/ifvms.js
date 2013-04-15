@@ -120,7 +120,7 @@ TODO:
 			
 			// Echo the response (7.1.1.1)
 			response = data.response;
-			this._print( response + '\n' );
+			this._print( response + '\r' );
 			
 			// Convert the response to lower case and then to ZSCII
 			response = this.text.text_to_zscii( response.toLowerCase() );
