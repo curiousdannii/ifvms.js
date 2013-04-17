@@ -18,9 +18,8 @@ TODO:
 	
 */
 
-// This object is incomplete; see vm.js for the second half!
-var VM = Class.subClass( {
-	
+// These functions will be added to the object literal in api.js
+
 	art_shift: function( number, places )
 	{
 		return places > 0 ? number << places : number >> -places;
@@ -94,7 +93,7 @@ var VM = Class.subClass( {
 	
 	encode_text: function( zscii, length, from, target )
 	{
-		this.m.setBuffer( target, this.text.encode( this.m.getBuffer( zscii + from, length ) ) );
+		this.m.setBuffer( target, this.encode( this.m.getBuffer( zscii + from, length ) ) );
 	},
 	
 	// Access the extension table
@@ -334,7 +333,7 @@ var VM = Class.subClass( {
 		if ( stream === -3 )
 		{
 			var data = this.streams[2].shift(),
-			text = this.text.text_to_zscii( data[1] );
+			text = this.text_to_zscii( data[1] );
 			this.m.setUint16( data[0], text.length );
 			this.m.setBuffer( data[0] + 2, text );
 		}
@@ -383,22 +382,22 @@ var VM = Class.subClass( {
 		// Text from address
 		if ( type === 2 )
 		{
-			val = this.jit[ val ] || this.text.decode( val );
+			val = this.jit[ val ] || this.decode( val );
 		}
 		// Object
 		if ( type === 3 )
 		{
 			var proptable = this.m.getUint16( this.objects + 14 * val + 12 );
-			val = this.text.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
+			val = this.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
 		}
 		// ZSCII
 		if ( type === 4 )
 		{
-			if ( !this.text.unicode_table[ val ] )
+			if ( !this.unicode_table[ val ] )
 			{
 				return;
 			}
-			val = this.text.unicode_table[ val ];
+			val = this.unicode_table[ val ];
 		}
 		this._print( val );
 	},
@@ -410,7 +409,7 @@ var VM = Class.subClass( {
 		var i = 0;
 		while ( i < height )
 		{
-			this._print( '\r' + this.text.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
+			this._print( '\r' + this.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
 			zscii += width + skip;
 			i++;
 		}
@@ -584,11 +583,9 @@ var VM = Class.subClass( {
 			addr_multipler: addr_multipler
 			
 		});
-		// These classes rely too much on the above, so add them after
-		extend( this, {
-			ui: new ZVMUI( this, memory.getUint8( 0x11 ) & 0x02 ),
-			text: new Text( this )
-		});
+
+		this.ui = new ZVMUI( this, memory.getUint8( 0x11 ) & 0x02 );
+		this.init_text();
 		
 		// Update the header
 		this.update_header();
@@ -935,4 +932,4 @@ var VM = Class.subClass( {
 	
 	// Utilities for signed arithmetic
 	U2S: U2S,
-	S2U: S2U,
+	S2U: S2U

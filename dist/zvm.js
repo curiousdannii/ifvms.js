@@ -1,9 +1,9 @@
 /*
 
-ZVM - the ifvms.js Z-Machine
-============================
+ZVM - the ifvms.js Z-Machine (versions 5 and 8)
+===============================================
 
-Built: 2013-04-15
+Built: 2013-04-17
 
 Copyright (c) 2011-2013 The ifvms.js team
 BSD licenced
@@ -36,6 +36,7 @@ if ( DEBUG )
  
 // Wrap all of ZVM in a closure/namespace, and enable strict mode
 var ZVM = (function(){ 'use strict';
+
 
 /*
 
@@ -697,7 +698,7 @@ Brancher = Opcode.subClass({
 			result = 'e.pc=' + offset;
 		}
 		
-		this.result = result + '; return';
+		this.result = result + ';return';
 		this.offset = offset;
 		this.cond = new BrancherLogic( [this] );
 		
@@ -907,6 +908,131 @@ function opcode_builder( Class, func, flags )
 };*/
 /*
 
+Inform idioms
+=============
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+ 
+*/
+
+/*
+	
+TODO:
+	loops
+		doesn't work yet because of storers before the branch
+		Need loops where the condition is at the end -> do {} while ()
+	break (& continue?)
+	when opcodes are removed, if debug then add a comment
+	The @jump check isn't VM independant
+	
+*/
+
+// Block if statements / while loops
+function idiom_if_block( context, pc )
+{
+	var i = 0,
+	subcontext,
+	sublen,
+	brancher,
+	lastop,
+	secondlastop;
+	
+	// This is only needed for pretty printing
+	if ( DEBUG )
+	{
+		// Update the contexts of new contexts
+		var update_contexts = function( ops, context )
+		{
+			for ( var i = 0; i < ops.length; i++ )
+			{
+				ops[i].context = context;
+			}
+		};
+	}
+	
+	// First, find the branch opcode
+	// (-1 because we don't want to catch the very last opcode, not that it should ever branch to the following statement)
+	while ( i < context.ops.length - 1 )
+	{
+		// As long as no other opcodes have an offset property we can skip the instanceof check
+		if ( /* context.ops[i] instanceof Brancher && */ context.ops[i].offset === pc )
+		{
+			// Sometimes Inform makes complex branches, where the only subcontext opcode would be a brancher itself
+			// Join the two branches into one
+			if ( context.ops.length - i === 2 /* && context.ops[i + 1] instanceof Brancher */ && context.ops[i + 1].offset )
+			{
+				lastop = context.ops.pop();
+				secondlastop = context.ops.pop();
+				// The first brancher must be inverted
+				secondlastop.cond.invert = !secondlastop.cond.invert;
+				// Make a new BrancherLogic to AND the old branchers together
+				lastop.cond = new BrancherLogic( [secondlastop.cond, lastop.cond], '&&' );
+				// Fix the labels and return the last opcode to the opcodes array
+				lastop.labels = secondlastop.labels.concat( lastop.labels );
+				context.ops.push( lastop );
+				return 1;
+			}
+			
+			// Make a new Context to contain all of the following opcodes
+			subcontext = new Context( context.e, context.ops[i + 1].pc );
+			subcontext.ops = context.ops.slice( i + 1 );
+			sublen = subcontext.ops.length - 1;
+			context.ops.length = i + 1;
+			// This is only needed for pretty printing
+			if ( DEBUG )
+			{
+				update_contexts( subcontext.ops, subcontext );
+			}
+			
+			// Set that Context as the branch's target, and invert its condition
+			brancher = context.ops[i];
+			brancher.result = subcontext;
+			brancher.cond.invert = !brancher.cond.invert;
+			
+			// Check if this is actually a loop
+			lastop = subcontext.ops[sublen];
+			if ( lastop.code === 140 && ( U2S( lastop.operands[0].v ) + lastop.next - 2 ) === brancher.pc )
+			{
+				brancher.keyword = 'while';
+				subcontext.ops.pop();
+			}
+			else
+			{
+				// Mark this subcontext as a stopper if its last opcode is
+				subcontext.stopper = lastop.stopper;
+			}
+			
+			if ( DEBUG )
+			{
+				// Check whether this could be a very complex condition
+				var allbranches = 1;
+				for ( i = 0; i < sublen + 1; i++ )
+				{
+					if ( !( subcontext.ops[i] instanceof Brancher ) )
+					{
+						allbranches = 0;
+					}
+				}
+				if ( allbranches === 1 )
+				{
+					console.info( 'Potential complex condition in ' + context.pc + ' at ' + brancher.pc );
+				}
+			}
+			
+			// Return 1 to signal that we can continue past the stopper
+			return 1;
+		}
+		i++;
+	}
+}
+
+/*idiom_do_while = function( context )
+{
+};*/
+/*
+
 Quetzal Common Save-File Format
 ===============================
 
@@ -985,462 +1111,6 @@ var Quetzal = IFF.subClass({
 	}
 });
 
-/*
-
-Z-Machine text functions
-========================
-
-Copyright (c) 2011 The ifvms.js team
-BSD licenced
-http://github.com/curiousdannii/ifvms.js
-
-*/
-
-/*
-	
-TODO:
-	Consider quote suggestions from 1.1 spec
-	
-*/
-
-// Key codes accepted by the Z-Machine
-var ZSCII_keyCodes = (function(){
-	var keycodes = {
-		8: 8, // delete/backspace
-		13: 13, // enter
-		27: 27, // escape
-		37: 131, 38: 129, 39: 132, 40: 130 // arrow keys
-	},
-	i = 96;
-	while ( i < 106 )
-	{
-		keycodes[i] = 49 + i++; // keypad
-	}
-	i = 112;
-	while ( i < 124 )
-	{
-		keycodes[i] = 21 + i++; // function keys
-	}
-	return keycodes;
-})(),
-
-// A class for managing everything text
-Text = Class.subClass({
-	init: function( engine )
-	{
-		var memory = engine.m,
-		
-		alphabet_addr = memory.getUint16( 0x34 ),
-		unicode_addr = engine.extension_table( 3 ),
-		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
-		
-		this.e = engine;
-		
-		// Check for custom alphabets
-		this.make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
-			// Or use the standard alphabet
-			: this.text_to_zscii( 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \r0123456789.,!?_#\'"/\\-:()', 1 ) );
-		
-		// Check for a custom unicode table
-		this.make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
-			// Or use the default
-			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
-		
-		// Parse the standard dictionary
-		this.dictionaries = {};
-		this.dict = memory.getUint16( 0x08 );
-		this.parse_dict( this.dict );
-		
-		// Optimise our own functions
-		/*if ( DEBUG )
-		{
-			if ( !debugflags.nooptimise )
-			optimise_obj( this, 'TEXT' );
-		}*/
-	},
-	
-	// Generate alphabets
-	make_alphabet: function( data )
-	{
-		var alphabets = [[], [], []],
-		i = 0;
-		while ( i < 78 )
-		{
-			alphabets[( i / 26 ) | 0][i % 26] = data[ i++ ];
-		}
-		// A2->7 is always a newline
-		alphabets[2][1] = 13;
-		this.alphabets = alphabets;
-	},
-	
-	// Make the unicode tables
-	make_unicode: function( data )
-	{
-		var table = { 13: '\r' }, // New line conversion
-		reverse = { 13: 13 },
-		i = 0;
-		while ( i < data.length )
-		{
-			table[155 + i] = String.fromCharCode( data[i] );
-			reverse[data[i]] = 155 + i++;
-		}
-		i = 32;
-		while ( i < 127 )
-		{
-			table[i] = String.fromCharCode( i );
-			reverse[i] = i++;
-		}
-		this.unicode_table = table;
-		this.reverse_unicode_table = reverse;
-	},
-	
-	// Decode Z-chars into ZSCII and then Unicode
-	decode: function( addr, length )
-	{
-		var memory = this.e.m,
-		
-		start_addr = addr,
-		temp,
-		buffer = [],
-		i = 0,
-		zchar,
-		alphabet = 0,
-		result = [],
-		resulttexts = [],
-		usesabbr,
-		tenbit,
-		unicodecount = 0;
-		
-		// Check if this one's been cached already
-		if ( this.e.jit[addr] )
-		{
-			return this.e.jit[addr];
-		}
-		
-		// If we've been given a length, then use it as the finaladdr,
-		// Otherwise don't go past the end of the file
-		length = length ? length + addr : this.e.eof;
-		
-		// Go through until we've reached the end of the text or a stop bit
-		while ( addr < length )
-		{
-			temp = memory.getUint16( addr );
-			addr += 2;
-			
-			buffer.push( temp >> 10 & 0x1F, temp >> 5 & 0x1F, temp & 0x1F );
-			
-			// Stop bit
-			if ( temp & 0x8000 )
-			{
-				break;
-			}
-		}
-		
-		// Process the Z-chars
-		while ( i < buffer.length )
-		{
-			zchar = buffer[i++];
-			
-			// Special chars
-			// Space
-			if ( zchar === 0 )
-			{
-				result.push( 32 );
-			}
-			// Abbreviations
-			else if ( zchar < 4 )
-			{
-				usesabbr = 1;
-				result.push( -1 );
-				resulttexts.push( '\uE000+this.abbr(' + ( 32 * ( zchar - 1 ) + buffer[i++] ) + ')+\uE000' );
-			}
-			// Shift characters
-			else if ( zchar < 6 )
-			{
-				alphabet = zchar;
-			}
-			// Check for a 10 bit ZSCII character
-			else if ( alphabet === 2 && zchar === 6 )
-			{
-				// Check we have enough Z-chars left.
-				if ( i + 1 < buffer.length )
-				{
-					tenbit = buffer[i++] << 5 | buffer[i++];
-					// A regular character
-					if ( tenbit < 768 )
-					{
-						result.push( tenbit );
-					}
-					// 1.1 spec Unicode strings - not the most efficient code, but then noone uses this
-					else
-					{
-						tenbit -= 767;
-						unicodecount += tenbit;
-						temp = i;
-						i = ( i % 3 ) + 3;
-						while ( tenbit-- )
-						{
-							result.push( -1 );
-							resulttexts.push( String.fromCharCode( buffer[i] << 10 | buffer[i + 1] << 5 | buffer[i + 2] ) );
-							// Set those characters so they won't be decoded again
-							buffer[i++] = buffer[i++] = buffer[i++] = 0x20;
-						}
-						i = temp;
-					}
-				}
-			}
-			// Regular characters
-			else if ( zchar < 0x20 )
-			{
-				result.push( this.alphabets[alphabet][ zchar - 6 ] );
-			}
-			
-			// Reset the alphabet
-			alphabet = alphabet < 4 ? 0 : alphabet - 3;
-			
-			// Add to the index if we've had raw unicode
-			if ( ( i % 3 ) === 0 )
-			{
-				i += unicodecount;
-				unicodecount = 0;
-			}
-		}
-		
-		result = this.zscii_to_text( result, resulttexts );
-		// Abbreviations must be extracted at run time, so return a function instead
-		if ( usesabbr )
-		{
-			result = {
-				toString: bind( Function( 'return "' + result.replace( /\\/g, '\\\\' ).replace( /"/g, '\\"' ).replace( /\r/g, '\\r' ).replace( /\uE000/g, '"' ) + '"' ), this )
-			};
-		}
-		// Cache and return
-		if ( start_addr >= this.e.staticmem )
-		{
-			this.e.jit[start_addr] = result;
-		}
-		return result;
-	},
-	
-	// Encode ZSCII into Z-chars
-	encode: function( zscii )
-	{
-		var alphabets = this.alphabets,
-		zchars = [],
-		i = 0,
-		achar,
-		temp,
-		result = [];
-		
-		// Encode the Z-chars
-		while ( zchars.length < 9 )
-		{
-			achar = zscii[i++];
-			// Space
-			if ( achar === 32 )
-			{
-				zchars.push( 0 );
-			}
-			// Alphabets
-			else if ( ( temp = alphabets[0].indexOf( achar ) ) >= 0 )
-			{
-				zchars.push( temp + 6 );
-			}
-			else if ( ( temp = alphabets[1].indexOf( achar ) ) >= 0 )
-			{
-				zchars.push( 4, temp + 6 );
-			}
-			else if ( ( temp = alphabets[2].indexOf( achar ) ) >= 0 )
-			{
-				zchars.push( 5, temp + 6 );
-			}
-			// 10-bit ZSCII / Unicode table
-			else if ( temp = this.reverse_unicode_table[achar] )
-			{
-				zchars.push( 5, 6, temp >> 5, temp & 0x1F );
-			}
-			// Pad character
-			else if ( achar === undefined )
-			{
-				zchars.push( 5 );
-			}
-		}
-		zchars.length = 9;
-		
-		// Encode to bytes
-		i = 0;
-		while ( i < 9 )
-		{
-			result.push( zchars[i++] << 2 | zchars[i] >> 3, ( zchars[i++] & 0x07 ) << 5 | zchars[i++] );
-		}
-		result[4] |= 0x80;
-		return result;
-	},
-	
-	// In these two functions zscii means an array of ZSCII codes and text means a regular Javascript unicode string
-	zscii_to_text: function( zscii, texts )
-	{
-		var i = 0, l = zscii.length,
-		charr,
-		j = 0,
-		result = '';
-		
-		while ( i < l )
-		{
-			charr = zscii[i++];
-			// Text substitution from abbreviations or 1.1 unicode
-			if ( charr === -1 )
-			{
-				result += texts[j++];
-			}
-			// Regular characters
-			if ( charr = this.unicode_table[charr] )
-			{
-				result += charr;
-			}
-		}
-		return result;
-	},
-	
-	// If the second argument is set then don't use the unicode table
-	text_to_zscii: function( text, notable )
-	{
-		var array = [], i = 0, l = text.length, charr;
-		while ( i < l )
-		{
-			charr = text.charCodeAt( i++ );
-			// Check the unicode table
-			if ( !notable )
-			{
-				charr = this.reverse_unicode_table[charr] || 63;
-			}
-			array.push( charr );
-		}
-		return array;
-	},
-	
-	// Parse and cache a dictionary
-	parse_dict: function( addr )
-	{
-		var memory = this.e.m,
-		
-		addr_start = addr,
-		dict = {},
-		entry_len,
-		endaddr,
-		
-		// Get the word separators
-		seperators_len = memory.getUint8( addr++ );
-		dict.separators = memory.getBuffer( addr, seperators_len );
-		addr += seperators_len;
-		
-		// Go through the dictionary and cache its entries
-		entry_len = memory.getUint8( addr++ );
-		endaddr = addr + 2 + entry_len * memory.getUint16( addr );
-		addr += 2;
-		while ( addr < endaddr )
-		{
-			dict['' + memory.getBuffer( addr, 6 )] = addr;
-			addr += entry_len;
-		}
-		this.dictionaries[addr_start] = dict;
-		
-		return dict;
-	},
-	
-	// Print an abbreviation
-	abbr: function( abbrnum )
-	{
-		var memory = this.e.m;
-		return this.decode( memory.getUint16( memory.getUint16( 0x18 ) + 2 * abbrnum ) * 2 );
-	},
-	
-	// Tokenise a text
-	tokenise: function( text, buffer, dictionary, flag )
-	{
-		// Use the default dictionary if one wasn't provided
-		dictionary = dictionary || this.dict;
-		
-		// Parse the dictionary if needed
-		dictionary = this.dictionaries[dictionary] || this.parse_dict( dictionary );
-		
-		var memory = this.e.m,
-		
-		i = 2,
-		textend = i + memory.getUint8( text + 1 ),
-		letter,
-		separators = dictionary.separators,
-		word = [],
-		words = [],
-		wordstart = i,
-		max_words,
-		wordcount = 0;
-		
-		// Find the words, separated by the separators, but as well as the separators themselves
-		while ( i < textend )
-		{
-			letter = memory.getUint8( text + i++ );
-			if ( letter === 32 || separators.indexOf( letter ) >= 0 )
-			{
-				if ( word.length )
-				{
-					words.push( [word, wordstart] );
-					wordstart += word.length;
-					word = [];
-				}
-				if ( letter !== 32 )
-				{
-					words.push( [[letter], wordstart] );
-				}
-				wordstart++;
-			}
-			else
-			{
-				word.push( letter );
-			}
-		}
-		if ( word.length )
-		{
-			words.push( [word, wordstart] );
-		}
-		
-		// Go through the text until we either have reached the max number of words, or we're out of words
-		max_words = Math.min( words.length, memory.getUint8( buffer ) );
-		while ( wordcount < max_words )
-		{
-			word = dictionary['' + this.encode( words[wordcount][0] )];
-			
-			// If the flag is set then don't overwrite words which weren't found
-			if ( !flag || word )
-			{
-				// Fill out the buffer
-				memory.setUint16( buffer + 2 + wordcount * 4, word || 0 );
-				memory.setUint8( buffer + 4 + wordcount * 4, words[wordcount][0].length );
-				memory.setUint8( buffer + 5 + wordcount * 4, words[wordcount][1] );
-			}
-			wordcount++;
-		}
-		
-		// Update the number of found words
-		memory.setUint8( buffer + 1, wordcount );
-	},
-	
-	// Handle key input
-	keyinput: function( data )
-	{
-		var charCode = data.charCode,
-		keyCode = data.keyCode;
-		
-		// Handle keyCodes first
-		if ( ZSCII_keyCodes[keyCode] )
-		{
-			return ZSCII_keyCodes[keyCode];
-		}
-		
-		// Check the character table or return a '?'
-		return this.reverse_unicode_table[charCode] || 63;
-	}
-});
 /*
 
 Z-Machine UI
@@ -1959,7 +1629,7 @@ opcodes = {
 /* not */ 248: opcode_builder( Storer, function( a ) { return 'e.S2U(~' + a + ')'; } ),
 /* call_vn */ 249: Caller,
 /* call_vn2 */ 250: Caller,
-/* tokenise */ 251: opcode_builder( Opcode, function() { return 'e.text.tokenise(' + this.args() + ')'; } ),
+/* tokenise */ 251: opcode_builder( Opcode, function() { return 'e.tokenise(' + this.args() + ')'; } ),
 /* encode_text */ 252: opcode_builder( Opcode, function() { return 'e.encode_text(' + this.args() + ')'; } ),
 /* copy_table */ 253: opcode_builder( Opcode, function() { return 'e.copy_table(' + this.args() + ')'; } ),
 /* print_table */ 254: opcode_builder( Opcode, function() { return 'e.print_table(' + this.args() + ')'; } ),
@@ -1984,135 +1654,10 @@ opcodes = {
 
 /*
 
-Inform idioms
-=============
+ZVM's public API
+================
 
-Copyright (c) 2011 The ifvms.js team
-BSD licenced
-http://github.com/curiousdannii/ifvms.js
- 
-*/
-
-/*
-	
-TODO:
-	loops
-		doesn't work yet because of storers before the branch
-		Need loops where the condition is at the end -> do {} while ()
-	break (& continue?)
-	when opcodes are removed, if debug then add a comment
-	The @jump check isn't VM independant
-	
-*/
-
-// Block if statements / while loops
-function idiom_if_block( context, pc )
-{
-	var i = 0,
-	subcontext,
-	sublen,
-	brancher,
-	lastop,
-	secondlastop;
-	
-	// First, find the branch opcode
-	// (-1 because we don't want to catch the very last opcode, not that it should ever branch to the following statement)
-	while ( i < context.ops.length - 1 )
-	{
-		// As long as no other opcodes have an offset property we can skip the instanceof check
-		if ( /* context.ops[i] instanceof Brancher && */ context.ops[i].offset === pc )
-		{
-			// Sometimes Inform makes complex branches, where the only subcontext opcode would be a brancher itself
-			// Join the two branches into one
-			if ( context.ops.length - i === 2 /* && context.ops[i + 1] instanceof Brancher */ && context.ops[i + 1].offset )
-			{
-				lastop = context.ops.pop();
-				secondlastop = context.ops.pop();
-				// The first brancher must be inverted
-				secondlastop.cond.invert = !secondlastop.cond.invert;
-				// Make a new BrancherLogic to AND the old branchers together
-				lastop.cond = new BrancherLogic( [secondlastop.cond, lastop.cond], '&&' );
-				// Fix the labels and return the last opcode to the opcodes array
-				lastop.labels = secondlastop.labels.concat( lastop.labels );
-				context.ops.push( lastop );
-				return 1;
-			}
-			
-			// Make a new Context to contain all of the following opcodes
-			subcontext = new Context( context.e, context.ops[i + 1].pc );
-			subcontext.ops = context.ops.slice( i + 1 );
-			sublen = subcontext.ops.length - 1;
-			context.ops.length = i + 1;
-			// This is only needed for pretty printing
-			if ( DEBUG )
-			{
-				update_contexts( subcontext.ops, subcontext );
-			}
-			
-			// Set that Context as the branch's target, and invert its condition
-			brancher = context.ops[i];
-			brancher.result = subcontext;
-			brancher.cond.invert = !brancher.cond.invert;
-			
-			// Check if this is actually a loop
-			lastop = subcontext.ops[sublen];
-			if ( lastop.code === 140 && ( U2S( lastop.operands[0].v ) + lastop.next - 2 ) === brancher.pc )
-			{
-				brancher.keyword = 'while';
-				subcontext.ops.pop();
-			}
-			else
-			{
-				// Mark this subcontext as a stopper if its last opcode is
-				subcontext.stopper = lastop.stopper;
-			}
-			
-			if ( DEBUG )
-			{
-				// Check whether this could be a very complex condition
-				var allbranches = 1;
-				for ( i = 0; i < sublen + 1; i++ )
-				{
-					if ( !( subcontext.ops[i] instanceof Brancher ) )
-					{
-						allbranches = 0;
-					}
-				}
-				if ( allbranches === 1 )
-				{
-					console.info( 'Potential complex condition in ' + context.pc + ' at ' + brancher.pc );
-				}
-			}
-			
-			// Return 1 to signal that we can continue past the stopper
-			return 1;
-		}
-		i++;
-	}
-}
-
-/*idiom_do_while = function( context )
-{
-};*/
-
-if ( DEBUG )
-{
-	// Update the contexts of new contexts
-	// Only needed for pretty printing
-	var update_contexts = function( ops, context )
-	{
-		for ( var i = 0; i < ops.length; i++ )
-		{
-			ops[i].context = context;
-		}
-	};
-}
-/*
-
-Z-Machine disassembler - disassembles zcode into an AST
-=======================================================
-
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -2120,217 +1665,18 @@ http://github.com/curiousdannii/ifvms.js
 
 /*
 
-Note:
-	Nothing is done to check whether an instruction actually has a valid number of operands. Extras will usually be ignored while missing operands may throw errors at either the code building stage or when the JIT code is called.
-
+This file represents the public API of the ZVM class.
+It is designed to be compatible with Web Workers, with everything passing through inputEvent() and outputEvent() (which must be provided by the user).
+	
 TODO:
-	If we diassessemble part of what we already have before, can we just copy/slice the context?
+	Specifically handle saving?
+	Try harder to find default colours
 	
 */
 
-// The disassembler function
-function disassemble( engine )
-{
-	var pc, offset, // Set in the loop below
-	memory = engine.m,
-	temp,
-	code,
-	opcode_class,
-	operands_type, // The types of the operands, or -1 for var instructions
-	operands,
+var VM = Class.subClass({
 	
-	// Create the context for this code fragment
-	context = new RoutineContext( engine, engine.pc );
-	
-	// Set the context's root context to be itself, and add it to the list of subcontexts
-	//context.root = context;
-	//context.contexts[0] = context;
-	
-	// Run through until we can no more
-	while (1)
-	{		
-		// This instruction
-		offset = pc = engine.pc;
-		code = memory.getUint8( pc++ );
-		
-		// Extended instructions
-		if ( code === 190 )
-		{
-			operands_type = -1;
-			code = memory.getUint8( pc++ ) + 1000;
-		}
-		
-		else if ( code & 0x80 )
-		{
-			// Variable form instructions
-			if ( code & 0x40 )
-			{
-				operands_type = -1;
-				// 2OP instruction with VAR parameters
-				if ( !(code & 0x20) )
-				{
-					code &= 0x1F;
-				}
-			}
-			
-			// Short form instructions
-			else
-			{
-				operands_type = [ (code & 0x30) >> 4 ];
-				// Clear the operand type if 1OP, keep for 0OPs
-				if ( operands_type[0] < 3 )
-				{
-					code &= 0xCF;
-				}
-			}
-		}
-		
-		// Long form instructions
-		else
-		{
-			operands_type = [ code & 0x40 ? 2 : 1, code & 0x20 ? 2 : 1 ];
-			code &= 0x1F;
-		}
-		
-		// Check for missing opcodes
-		if ( !opcodes[code] )
-		{
-			if ( DEBUG )
-			{
-				console.log( '' + context );
-			}
-			engine.stop = 1;
-			throw new Error( 'Unknown opcode #' + code + ' at pc=' + offset );
-		}
-		
-		// Variable for quicker access to the opcode flags
-		opcode_class = opcodes[code].prototype;
-		
-		// Variable form operand types
-		if ( operands_type === -1 )
-		{
-			operands_type = [];
-			get_var_operand_types( memory.getUint8(pc++), operands_type );
-			
-			// VAR_LONG opcodes have two operand type bytes
-			if ( code === 236 || code === 250 )
-			{
-				get_var_operand_types( memory.getUint8(pc++), operands_type );
-			}
-		}
-		
-		// Load the operands
-		operands = [];
-		temp = 0;
-		while ( temp < operands_type.length )
-		{
-			// Large constant
-			if ( operands_type[temp] === 0 )
-			{
-				operands.push( new Operand( engine, memory.getUint16(pc) ) );
-				pc += 2;
-			}
-			
-			// Small constant
-			if ( operands_type[temp] === 1 )
-			{
-				operands.push( new Operand( engine, memory.getUint8(pc++) ) );
-			}
-			
-			// Variable operand
-			if ( operands_type[temp++] === 2 )
-			{
-				operands.push( new Variable( engine, memory.getUint8(pc++) ) );
-			}
-		}
-		
-		// Check for a store variable
-		if ( opcode_class.storer )
-		{
-			operands.push( new Variable( engine, memory.getUint8(pc++) ) );
-		}
-		
-		// Check for a branch address
-		// If we don't calculate the offset now we won't be able to tell the difference between 0x40 and 0x0040
-		if ( opcode_class.brancher )
-		{
-			temp = memory.getUint8( pc++ );
-			operands.push( [
-				temp & 0x80, // iftrue
-				temp & 0x40 ?
-					// single byte address
-					temp & 0x3F :
-					// word address, but first get the second byte of it
-					( temp << 8 | memory.getUint8( pc++ ) ) << 18 >> 18
-			] );
-		}
-		
-		// Check for a text literal
-		if ( opcode_class.printer )
-		{
-			// Just use the address as an operand, the text will be decoded at run time
-			operands.push( pc );
-			
-			// Continue until we reach the stop bit
-			// (or the end of the file, which will stop memory access errors, even though it must be a malformed storyfile)
-			while ( pc < engine.eof )
-			{
-				temp = memory.getUint8( pc );
-				pc += 2;
-				
-				// Stop bit
-				if ( temp & 0x80 )
-				{
-					break;
-				}
-			}
-		}
-		
-		// Update the engine's pc
-		engine.pc = pc;
-		
-		// Create the instruction
-		context.ops.push( new opcodes[code]( engine, context, code, offset, pc, operands ) );
-		
-		// Check for the end of a large if block
-		temp = 0;
-		if ( context.targets.indexOf( pc ) >= 0 )
-		{
-			if ( DEBUG )
-			{
-				// Skip if we must
-				if ( !debugflags.noidioms )
-				{
-					temp = idiom_if_block( context, pc );
-				}
-			}
-			else
-			{
-				temp = idiom_if_block( context, pc );
-			}
-		}
-		
-		// We can't go any further if we have a final stopper :(
-		if ( opcode_class.stopper && !temp )
-		{
-			break;
-		}
-	}
-	
-	return context;
-}
-
-// Utility function to unpack the variable form operand types byte
-function get_var_operand_types( operands_byte, operands_type )
-{
-	for ( var i = 0; i < 4; i++ )
-	{
-		operands_type.push( (operands_byte & 0xC0) >> 6 );
-		operands_byte <<= 2;
-	}
-}
-
-/*
+	/*
 
 Z-Machine runtime functions
 ===========================
@@ -2350,9 +1696,8 @@ TODO:
 	
 */
 
-// This object is incomplete; see vm.js for the second half!
-var VM = Class.subClass( {
-	
+// These functions will be added to the object literal in api.js
+
 	art_shift: function( number, places )
 	{
 		return places > 0 ? number << places : number >> -places;
@@ -2426,7 +1771,7 @@ var VM = Class.subClass( {
 	
 	encode_text: function( zscii, length, from, target )
 	{
-		this.m.setBuffer( target, this.text.encode( this.m.getBuffer( zscii + from, length ) ) );
+		this.m.setBuffer( target, this.encode( this.m.getBuffer( zscii + from, length ) ) );
 	},
 	
 	// Access the extension table
@@ -2666,7 +2011,7 @@ var VM = Class.subClass( {
 		if ( stream === -3 )
 		{
 			var data = this.streams[2].shift(),
-			text = this.text.text_to_zscii( data[1] );
+			text = this.text_to_zscii( data[1] );
 			this.m.setUint16( data[0], text.length );
 			this.m.setBuffer( data[0] + 2, text );
 		}
@@ -2715,22 +2060,22 @@ var VM = Class.subClass( {
 		// Text from address
 		if ( type === 2 )
 		{
-			val = this.jit[ val ] || this.text.decode( val );
+			val = this.jit[ val ] || this.decode( val );
 		}
 		// Object
 		if ( type === 3 )
 		{
 			var proptable = this.m.getUint16( this.objects + 14 * val + 12 );
-			val = this.text.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
+			val = this.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
 		}
 		// ZSCII
 		if ( type === 4 )
 		{
-			if ( !this.text.unicode_table[ val ] )
+			if ( !this.unicode_table[ val ] )
 			{
 				return;
 			}
-			val = this.text.unicode_table[ val ];
+			val = this.unicode_table[ val ];
 		}
 		this._print( val );
 	},
@@ -2742,7 +2087,7 @@ var VM = Class.subClass( {
 		var i = 0;
 		while ( i < height )
 		{
-			this._print( '\r' + this.text.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
+			this._print( '\r' + this.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
 			zscii += width + skip;
 			i++;
 		}
@@ -2916,11 +2261,9 @@ var VM = Class.subClass( {
 			addr_multipler: addr_multipler
 			
 		});
-		// These classes rely too much on the above, so add them after
-		extend( this, {
-			ui: new ZVMUI( this, memory.getUint8( 0x11 ) & 0x02 ),
-			text: new Text( this )
-		});
+
+		this.ui = new ZVMUI( this, memory.getUint8( 0x11 ) & 0x02 );
+		this.init_text();
 		
 		// Update the header
 		this.update_header();
@@ -3268,10 +2611,11 @@ var VM = Class.subClass( {
 	// Utilities for signed arithmetic
 	U2S: U2S,
 	S2U: S2U,
-/*
+	
+	/*
 
-The Z-Machine VM for versions 5 and 8
-=====================================
+Z-Machine text functions
+========================
 
 Copyright (c) 2013 The ifvms.js team
 BSD licenced
@@ -3280,17 +2624,673 @@ http://github.com/curiousdannii/ifvms.js
 */
 
 /*
-
-This file represents the public API of the ZVM class, while runtime.js contains most other class functions
 	
 TODO:
-	Is 'use strict' needed for JIT functions too, or do they inherit that status?
-	Specifically handle saving?
-	Try harder to find default colours
+	Consider quote suggestions from 1.1 spec
 	
 */
 
-// See runtime.js for the first half!
+// These functions will be added to the object literal in api.js
+
+	init_text: function()
+	{
+		var self = this,
+		memory = this.m,
+		
+		alphabet_addr = memory.getUint16( 0x34 ),
+		unicode_addr = this.extension_table( 3 ),
+		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
+		
+		
+		// Generate alphabets
+		function make_alphabet( data )
+		{
+			var alphabets = [[], [], []],
+			i = 0;
+			while ( i < 78 )
+			{
+				alphabets[( i / 26 ) | 0][i % 26] = data[ i++ ];
+			}
+			// A2->7 is always a newline
+			alphabets[2][1] = 13;
+			self.alphabets = alphabets;
+		}
+		
+		// Make the unicode tables
+		function make_unicode( data )
+		{
+			var table = { 13: '\r' }, // New line conversion
+			reverse = { 13: 13 },
+			i = 0;
+			while ( i < data.length )
+			{
+				table[155 + i] = String.fromCharCode( data[i] );
+				reverse[data[i]] = 155 + i++;
+			}
+			i = 32;
+			while ( i < 127 )
+			{
+				table[i] = String.fromCharCode( i );
+				reverse[i] = i++;
+			}
+			self.unicode_table = table;
+			self.reverse_unicode_table = reverse;
+		}
+		
+		// Check for custom alphabets
+		make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
+			// Or use the standard alphabet
+			: this.text_to_zscii( 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \r0123456789.,!?_#\'"/\\-:()', 1 ) );
+		
+		// Check for a custom unicode table
+		make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
+			// Or use the default
+			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
+		
+		// Parse the standard dictionary
+		this.dictionaries = {};
+		this.dict = memory.getUint16( 0x08 );
+		this.parse_dict( this.dict );
+		
+		// Optimise our own functions
+		/*if ( DEBUG )
+		{
+			if ( !debugflags.nooptimise )
+			optimise_obj( this, 'TEXT' );
+		}*/
+	},
+	
+	// Decode Z-chars into ZSCII and then Unicode
+	decode: function( addr, length )
+	{
+		var memory = this.m,
+		
+		start_addr = addr,
+		temp,
+		buffer = [],
+		i = 0,
+		zchar,
+		alphabet = 0,
+		result = [],
+		resulttexts = [],
+		usesabbr,
+		tenbit,
+		unicodecount = 0;
+		
+		// Check if this one's been cached already
+		if ( this.jit[addr] )
+		{
+			return this.jit[addr];
+		}
+		
+		// If we've been given a length, then use it as the finaladdr,
+		// Otherwise don't go past the end of the file
+		length = length ? length + addr : this.eof;
+		
+		// Go through until we've reached the end of the text or a stop bit
+		while ( addr < length )
+		{
+			temp = memory.getUint16( addr );
+			addr += 2;
+			
+			buffer.push( temp >> 10 & 0x1F, temp >> 5 & 0x1F, temp & 0x1F );
+			
+			// Stop bit
+			if ( temp & 0x8000 )
+			{
+				break;
+			}
+		}
+		
+		// Process the Z-chars
+		while ( i < buffer.length )
+		{
+			zchar = buffer[i++];
+			
+			// Special chars
+			// Space
+			if ( zchar === 0 )
+			{
+				result.push( 32 );
+			}
+			// Abbreviations
+			else if ( zchar < 4 )
+			{
+				usesabbr = 1;
+				result.push( -1 );
+				resulttexts.push( '\uE000+this.abbr(' + ( 32 * ( zchar - 1 ) + buffer[i++] ) + ')+\uE000' );
+			}
+			// Shift characters
+			else if ( zchar < 6 )
+			{
+				alphabet = zchar;
+			}
+			// Check for a 10 bit ZSCII character
+			else if ( alphabet === 2 && zchar === 6 )
+			{
+				// Check we have enough Z-chars left.
+				if ( i + 1 < buffer.length )
+				{
+					tenbit = buffer[i++] << 5 | buffer[i++];
+					// A regular character
+					if ( tenbit < 768 )
+					{
+						result.push( tenbit );
+					}
+					// 1.1 spec Unicode strings - not the most efficient code, but then noone uses this
+					else
+					{
+						tenbit -= 767;
+						unicodecount += tenbit;
+						temp = i;
+						i = ( i % 3 ) + 3;
+						while ( tenbit-- )
+						{
+							result.push( -1 );
+							resulttexts.push( String.fromCharCode( buffer[i] << 10 | buffer[i + 1] << 5 | buffer[i + 2] ) );
+							// Set those characters so they won't be decoded again
+							buffer[i++] = buffer[i++] = buffer[i++] = 0x20;
+						}
+						i = temp;
+					}
+				}
+			}
+			// Regular characters
+			else if ( zchar < 0x20 )
+			{
+				result.push( this.alphabets[alphabet][ zchar - 6 ] );
+			}
+			
+			// Reset the alphabet
+			alphabet = alphabet < 4 ? 0 : alphabet - 3;
+			
+			// Add to the index if we've had raw unicode
+			if ( ( i % 3 ) === 0 )
+			{
+				i += unicodecount;
+				unicodecount = 0;
+			}
+		}
+		
+		result = this.zscii_to_text( result, resulttexts );
+		// Abbreviations must be extracted at run time, so return a function instead
+		if ( usesabbr )
+		{
+			result = {
+				toString: bind( Function( 'return"' + result.replace( /\\/g, '\\\\' ).replace( /"/g, '\\"' ).replace( /\r/g, '\\r' ).replace( /\uE000/g, '"' ) + '"' ), this )
+			};
+		}
+		// Cache and return
+		if ( start_addr >= this.staticmem )
+		{
+			this.jit[start_addr] = result;
+		}
+		return result;
+	},
+	
+	// Encode ZSCII into Z-chars
+	encode: function( zscii )
+	{
+		var alphabets = this.alphabets,
+		zchars = [],
+		i = 0,
+		achar,
+		temp,
+		result = [];
+		
+		// Encode the Z-chars
+		while ( zchars.length < 9 )
+		{
+			achar = zscii[i++];
+			// Space
+			if ( achar === 32 )
+			{
+				zchars.push( 0 );
+			}
+			// Alphabets
+			else if ( ( temp = alphabets[0].indexOf( achar ) ) >= 0 )
+			{
+				zchars.push( temp + 6 );
+			}
+			else if ( ( temp = alphabets[1].indexOf( achar ) ) >= 0 )
+			{
+				zchars.push( 4, temp + 6 );
+			}
+			else if ( ( temp = alphabets[2].indexOf( achar ) ) >= 0 )
+			{
+				zchars.push( 5, temp + 6 );
+			}
+			// 10-bit ZSCII / Unicode table
+			else if ( temp = this.reverse_unicode_table[achar] )
+			{
+				zchars.push( 5, 6, temp >> 5, temp & 0x1F );
+			}
+			// Pad character
+			else if ( achar === undefined )
+			{
+				zchars.push( 5 );
+			}
+		}
+		zchars.length = 9;
+		
+		// Encode to bytes
+		i = 0;
+		while ( i < 9 )
+		{
+			result.push( zchars[i++] << 2 | zchars[i] >> 3, ( zchars[i++] & 0x07 ) << 5 | zchars[i++] );
+		}
+		result[4] |= 0x80;
+		return result;
+	},
+	
+	// In these two functions zscii means an array of ZSCII codes and text means a regular Javascript unicode string
+	zscii_to_text: function( zscii, texts )
+	{
+		var i = 0, l = zscii.length,
+		charr,
+		j = 0,
+		result = '';
+		
+		while ( i < l )
+		{
+			charr = zscii[i++];
+			// Text substitution from abbreviations or 1.1 unicode
+			if ( charr === -1 )
+			{
+				result += texts[j++];
+			}
+			// Regular characters
+			if ( charr = this.unicode_table[charr] )
+			{
+				result += charr;
+			}
+		}
+		return result;
+	},
+	
+	// If the second argument is set then don't use the unicode table
+	text_to_zscii: function( text, notable )
+	{
+		var array = [], i = 0, l = text.length, charr;
+		while ( i < l )
+		{
+			charr = text.charCodeAt( i++ );
+			// Check the unicode table
+			if ( !notable )
+			{
+				charr = this.reverse_unicode_table[charr] || 63;
+			}
+			array.push( charr );
+		}
+		return array;
+	},
+	
+	// Parse and cache a dictionary
+	parse_dict: function( addr )
+	{
+		var memory = this.m,
+		
+		addr_start = addr,
+		dict = {},
+		entry_len,
+		endaddr,
+		
+		// Get the word separators
+		seperators_len = memory.getUint8( addr++ );
+		dict.separators = memory.getBuffer( addr, seperators_len );
+		addr += seperators_len;
+		
+		// Go through the dictionary and cache its entries
+		entry_len = memory.getUint8( addr++ );
+		endaddr = addr + 2 + entry_len * memory.getUint16( addr );
+		addr += 2;
+		while ( addr < endaddr )
+		{
+			dict['' + memory.getBuffer( addr, 6 )] = addr;
+			addr += entry_len;
+		}
+		this.dictionaries[addr_start] = dict;
+		
+		return dict;
+	},
+	
+	// Print an abbreviation
+	abbr: function( abbrnum )
+	{
+		var memory = this.m;
+		return this.decode( memory.getUint16( memory.getUint16( 0x18 ) + 2 * abbrnum ) * 2 );
+	},
+	
+	// Tokenise a text
+	tokenise: function( text, buffer, dictionary, flag )
+	{
+		// Use the default dictionary if one wasn't provided
+		dictionary = dictionary || this.dict;
+		
+		// Parse the dictionary if needed
+		dictionary = this.dictionaries[dictionary] || this.parse_dict( dictionary );
+		
+		var memory = this.m,
+		
+		i = 2,
+		textend = i + memory.getUint8( text + 1 ),
+		letter,
+		separators = dictionary.separators,
+		word = [],
+		words = [],
+		wordstart = i,
+		max_words,
+		wordcount = 0;
+		
+		// Find the words, separated by the separators, but as well as the separators themselves
+		while ( i < textend )
+		{
+			letter = memory.getUint8( text + i++ );
+			if ( letter === 32 || separators.indexOf( letter ) >= 0 )
+			{
+				if ( word.length )
+				{
+					words.push( [word, wordstart] );
+					wordstart += word.length;
+					word = [];
+				}
+				if ( letter !== 32 )
+				{
+					words.push( [[letter], wordstart] );
+				}
+				wordstart++;
+			}
+			else
+			{
+				word.push( letter );
+			}
+		}
+		if ( word.length )
+		{
+			words.push( [word, wordstart] );
+		}
+		
+		// Go through the text until we either have reached the max number of words, or we're out of words
+		max_words = Math.min( words.length, memory.getUint8( buffer ) );
+		while ( wordcount < max_words )
+		{
+			word = dictionary['' + this.encode( words[wordcount][0] )];
+			
+			// If the flag is set then don't overwrite words which weren't found
+			if ( !flag || word )
+			{
+				// Fill out the buffer
+				memory.setUint16( buffer + 2 + wordcount * 4, word || 0 );
+				memory.setUint8( buffer + 4 + wordcount * 4, words[wordcount][0].length );
+				memory.setUint8( buffer + 5 + wordcount * 4, words[wordcount][1] );
+			}
+			wordcount++;
+		}
+		
+		// Update the number of found words
+		memory.setUint8( buffer + 1, wordcount );
+	},
+	
+	// Handle key input
+	keyinput: function( data )
+	{
+		var charCode = data.charCode,
+		keyCode = data.keyCode,
+		
+		// Key codes accepted by the Z-Machine
+		ZSCII_keyCodes = (function(){
+			var keycodes = {
+				8: 8, // delete/backspace
+				13: 13, // enter
+				27: 27, // escape
+				37: 131, 38: 129, 39: 132, 40: 130 // arrow keys
+			},
+			i = 96;
+			while ( i < 106 )
+			{
+				keycodes[i] = 49 + i++; // keypad
+			}
+			i = 112;
+			while ( i < 124 )
+			{
+				keycodes[i] = 21 + i++; // function keys
+			}
+			return keycodes;
+		})();
+		
+		// Handle keyCodes first
+		if ( ZSCII_keyCodes[keyCode] )
+		{
+			return ZSCII_keyCodes[keyCode];
+		}
+		
+		// Check the character table or return a '?'
+		return this.reverse_unicode_table[charCode] || 63;
+	},
+	
+	/*
+
+Z-Machine disassembler - disassembles zcode into an AST
+=======================================================
+
+Copyright (c) 2011 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+
+*/
+
+/*
+
+Note:
+	Nothing is done to check whether an instruction actually has a valid number of operands. Extras will usually be ignored while missing operands may throw errors at either the code building stage or when the JIT code is called.
+
+TODO:
+	If we diassessemble part of what we already have before, can we just copy/slice the context?
+	
+*/
+
+// The disassembler will be added to the object literal in api.js
+
+disassemble: function()
+{
+	var pc, offset, // Set in the loop below
+	memory = this.m,
+	temp,
+	code,
+	opcode_class,
+	operands_type, // The types of the operands, or -1 for var instructions
+	operands,
+	
+	// Create the context for this code fragment
+	context = new RoutineContext( this, this.pc );
+		
+	// Utility function to unpack the variable form operand types byte
+	function get_var_operand_types( operands_byte, operands_type )
+	{
+		for ( var i = 0; i < 4; i++ )
+		{
+			operands_type.push( (operands_byte & 0xC0) >> 6 );
+			operands_byte <<= 2;
+		}
+	}
+	
+	// Set the context's root context to be itself, and add it to the list of subcontexts
+	//context.root = context;
+	//context.contexts[0] = context;
+	
+	// Run through until we can no more
+	while (1)
+	{		
+		// This instruction
+		offset = pc = this.pc;
+		code = memory.getUint8( pc++ );
+		
+		// Extended instructions
+		if ( code === 190 )
+		{
+			operands_type = -1;
+			code = memory.getUint8( pc++ ) + 1000;
+		}
+		
+		else if ( code & 0x80 )
+		{
+			// Variable form instructions
+			if ( code & 0x40 )
+			{
+				operands_type = -1;
+				// 2OP instruction with VAR parameters
+				if ( !(code & 0x20) )
+				{
+					code &= 0x1F;
+				}
+			}
+			
+			// Short form instructions
+			else
+			{
+				operands_type = [ (code & 0x30) >> 4 ];
+				// Clear the operand type if 1OP, keep for 0OPs
+				if ( operands_type[0] < 3 )
+				{
+					code &= 0xCF;
+				}
+			}
+		}
+		
+		// Long form instructions
+		else
+		{
+			operands_type = [ code & 0x40 ? 2 : 1, code & 0x20 ? 2 : 1 ];
+			code &= 0x1F;
+		}
+		
+		// Check for missing opcodes
+		if ( !opcodes[code] )
+		{
+			if ( DEBUG )
+			{
+				console.log( '' + context );
+			}
+			this.stop = 1;
+			throw new Error( 'Unknown opcode #' + code + ' at pc=' + offset );
+		}
+		
+		// Variable for quicker access to the opcode flags
+		opcode_class = opcodes[code].prototype;
+		
+		// Variable form operand types
+		if ( operands_type === -1 )
+		{
+			operands_type = [];
+			get_var_operand_types( memory.getUint8(pc++), operands_type );
+			
+			// VAR_LONG opcodes have two operand type bytes
+			if ( code === 236 || code === 250 )
+			{
+				get_var_operand_types( memory.getUint8(pc++), operands_type );
+			}
+		}
+		
+		// Load the operands
+		operands = [];
+		temp = 0;
+		while ( temp < operands_type.length )
+		{
+			// Large constant
+			if ( operands_type[temp] === 0 )
+			{
+				operands.push( new Operand( this, memory.getUint16(pc) ) );
+				pc += 2;
+			}
+			
+			// Small constant
+			if ( operands_type[temp] === 1 )
+			{
+				operands.push( new Operand( this, memory.getUint8(pc++) ) );
+			}
+			
+			// Variable operand
+			if ( operands_type[temp++] === 2 )
+			{
+				operands.push( new Variable( this, memory.getUint8(pc++) ) );
+			}
+		}
+		
+		// Check for a store variable
+		if ( opcode_class.storer )
+		{
+			operands.push( new Variable( this, memory.getUint8(pc++) ) );
+		}
+		
+		// Check for a branch address
+		// If we don't calculate the offset now we won't be able to tell the difference between 0x40 and 0x0040
+		if ( opcode_class.brancher )
+		{
+			temp = memory.getUint8( pc++ );
+			operands.push( [
+				temp & 0x80, // iftrue
+				temp & 0x40 ?
+					// single byte address
+					temp & 0x3F :
+					// word address, but first get the second byte of it
+					( temp << 8 | memory.getUint8( pc++ ) ) << 18 >> 18
+			] );
+		}
+		
+		// Check for a text literal
+		if ( opcode_class.printer )
+		{
+			// Just use the address as an operand, the text will be decoded at run time
+			operands.push( pc );
+			
+			// Continue until we reach the stop bit
+			// (or the end of the file, which will stop memory access errors, even though it must be a malformed storyfile)
+			while ( pc < this.eof )
+			{
+				temp = memory.getUint8( pc );
+				pc += 2;
+				
+				// Stop bit
+				if ( temp & 0x80 )
+				{
+					break;
+				}
+			}
+		}
+		
+		// Update the engine's pc
+		this.pc = pc;
+		
+		// Create the instruction
+		context.ops.push( new opcodes[code]( this, context, code, offset, pc, operands ) );
+		
+		// Check for the end of a large if block
+		temp = 0;
+		if ( context.targets.indexOf( pc ) >= 0 )
+		{
+			if ( DEBUG )
+			{
+				// Skip if we must
+				if ( !debugflags.noidioms )
+				{
+					temp = idiom_if_block( context, pc );
+				}
+			}
+			else
+			{
+				temp = idiom_if_block( context, pc );
+			}
+		}
+		
+		// We can't go any further if we have a final stopper :(
+		if ( opcode_class.stopper && !temp )
+		{
+			break;
+		}
+	}
+	
+	return context;
+},
 	
 	init: function()
 	{
@@ -3393,7 +3393,7 @@ TODO:
 			this._print( response + '\r' );
 			
 			// Convert the response to lower case and then to ZSCII
-			response = this.text.text_to_zscii( response.toLowerCase() );
+			response = this.text_to_zscii( response.toLowerCase() );
 			
 			// Check if the response is too long, and then set its length
 			if ( response.length > data.len )
@@ -3408,14 +3408,14 @@ TODO:
 			if ( data.parse )
 			{
 				// Tokenise the response
-				this.text.tokenise( data.buffer, data.parse );
+				this.tokenise( data.buffer, data.parse );
 			}
 		}
 		
 		// Handle character input
 		if ( code === 'char' )
 		{
-			this.variable( data.storer, this.text.keyinput( data.response ) );
+			this.variable( data.storer, this.keyinput( data.response ) );
 		}
 		
 		// Write the status window's cursor position
@@ -3470,7 +3470,7 @@ TODO:
 	// Compile a JIT routine
 	compile: function()
 	{
-		var context = disassemble( this );
+		var context = this.disassemble();
 		
 		// Compile the routine with new Function()
 		if ( DEBUG )
@@ -3550,7 +3550,7 @@ TODO:
 			this.outputEvent( this.orders );
 		}
 	}
-
+	
 });
 /*
 

@@ -1,7 +1,7 @@
 /*
 
-The Z-Machine VM for versions 5 and 8
-=====================================
+ZVM's public API
+================
 
 Copyright (c) 2013 The ifvms.js team
 BSD licenced
@@ -11,16 +11,22 @@ http://github.com/curiousdannii/ifvms.js
 
 /*
 
-This file represents the public API of the ZVM class, while runtime.js contains most other class functions
+This file represents the public API of the ZVM class.
+It is designed to be compatible with Web Workers, with everything passing through inputEvent() and outputEvent() (which must be provided by the user).
 	
 TODO:
-	Is 'use strict' needed for JIT functions too, or do they inherit that status?
 	Specifically handle saving?
 	Try harder to find default colours
 	
 */
 
-// See runtime.js for the first half!
+var VM = Class.subClass({
+	
+	<%= grunt.file.read( 'src/zvm/runtime.js' ) %>,
+	
+	<%= grunt.file.read( 'src/zvm/text.js' ) %>,
+	
+	<%= grunt.file.read( 'src/zvm/disassembler.js' ) %>,
 	
 	init: function()
 	{
@@ -123,7 +129,7 @@ TODO:
 			this._print( response + '\r' );
 			
 			// Convert the response to lower case and then to ZSCII
-			response = this.text.text_to_zscii( response.toLowerCase() );
+			response = this.text_to_zscii( response.toLowerCase() );
 			
 			// Check if the response is too long, and then set its length
 			if ( response.length > data.len )
@@ -138,14 +144,14 @@ TODO:
 			if ( data.parse )
 			{
 				// Tokenise the response
-				this.text.tokenise( data.buffer, data.parse );
+				this.tokenise( data.buffer, data.parse );
 			}
 		}
 		
 		// Handle character input
 		if ( code === 'char' )
 		{
-			this.variable( data.storer, this.text.keyinput( data.response ) );
+			this.variable( data.storer, this.keyinput( data.response ) );
 		}
 		
 		// Write the status window's cursor position
@@ -200,7 +206,7 @@ TODO:
 	// Compile a JIT routine
 	compile: function()
 	{
-		var context = disassemble( this );
+		var context = this.disassemble();
 		
 		// Compile the routine with new Function()
 		if ( DEBUG )
@@ -280,5 +286,5 @@ TODO:
 			this.outputEvent( this.orders );
 		}
 	}
-
+	
 });

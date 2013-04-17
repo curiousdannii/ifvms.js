@@ -19,11 +19,12 @@ TODO:
 	
 */
 
-// The disassembler function
-function disassemble( engine )
+// The disassembler will be added to the object literal in api.js
+
+disassemble: function()
 {
 	var pc, offset, // Set in the loop below
-	memory = engine.m,
+	memory = this.m,
 	temp,
 	code,
 	opcode_class,
@@ -31,7 +32,17 @@ function disassemble( engine )
 	operands,
 	
 	// Create the context for this code fragment
-	context = new RoutineContext( engine, engine.pc );
+	context = new RoutineContext( this, this.pc );
+		
+	// Utility function to unpack the variable form operand types byte
+	function get_var_operand_types( operands_byte, operands_type )
+	{
+		for ( var i = 0; i < 4; i++ )
+		{
+			operands_type.push( (operands_byte & 0xC0) >> 6 );
+			operands_byte <<= 2;
+		}
+	}
 	
 	// Set the context's root context to be itself, and add it to the list of subcontexts
 	//context.root = context;
@@ -41,7 +52,7 @@ function disassemble( engine )
 	while (1)
 	{		
 		// This instruction
-		offset = pc = engine.pc;
+		offset = pc = this.pc;
 		code = memory.getUint8( pc++ );
 		
 		// Extended instructions
@@ -90,7 +101,7 @@ function disassemble( engine )
 			{
 				console.log( '' + context );
 			}
-			engine.stop = 1;
+			this.stop = 1;
 			throw new Error( 'Unknown opcode #' + code + ' at pc=' + offset );
 		}
 		
@@ -118,27 +129,27 @@ function disassemble( engine )
 			// Large constant
 			if ( operands_type[temp] === 0 )
 			{
-				operands.push( new Operand( engine, memory.getUint16(pc) ) );
+				operands.push( new Operand( this, memory.getUint16(pc) ) );
 				pc += 2;
 			}
 			
 			// Small constant
 			if ( operands_type[temp] === 1 )
 			{
-				operands.push( new Operand( engine, memory.getUint8(pc++) ) );
+				operands.push( new Operand( this, memory.getUint8(pc++) ) );
 			}
 			
 			// Variable operand
 			if ( operands_type[temp++] === 2 )
 			{
-				operands.push( new Variable( engine, memory.getUint8(pc++) ) );
+				operands.push( new Variable( this, memory.getUint8(pc++) ) );
 			}
 		}
 		
 		// Check for a store variable
 		if ( opcode_class.storer )
 		{
-			operands.push( new Variable( engine, memory.getUint8(pc++) ) );
+			operands.push( new Variable( this, memory.getUint8(pc++) ) );
 		}
 		
 		// Check for a branch address
@@ -164,7 +175,7 @@ function disassemble( engine )
 			
 			// Continue until we reach the stop bit
 			// (or the end of the file, which will stop memory access errors, even though it must be a malformed storyfile)
-			while ( pc < engine.eof )
+			while ( pc < this.eof )
 			{
 				temp = memory.getUint8( pc );
 				pc += 2;
@@ -178,10 +189,10 @@ function disassemble( engine )
 		}
 		
 		// Update the engine's pc
-		engine.pc = pc;
+		this.pc = pc;
 		
 		// Create the instruction
-		context.ops.push( new opcodes[code]( engine, context, code, offset, pc, operands ) );
+		context.ops.push( new opcodes[code]( this, context, code, offset, pc, operands ) );
 		
 		// Check for the end of a large if block
 		temp = 0;
@@ -209,14 +220,4 @@ function disassemble( engine )
 	}
 	
 	return context;
-}
-
-// Utility function to unpack the variable form operand types byte
-function get_var_operand_types( operands_byte, operands_type )
-{
-	for ( var i = 0; i < 4; i++ )
-	{
-		operands_type.push( (operands_byte & 0xC0) >> 6 );
-		operands_byte <<= 2;
-	}
 }

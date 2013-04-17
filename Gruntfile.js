@@ -18,14 +18,11 @@ module.exports = function( grunt )
 					'src/common/util.js',
 					'src/common/bytearray.js',
 					'src/common/ast.js',
+					'src/common/idioms.js',
 					'src/zvm/quetzal.js',
-					'src/zvm/text.js',
 					'src/zvm/ui.js',
 					'src/zvm/opcodes.js',
-					'src/common/idioms.js',
-					'src/zvm/disassembler.js',
-					'src/zvm/runtime.js',
-					'src/zvm/vm.js',
+					'src/zvm/api.js',
 					'src/common/outro.js',
 				],
 			},
@@ -75,7 +72,7 @@ module.exports = function( grunt )
 		
 		watch: {
 			src: {
-				files: '<%= concat.zvm.src %>',
+				files: [ 'src/common/*.js', 'src/zvm/*.js' ],
 				tasks: [ 'zvm' ],
 			},
 		},
@@ -84,8 +81,11 @@ module.exports = function( grunt )
 			tests: {
 				router: function ( filepath )
 				{
-					// Put all files directly in tests
-					return require( 'path' ).basename( filepath );
+					// Only extract the test files
+					if ( /.(z5|ulx)$/.test( filepath ) )
+					{
+						return require( 'path' ).basename( filepath );
+					}
 				},
 				src: 'tests/tests.zip',
 				dest: 'tests/',
@@ -96,6 +96,8 @@ module.exports = function( grunt )
 	grunt.loadNpmTasks( 'grunt-contrib-concat' );
 	grunt.loadNpmTasks( 'grunt-contrib-jshint' );
 	grunt.loadNpmTasks( 'grunt-contrib-watch' );
+	grunt.loadNpmTasks( 'grunt-curl' );
+	grunt.loadNpmTasks( 'grunt-zip' );
 	
 	// Run the Praxix test suite
 	grunt.registerTask( 'testzvm', function()
@@ -120,10 +122,6 @@ module.exports = function( grunt )
 			grunt.fail.warncount++;
 		}
 	});
-	
-	// These must be loaded late because grunt-retro breaks testzvm
-	grunt.loadNpmTasks( 'grunt-curl' );
-	grunt.loadNpmTasks( 'grunt-zip' );
 	
 	grunt.registerTask( 'default', [ 'jshint:misc', 'zvm' ] );
 	

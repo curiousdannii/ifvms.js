@@ -3,7 +3,7 @@
 Z-Machine text functions
 ========================
 
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2013 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -16,46 +16,60 @@ TODO:
 	
 */
 
-// Key codes accepted by the Z-Machine
-var ZSCII_keyCodes = (function(){
-	var keycodes = {
-		8: 8, // delete/backspace
-		13: 13, // enter
-		27: 27, // escape
-		37: 131, 38: 129, 39: 132, 40: 130 // arrow keys
-	},
-	i = 96;
-	while ( i < 106 )
-	{
-		keycodes[i] = 49 + i++; // keypad
-	}
-	i = 112;
-	while ( i < 124 )
-	{
-		keycodes[i] = 21 + i++; // function keys
-	}
-	return keycodes;
-})(),
+// These functions will be added to the object literal in api.js
 
-// A class for managing everything text
-Text = Class.subClass({
-	init: function( engine )
+	init_text: function()
 	{
-		var memory = engine.m,
+		var self = this,
+		memory = this.m,
 		
 		alphabet_addr = memory.getUint16( 0x34 ),
-		unicode_addr = engine.extension_table( 3 ),
+		unicode_addr = this.extension_table( 3 ),
 		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
 		
-		this.e = engine;
+		
+		// Generate alphabets
+		function make_alphabet( data )
+		{
+			var alphabets = [[], [], []],
+			i = 0;
+			while ( i < 78 )
+			{
+				alphabets[( i / 26 ) | 0][i % 26] = data[ i++ ];
+			}
+			// A2->7 is always a newline
+			alphabets[2][1] = 13;
+			self.alphabets = alphabets;
+		}
+		
+		// Make the unicode tables
+		function make_unicode( data )
+		{
+			var table = { 13: '\r' }, // New line conversion
+			reverse = { 13: 13 },
+			i = 0;
+			while ( i < data.length )
+			{
+				table[155 + i] = String.fromCharCode( data[i] );
+				reverse[data[i]] = 155 + i++;
+			}
+			i = 32;
+			while ( i < 127 )
+			{
+				table[i] = String.fromCharCode( i );
+				reverse[i] = i++;
+			}
+			self.unicode_table = table;
+			self.reverse_unicode_table = reverse;
+		}
 		
 		// Check for custom alphabets
-		this.make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
+		make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
 			// Or use the standard alphabet
 			: this.text_to_zscii( 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \r0123456789.,!?_#\'"/\\-:()', 1 ) );
 		
 		// Check for a custom unicode table
-		this.make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
+		make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
 			// Or use the default
 			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
 		
@@ -72,45 +86,10 @@ Text = Class.subClass({
 		}*/
 	},
 	
-	// Generate alphabets
-	make_alphabet: function( data )
-	{
-		var alphabets = [[], [], []],
-		i = 0;
-		while ( i < 78 )
-		{
-			alphabets[( i / 26 ) | 0][i % 26] = data[ i++ ];
-		}
-		// A2->7 is always a newline
-		alphabets[2][1] = 13;
-		this.alphabets = alphabets;
-	},
-	
-	// Make the unicode tables
-	make_unicode: function( data )
-	{
-		var table = { 13: '\r' }, // New line conversion
-		reverse = { 13: 13 },
-		i = 0;
-		while ( i < data.length )
-		{
-			table[155 + i] = String.fromCharCode( data[i] );
-			reverse[data[i]] = 155 + i++;
-		}
-		i = 32;
-		while ( i < 127 )
-		{
-			table[i] = String.fromCharCode( i );
-			reverse[i] = i++;
-		}
-		this.unicode_table = table;
-		this.reverse_unicode_table = reverse;
-	},
-	
 	// Decode Z-chars into ZSCII and then Unicode
 	decode: function( addr, length )
 	{
-		var memory = this.e.m,
+		var memory = this.m,
 		
 		start_addr = addr,
 		temp,
@@ -125,14 +104,14 @@ Text = Class.subClass({
 		unicodecount = 0;
 		
 		// Check if this one's been cached already
-		if ( this.e.jit[addr] )
+		if ( this.jit[addr] )
 		{
-			return this.e.jit[addr];
+			return this.jit[addr];
 		}
 		
 		// If we've been given a length, then use it as the finaladdr,
 		// Otherwise don't go past the end of the file
-		length = length ? length + addr : this.e.eof;
+		length = length ? length + addr : this.eof;
 		
 		// Go through until we've reached the end of the text or a stop bit
 		while ( addr < length )
@@ -224,13 +203,13 @@ Text = Class.subClass({
 		if ( usesabbr )
 		{
 			result = {
-				toString: bind( Function( 'return "' + result.replace( /\\/g, '\\\\' ).replace( /"/g, '\\"' ).replace( /\r/g, '\\r' ).replace( /\uE000/g, '"' ) + '"' ), this )
+				toString: bind( Function( 'return"' + result.replace( /\\/g, '\\\\' ).replace( /"/g, '\\"' ).replace( /\r/g, '\\r' ).replace( /\uE000/g, '"' ) + '"' ), this )
 			};
 		}
 		// Cache and return
-		if ( start_addr >= this.e.staticmem )
+		if ( start_addr >= this.staticmem )
 		{
-			this.e.jit[start_addr] = result;
+			this.jit[start_addr] = result;
 		}
 		return result;
 	},
@@ -335,7 +314,7 @@ Text = Class.subClass({
 	// Parse and cache a dictionary
 	parse_dict: function( addr )
 	{
-		var memory = this.e.m,
+		var memory = this.m,
 		
 		addr_start = addr,
 		dict = {},
@@ -364,7 +343,7 @@ Text = Class.subClass({
 	// Print an abbreviation
 	abbr: function( abbrnum )
 	{
-		var memory = this.e.m;
+		var memory = this.m;
 		return this.decode( memory.getUint16( memory.getUint16( 0x18 ) + 2 * abbrnum ) * 2 );
 	},
 	
@@ -377,7 +356,7 @@ Text = Class.subClass({
 		// Parse the dictionary if needed
 		dictionary = this.dictionaries[dictionary] || this.parse_dict( dictionary );
 		
-		var memory = this.e.m,
+		var memory = this.m,
 		
 		i = 2,
 		textend = i + memory.getUint8( text + 1 ),
@@ -442,7 +421,28 @@ Text = Class.subClass({
 	keyinput: function( data )
 	{
 		var charCode = data.charCode,
-		keyCode = data.keyCode;
+		keyCode = data.keyCode,
+		
+		// Key codes accepted by the Z-Machine
+		ZSCII_keyCodes = (function(){
+			var keycodes = {
+				8: 8, // delete/backspace
+				13: 13, // enter
+				27: 27, // escape
+				37: 131, 38: 129, 39: 132, 40: 130 // arrow keys
+			},
+			i = 96;
+			while ( i < 106 )
+			{
+				keycodes[i] = 49 + i++; // keypad
+			}
+			i = 112;
+			while ( i < 124 )
+			{
+				keycodes[i] = 21 + i++; // function keys
+			}
+			return keycodes;
+		})();
 		
 		// Handle keyCodes first
 		if ( ZSCII_keyCodes[keyCode] )
@@ -453,4 +453,3 @@ Text = Class.subClass({
 		// Check the character table or return a '?'
 		return this.reverse_unicode_table[charCode] || 63;
 	}
-});

@@ -235,7 +235,7 @@ Brancher = Opcode.subClass({
 			result = 'e.pc=' + offset;
 		}
 		
-		this.result = result + '; return';
+		this.result = result + ';return';
 		this.offset = offset;
 		this.cond = new BrancherLogic( [this] );
 		

@@ -1,7 +1,7 @@
 /*
 
-ZVM - the ifvms.js Z-Machine
-============================
+ZVM - the ifvms.js Z-Machine (versions 5 and 8)
+===============================================
 
 Built: <%= grunt.template.today('yyyy-mm-dd') %>
 
@@ -36,3 +36,4 @@ if ( DEBUG )
  
 // Wrap all of ZVM in a closure/namespace, and enable strict mode
 var ZVM = (function(){ 'use strict';
+

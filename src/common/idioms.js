@@ -31,6 +31,19 @@ function idiom_if_block( context, pc )
 	lastop,
 	secondlastop;
 	
+	// This is only needed for pretty printing
+	if ( DEBUG )
+	{
+		// Update the contexts of new contexts
+		var update_contexts = function( ops, context )
+		{
+			for ( var i = 0; i < ops.length; i++ )
+			{
+				ops[i].context = context;
+			}
+		};
+	}
+	
 	// First, find the branch opcode
 	// (-1 because we don't want to catch the very last opcode, not that it should ever branch to the following statement)
 	while ( i < context.ops.length - 1 )
@@ -110,16 +123,3 @@ function idiom_if_block( context, pc )
 /*idiom_do_while = function( context )
 {
 };*/
-
-if ( DEBUG )
-{
-	// Update the contexts of new contexts
-	// Only needed for pretty printing
-	var update_contexts = function( ops, context )
-	{
-		for ( var i = 0; i < ops.length; i++ )
-		{
-			ops[i].context = context;
-		}
-	};
-}
