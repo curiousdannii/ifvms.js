@@ -118,7 +118,8 @@ module.exports = function( grunt )
 		}
 		else
 		{
-			grunt.log.error( /\d+ tests failed overall:[^$\r]+/.exec( result )[0] );
+			var errormsg = /\d+ tests failed overall:[^$\r]+/.exec( result );
+			grunt.log.error( errormsg ? errormsg[0] : 'Praxix did not run successfully' );
 			grunt.fail.warncount++;
 		}
 	});

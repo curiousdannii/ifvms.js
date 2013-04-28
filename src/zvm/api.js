@@ -87,6 +87,9 @@ var VM = Class.subClass({
 			return;
 		}
 		
+		// Clear the list of orders
+		this.orders = [];
+		
 		if ( code === 'restart' )
 		{
 			this.restart();
@@ -172,9 +175,6 @@ var VM = Class.subClass({
 		pc,
 		result,
 		count = 0;
-		
-		// Clear the list of orders
-		this.orders = [];
 		
 		// Stop when ordered to
 		this.stop = 0;

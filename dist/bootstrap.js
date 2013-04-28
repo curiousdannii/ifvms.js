@@ -40,7 +40,7 @@ function text_to_array( text, array )
 // A basic ZVM runner
 function run( vm, walkthrough )
 {
-	var orders, order, i, l;
+	var orders, order, code, i, l;
 	walkthrough = walkthrough || [];
 	
 	vm.run();
@@ -55,24 +55,30 @@ function run( vm, walkthrough )
 		while ( i < l )
 		{
 			order = orders[i++];
+			code = order.code;
 			
 			// Text output
 			// We don't do much, just add it to a string on the vm object
-			if ( order.code === 'stream' )
+			if ( code === 'stream' )
 			{
 				// Skip status line updates
 				if ( order.to === 'status' )
 				{
 					continue;
 				}
-				vm.log += order.text;
+				vm.log += order.text || '';
 			}
 			
 			// Line input
-			else if ( order.code === 'read' && walkthrough.length )
+			else if ( code === 'read' && walkthrough.length )
 			{
 				order.response = walkthrough.shift();
 				vm.inputEvent( order ); // Calls run
+			}
+			
+			else if ( code === 'find' )
+			{
+				continue;
 			}
 			
 			// Return on anything else
