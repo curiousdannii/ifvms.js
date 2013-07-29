@@ -13,6 +13,8 @@ http://github.com/curiousdannii/ifvms.js
 
 These styles are required for the classes formatter
 
+ZVM also requires that the whole VM <div> have white-space: pre-wrap.
+
 */
 
 .zvm-bold { font-weight: bold; }

@@ -856,9 +856,7 @@ TODO:
 	// Update the header after restarting or restoring
 	update_header: function()
 	{
-		var memory = this.m,
-		fgcolour = this.env.fgcolour ? this.ui.convert_RGB( this.env.fgcolour ) : 0xFFFF,
-		bgcolour = this.env.bgcolour ? this.ui.convert_RGB( this.env.bgcolour ) : 0xFFFF;
+		var memory = this.m;
 		
 		// Reset the random state
 		this.random_state = 0;
@@ -875,17 +873,12 @@ TODO:
 		memory.setUint16( 0x22, this.env.width );
 		memory.setUint16( 0x24, 255 );
 		memory.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
-		// Default colours
-		// Math.abs will convert -1 (not found) to 1 (default) which is convenient
-		memory.setUint8( 0x2C, Math.abs( this.ui.colours.indexOf( bgcolour ) ) );
-		memory.setUint8( 0x2D, Math.abs( this.ui.colours.indexOf( fgcolour ) ) );
 		// Z Machine Spec revision
 		memory.setUint16( 0x32, 0x0102 );
 		// Clear flags three, we don't support any of that stuff
 		this.extension_table( 4, 0 );
-		// Default true colours - assume that the 1.1 spec has a typo, it's silly to store the foreground colour twice!
-		this.extension_table( 5, fgcolour );
-		this.extension_table( 6, bgcolour );
+		
+		this.ui.update_header();
 	},
 	
 	// Read or write a variable

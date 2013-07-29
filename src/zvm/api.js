@@ -28,8 +28,6 @@ var VM = Class.subClass({
 	
 	<%= grunt.file.read( 'src/zvm/disassembler.js' ) %>,
 	
-	ZVMUI: ZVMUI,
-	
 	init: function()
 	{
 		// Create this here so that it won't be cleared on restart
@@ -290,3 +288,5 @@ var VM = Class.subClass({
 	}
 	
 });
+
+VM.ZVMUI = ZVMUI;
