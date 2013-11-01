@@ -407,11 +407,10 @@ TODO:
 		height = height || 1;
 		skip = skip || 0;
 		var i = 0;
-		while ( i < height )
+		while ( i++ < height )
 		{
-			this._print( '\r' + this.zscii_to_text( this.m.getBuffer( zscii, width ) ) );
+			this._print( this.zscii_to_text( this.m.getBuffer( zscii, width ) ) + ( i < height ? '\r' : '' ) );
 			zscii += width + skip;
-			i++;
 		}
 	},
 	
