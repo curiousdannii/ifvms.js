@@ -237,8 +237,7 @@ TODO:
 		return value & 0x40 ? 2 : 1;
 	},
 	
-	// Quick hack for @inc/@dec
-	// It would be possible to do this with AST nodes but it would be very messy
+	// Quick hack for @inc/@dec/@inc_chk/@dec_chk
 	incdec: function( varnum, change )
 	{
 		var result, offset;
@@ -287,17 +286,16 @@ TODO:
 	// @jeq
 	jeq: function()
 	{	
-		var i = 1, r;
+		var i = 1;
 		
 		// Account for many arguments
 		while ( i < arguments.length )
 		{
 			if ( arguments[i++] === arguments[0] )
 			{
-				r = 1;
+				return 1;
 			}
 		}
-		return r;
 	},
 	
 	jin: function( child, parent )
@@ -437,7 +435,7 @@ TODO:
 		// Pure randomness
 		if ( this.random_state === 0 )
 		{
-			return ( Math.random() * range ) | 0 + 1;
+			return 1 + ( Math.random() * range ) | 0;
 		}
 		// How can we best seed the RNG?
 		
