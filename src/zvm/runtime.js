@@ -28,6 +28,16 @@ TODO:
 	// Call a routine
 	call: function( addr, storer, next, args )
 	{
+		// 6.4.3: Calls to 0 instead just store 0
+		if ( addr === 0 )
+		{
+			if ( storer >= 0 )
+			{
+				this.variable( storer, 0 );
+			}
+			return this.pc = next;
+		}
+		
 		var i,
 		locals_count,
 		old_locals_count = this.l.length,
@@ -697,7 +707,7 @@ TODO:
 		// Store the result if there is one
 		if ( storer >= 0 )
 		{
-			this.variable( storer, result );
+			this.variable( storer, result | 0 );
 		}
 	},
 	
