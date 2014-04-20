@@ -3,7 +3,7 @@
 Z-Machine runtime functions
 ===========================
 
-Copyright (c) 2013 The ifvms.js team
+Copyright (c) 2014 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -657,10 +657,9 @@ TODO:
 				call_stack[0][4]++; // provided_args - this is a stupid way to store it
 				temp >>= 1;
 			}
-			temp = qstacks[i++] << 8 | qstacks[i++]; // "eval" stack length
-			newlocals = byte_to_word( qstacks.slice( i, i + call_stack[0][2] ) ).concat( newlocals );
-			i += call_stack[0][2] * 2;
-			newstack = newstack.concat( byte_to_word( qstacks.slice( i, temp ) ) );
+			temp = ( qstacks[i++] << 8 | qstacks[i++] ) * 2; // "eval" stack length
+			newlocals = byte_to_word( qstacks.slice( i, ( i += call_stack[0][2] * 2 ) ) ).concat( newlocals );
+			newstack = newstack.concat( byte_to_word( qstacks.slice( i, ( i += temp ) ) ) );
 		}
 		this.call_stack = call_stack;
 		this.l = newlocals;
