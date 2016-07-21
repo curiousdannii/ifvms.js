@@ -3,7 +3,7 @@
 Z-Machine runtime functions
 ===========================
 
-Copyright (c) 2015 The ifvms.js team
+Copyright (c) 2016 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -451,12 +451,11 @@ TODO:
 		// Based on the discussions in this forum topic, we will not implement the sequential mode recommended in the standard
 		// http://www.intfiction.org/forum/viewtopic.php?f=38&t=16023
 		
-		// Instead implement a 16 bit Xorshift generator taken from
-		// http://b2d-f9r.blogspot.com.au/2010/08/16-bit-xorshift-rng.html
-		seed ^= ( seed << 4 ) & 0xFFFF;
-		seed ^= ( seed >> 3 ) & 0xFFFF;
-		this.xorshift_seed = ( seed ^= ( seed << 7 ) & 0xFFFF );
-		return 1 + ( seed % range );
+		// Instead implement a 32 bit Xorshift generator
+		seed ^= ( seed << 13 );
+		seed ^= ( seed >> 17 );
+		this.xorshift_seed = ( seed ^= ( seed << 5 ) );
+		return 1 + ( ( seed & 0x7FFF ) % range );
 	},
 	
 	// Request line input
