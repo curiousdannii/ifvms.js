@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "The Interactive Fiction Virtual Machines Suite - in Javascript",
   "author": "Dannii Willis <curiousdannii@gmail.com>",
-  "license": "BSD",
+  "license": "BSD-3-Clause",
   "keywords": [
     "intfiction",
     "vm"
@@ -14,12 +14,10 @@
     "test": "grunt testzvm"
   },
   "homepage": "https://github.com/curiousdannii/ifvms.js",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/curiousdannii/ifvms.js.git"
-  },
+  "repository": "curiousdannii/ifvms.js.git",
   "bugs": "https://github.com/curiousdannii/ifvms.js/issues",
   "devDependencies": {
+    "eslint": "^3.1.1",
     "grunt": "~0.4.1",
     "grunt-contrib-concat": "~0.2.0",
     "grunt-contrib-jshint": "~0.4.0",
@@ -27,5 +25,8 @@
     "grunt-curl": "~0.6.0",
     "grunt-zip": "~0.9.0",
     "iconv-lite": "~0.2.7"
+  },
+  "scripts": {
+	"lint": "eslint ."
   }
 }
