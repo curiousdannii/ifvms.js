@@ -312,7 +312,7 @@ BrancherStorer = Brancher.subClass({
 	// Set aside the storer operand
 	post: function()
 	{
-		this._super();
+		BrancherStorer.super.post.call( this );
 		this.storer = this.operands.pop();
 		this.storer.returnval = 1;
 
@@ -341,7 +341,7 @@ Storer = Opcode.subClass({
 	// Write out the opcode, passing it to the storer (if there still is one)
 	toString: function()
 	{
-		var data = this._super();
+		var data = Storer.super.toString.call( this );
 
 		// If we still have a storer operand, use it
 		// Otherwise (if it's been removed due to optimisations) just return func()
@@ -419,7 +419,7 @@ RoutineContext = Context.subClass({
 
 		// Add in some extra vars and return
 		this.pre.unshift( 'var l=e.l,m=e.m,s=e.s;\n' );
-		return this._super();
+		return RoutineContext.super.toString.call( this );
 	},
 });
 

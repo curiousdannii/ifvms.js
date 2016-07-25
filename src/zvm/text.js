@@ -64,7 +64,7 @@ module.exports = {
 		}
 
 		// Check for custom alphabets
-		make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
+		make_alphabet( alphabet_addr ? memory.getBuffer8( alphabet_addr, 78 )
 			// Or use the standard alphabet
 			: this.text_to_zscii( 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \r0123456789.,!?_#\'"/\\-:()', 1 ) );
 
@@ -323,7 +323,7 @@ module.exports = {
 
 		// Get the word separators
 		seperators_len = memory.getUint8( addr++ );
-		dict.separators = memory.getBuffer( addr, seperators_len );
+		dict.separators = memory.getBuffer8( addr, seperators_len );
 		addr += seperators_len;
 
 		// Go through the dictionary and cache its entries
@@ -332,7 +332,7 @@ module.exports = {
 		addr += 2;
 		while ( addr < endaddr )
 		{
-			dict['' + memory.getBuffer( addr, 6 )] = addr;
+			dict['' + memory.getBuffer8( addr, 6 )] = addr;
 			addr += entry_len;
 		}
 		this.dictionaries[addr_start] = dict;

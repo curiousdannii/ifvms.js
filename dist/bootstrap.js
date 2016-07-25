@@ -18,29 +18,7 @@ Once the list is complete, the VM is handed back to you, and you can do what you
 
 /*eslint one-var: "off" */
 
-(function()
-{
-
 'use strict';
-
-// Convert text into an array
-function text_to_array( text, array )
-{
-	var i = 0, l;
-	array = array || [];
-	for ( l = text.length % 8; i < l; ++i )
-	{
-		array.push( text.charCodeAt( i ) );
-	}
-	for ( l = text.length; i < l; )
-	{
-		// Unfortunately unless text is cast to a String object there is no shortcut for charCodeAt,
-		// and if text is cast to a String object, it's considerably slower.
-		array.push( text.charCodeAt( i++ ), text.charCodeAt( i++ ), text.charCodeAt( i++ ), text.charCodeAt( i++ ),
-			text.charCodeAt( i++ ), text.charCodeAt( i++ ), text.charCodeAt( i++ ), text.charCodeAt( i++ ) );
-	}
-	return array;
-}
 
 // A basic ZVM runner
 function run( vm, walkthrough )
@@ -99,21 +77,17 @@ function run( vm, walkthrough )
 exports.zvm = function( path, walkthrough )
 {
 	var fs = require( 'fs' );
-	var iconv = require( 'iconv-lite' );
 	var ZVM = require( '../src/zvm.js' );
-	console.log(ZVM.toString())
 
-	var data = iconv.decode( fs.readFileSync( path ), 'latin1' );
+	var data = fs.readFileSync( path );
 
 	var vm = new ZVM();
 	vm.inputEvent({
 		code: 'load',
-		data: text_to_array( data ),
+		data: data,
 	});
 	vm.restart();
 	vm.log = '';
 	run( vm, walkthrough );
 	return vm;
 };
-
-})();

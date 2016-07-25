@@ -10,6 +10,8 @@ env:
 
 globals:
   DataView: false
+  Uint8Array: false
+  Uint16Array: false
 
 rules:
   brace-style:

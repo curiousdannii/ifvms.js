@@ -23,7 +23,6 @@ function extend()
 	}
 	return old;
 }
-module.exports.extend = extend;
 
 // Simple classes
 // Inspired by John Resig's class implementation
@@ -34,33 +33,72 @@ function Class()
 
 Class.subClass = function( props )
 {
-	var newClass = function()
+	function newClass()
 	{
 		if ( this.init )
 		{
-			this.init.apply( arguments );
+			this.init.apply( this, arguments );
 		}
-	},
-	newClass_prototype = newClass.prototype = Object.create( this.prototype );
-	extend( newClass_prototype, props );
+	}
+	newClass.prototype = extend( Object.create( this.prototype ), props );
 	newClass.subClass = this.subClass;
-	newClass.super = newClass_prototype.super = this.prototype;
+	newClass.super = newClass.prototype.super = this.prototype;
 	return newClass;
 };
-module.exports.Class = Class;
+
+// An enhanced DataView
+function MemoryView( buffer )
+{
+	return extend( new DataView( buffer ), {
+		getBuffer8: function( start, length )
+		{
+			return new Uint8Array( this.buffer.slice( start, start + length ) );
+		},
+		getBuffer16: function( start, length )
+		{
+			return new Uint16Array( this.buffer.slice( start, start + length * 2 ) );
+		},
+		setBuffer8: function( start, data )
+		{
+			( new Uint8Array( this.buffer ) ).set( data, start );
+		},
+		//setBuffer16
+	} );
+}
+
+// DataView doesn't seem to be subclassable in ES5: http://stackoverflow.com/a/36068693/2854284
+/*function MemoryView()
+{
+	DataView.apply( this, arguments );
+}
+MemoryView.prototype = extend( Object.create( DataView.prototype ), {
+	getBuffer8: function( start, length )
+	{
+		return new Uint8Array( this.buffer.slice( start, start + length ) );
+	},
+	getBuffer16: function( start, length )
+	{
+		return new Uint16Array( this.buffer.slice( start, start + length * 2 ) );
+	},
+	setBuffer8: function( start, buffer )
+	{
+		( new Uint8Array( this.buffer ) ).set( buffer, start );
+	},
+	//setBuffer16
+} );*/
 
 // Utilities for 16-bit signed arithmetic
-module.exports.U2S16 = function( value )
+function U2S16( value )
 {
 	return value << 16 >> 16;
-};
-module.exports.S2U16 = function( value )
+}
+function S2U16 ( value )
 {
 	return value & 0xFFFF;
-};
+}
 
 // Utility to convert from byte arrays to word arrays
-module.exports.byte_to_word = function( array )
+function byte_to_word( array )
 {
 	var i = 0, l = array.length,
 	result = [];
@@ -69,6 +107,15 @@ module.exports.byte_to_word = function( array )
 		result[i / 2] = array[i++] << 8 | array[i++];
 	}
 	return result;
+}
+
+module.exports = {
+	extend: extend,
+	Class: Class,
+	MemoryView: MemoryView,
+	U2S16: U2S16,
+	S2U16: S2U16,
+	byte_to_word: byte_to_word,
 };
 
 /*// Perform some micro optimisations

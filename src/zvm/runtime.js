@@ -106,13 +106,13 @@ module.exports = {
 		}
 		else
 		{
-			memory.setBuffer( second, memory.getBuffer( first, size ) );
+			memory.setBuffer8( second, memory.getBuffer8( first, size ) );
 		}
 	},
 
 	encode_text: function( zscii, length, from, target )
 	{
-		this.m.setBuffer( target, this.encode( this.m.getBuffer( zscii + from, length ) ) );
+		this.m.setBuffer8( target, this.encode( this.m.getBuffer8( zscii + from, length ) ) );
 	},
 
 	// Access the extension table
@@ -226,7 +226,7 @@ module.exports = {
 		if ( addr )
 		{
 			// Assume we're being called for a valid short property
-			return ( memory.getUint8( addr - 1 ) & 0x40 ? memory.getUint16 : memory.getUint8 )( addr );
+			return memory[ memory.getUint8( addr - 1 ) & 0x40 ? 'getUint16' : 'getUint8' ]( addr );
 		}
 
 		// Use the default properties table
@@ -357,7 +357,7 @@ module.exports = {
 			var data = this.streams[2].shift(),
 			text = this.text_to_zscii( data[1] );
 			this.m.setUint16( data[0], text.length );
-			this.m.setBuffer( data[0] + 2, text );
+			this.m.setBuffer8( data[0] + 2, text );
 		}
 	},
 
@@ -431,7 +431,7 @@ module.exports = {
 		var i = 0;
 		while ( i++ < height )
 		{
-			this._print( this.zscii_to_text( this.m.getBuffer( zscii, width ) ) + ( i < height ? '\r' : '' ) );
+			this._print( this.zscii_to_text( this.m.getBuffer8( zscii, width ) ) + ( i < height ? '\r' : '' ) );
 			zscii += width + skip;
 		}
 	},
@@ -555,7 +555,7 @@ module.exports = {
 	restart: function()
 	{
 		// Set up the memory
-		var memory = new DataView( this.data ),
+		var memory = utils.MemoryView( this.data ),
 
 		version = memory.getUint8( 0x00 ),
 		addr_multipler = version === 5 ? 4 : 8,
@@ -624,7 +624,7 @@ module.exports = {
 		newstack;
 
 		// Memory chunk
-		this.m.setBuffer( 0, this.data.slice( 0, this.staticmem ) );
+		this.m.setBuffer8( 0, this.data.slice( 0, this.staticmem ) );
 		if ( quetzal.compressed )
 		{
 			while ( i < qmem.length )
@@ -643,7 +643,7 @@ module.exports = {
 		}
 		else
 		{
-			this.m.setBuffer( 0, qmem );
+			this.m.setBuffer8( 0, qmem );
 		}
 		// Preserve flags 1
 		this.m.setUint8( 0x11, flags2 );
@@ -699,7 +699,7 @@ module.exports = {
 		this.pc = state[0];
 		// Preserve flags 2
 		state[2][0x11] = this.m.getUint8( 0x11 );
-		this.m.setBuffer( 0, state[2] );
+		this.m.setBuffer8( 0, state[2] );
 		this.l = state[3];
 		this.s = state[4];
 		this.call_stack = state[5];
@@ -743,9 +743,9 @@ module.exports = {
 		stacks = [ 0, 0, 0, 0, 0, 0 ]; // Dummy call frame
 
 		// IFhd chunk
-		quetzal.release = memory.getBuffer( 0x02, 2 );
-		quetzal.serial = memory.getBuffer( 0x12, 6 );
-		quetzal.checksum = memory.getBuffer( 0x1C, 2 );
+		quetzal.release = memory.getBuffer8( 0x02, 2 );
+		quetzal.serial = memory.getBuffer8( 0x12, 6 );
+		quetzal.checksum = memory.getBuffer8( 0x1C, 2 );
 		quetzal.pc = pc;
 
 		// Memory chunk
@@ -817,7 +817,7 @@ module.exports = {
 		this.undo.push( [
 			pc,
 			variable,
-			this.m.getBuffer( 0, this.staticmem ),
+			this.m.getBuffer8( 0, this.staticmem ),
 			this.l.slice(),
 			this.s.slice(),
 			this.call_stack.slice(),
@@ -828,13 +828,13 @@ module.exports = {
 	scan_table: function( key, addr, length, form )
 	{
 		form = form || 0x82;
-		var memoryfunc = form & 0x80 ? this.m.getUint16 : this.m.getUint8;
+		var memoryfunc = form & 0x80 ? 'getUint16' : 'getUint8';
 		form &= 0x7F;
 		length = addr + length * form;
 
 		while ( addr < length )
 		{
-			if ( memoryfunc( addr ) === key )
+			if ( this.m[memoryfunc]( addr ) === key )
 			{
 				return addr;
 			}

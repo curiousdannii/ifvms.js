@@ -7,32 +7,9 @@ Currently only the Z-Machine is supported, but plans to support Glulx and possib
 
 ifvms.js is BSD licenced, but please help the community by sharing any changes you make with us.
 
-Building ifvms.js
------------------
+Testing ifvms.js
+----------------
 
-We use [Node.js](http://nodejs.org/) and [Grunt](http://gruntjs.com/) to build and test ifvms.js. Install Node.js, and then install the grunt-cli package:
+Simply running `make` is enough to run the Praxix test suite.
 
-```
-npm install -g grunt-cli
-```
-
-Then from the ifvms.js directory install our dependencies:
-
-```
-npm install
-```
-
-To build the VMs run the following:
-
-```
-grunt
-```
-
-Continuous development
-----------------------
-
-By running the following, Grunt will automatically build the VMs and run the tests.
-
-```
-grunt dev
-```
+If you are on an OS where that is difficult, then download [praxix.z5](https://github.com/curiousdannii/if/raw/gh-pages/tests/praxix.z5) and run `praxix.js` from the tests directory.

@@ -32,7 +32,7 @@ var utils = require( './common/utils.js' ),
 Class = utils.Class,
 extend = utils.extend,
 
-props = {
+api = {
 
 	init: function()
 	{
@@ -90,7 +90,15 @@ props = {
 		// Load the story file
 		if ( code === 'load' )
 		{
-			this.data = data.data;
+			// Check if we were passed an buffer
+			if ( data.data.buffer )
+			{
+				this.data = data.data.buffer;
+			}
+			else
+			{
+				this.data = data.data;
+			}
 			return;
 		}
 
@@ -149,7 +157,7 @@ props = {
 			memory.setUint8( data.buffer + 1, response.length );
 
 			// Store the response in the buffer
-			memory.setBuffer( data.buffer + 2, response );
+			memory.setBuffer8( data.buffer + 2, response );
 
 			if ( data.parse )
 			{
@@ -299,7 +307,7 @@ props = {
 },
 
 VM = Class.subClass( extend(
-	props,
+	api,
 	require( './zvm/runtime.js' ),
 	require( './zvm/text.js' ),
 	require( './zvm/disassembler.js' )
