@@ -10,9 +10,6 @@
     "vm"
   ],
   "main": "dist/node.js",
-  "scripts": {
-    "test": "grunt testzvm"
-  },
   "homepage": "https://github.com/curiousdannii/ifvms.js",
   "repository": "curiousdannii/ifvms.js.git",
   "bugs": "https://github.com/curiousdannii/ifvms.js/issues",
@@ -23,10 +20,12 @@
     "grunt-contrib-jshint": "~0.4.0",
     "grunt-contrib-watch": "~0.3.0",
     "grunt-curl": "~0.6.0",
+    "grunt-cli": "*",
     "grunt-zip": "~0.9.0",
     "iconv-lite": "~0.2.7"
   },
   "scripts": {
-	"lint": "eslint ."
+    "lint": "eslint .",
+    "test": "grunt testzvm"
   }
 }

@@ -3,58 +3,70 @@
 Z-Machine opcodes
 =================
 
-Copyright (c) 2011 The ifvms.js team
+Copyright (c) 2016 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
 */
 
 /*
-	
+
 TODO:
 	Abstract out the signed conversions such that they can be eliminated if possible
 	don't access memory directly
-	
+
 */
 
+var AST = require( '../common/ast.js' ),
+Variable = AST.Variable,
+Opcode = AST.Opcode,
+Stopper = AST.Stopper,
+Pauser = AST.Pauser,
+Brancher = AST.Brancher,
+BrancherStorer = AST.BrancherStorer,
+Storer = AST.Storer,
+Caller = AST.Caller,
+CallerStorer = AST.CallerStorer,
+opcode_builder = AST.opcode_builder,
+
 // Common functions
-function simple_func( a ) { return '' + a; }
+simple_func = function( a ) { return '' + a; },
 
 // Common opcodes
-var alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
+alwaysbranch = opcode_builder( AST.Brancher, function() { return 1; } ),
 
 // Indirect storer opcodes - rather non-generic I'm afraid
 // Not used for inc/dec
 // @load (variable) -> (result)
 // @pull (variable)
 // @store (variable) value
-Indirect = Storer.subClass({
+Indirect = AST.Storer.subClass({
 	storer: 0,
-	
+
 	post: function()
 	{
 		var operands = this.operands,
 		op0 = operands[0],
 		op0isVar = op0 instanceof Variable;
-		
+
 		// Replace the indirect operand with a Variable, and set .indirect if needed
 		operands[0] = new Variable( this.e, op0isVar ? op0 : op0.v );
 		if ( op0isVar || op0.v === 0 )
 		{
 			operands[0].indirect = 1;
 		}
-		
+
 		// Get the storer
 		this.storer = this.code === 142 ? operands.pop() : operands.shift();
-		
+
 		// @pull needs an added stack. If for some reason it was compiled with two operands this will break!
 		if ( operands.length === 0 )
 		{
 			operands.push( new Variable( this.e, 0 ) );
 		}
 	},
-	
-	func: simple_func
+
+	func: simple_func,
 }),
 
 Incdec = Opcode.subClass({
@@ -62,20 +74,23 @@ Incdec = Opcode.subClass({
 	{
 		var varnum = variable.v - 1,
 		operator = this.code % 2 ? 1 : -1;
-		
+
 		// Fallback to the runtime function if our variable is a variable operand itself
 		// Or, if it's a global
 		if ( variable instanceof Variable || varnum > 14 )
 		{
 			return 'e.incdec(' + variable + ',' + operator + ')';
 		}
-		
-		return ( varnum < 0 ? 'e.s[e.s.length-1]=e.S2U(e.s[e.s.length-1]+' : ( 'e.l[' + varnum + ']=e.S2U(e.l[' + varnum + ']+' ) ) + operator + ')';
-	}
-}),
 
-opcodes = {
-	
+		return ( varnum < 0 ? 'e.s[e.s.length-1]=e.S2U(e.s[e.s.length-1]+' : ( 'e.l[' + varnum + ']=e.S2U(e.l[' + varnum + ']+' ) ) + operator + ')';
+	},
+});
+
+/*eslint brace-style: "off" */
+/*eslint indent: "off" */
+
+module.exports = {
+
 /* je */ 1: opcode_builder( Brancher, function() { return arguments.length === 2 ? this.args( '===' ) : 'e.jeq(' + this.args() + ')'; } ),
 /* jl */ 2: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '<' + b.U2S(); } ),
 /* jg */ 3: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '>' + b.U2S(); } ),
@@ -179,7 +194,7 @@ opcodes = {
 /* check_unicode */ 1012: opcode_builder( Storer, function() { return 3; } ),
 /* set_true_colour */ 1013: opcode_builder( Opcode, function() { return 'e.ui.set_true_colour(' + this.args() + ')'; } ),
 /* sound_data */ 1014: Opcode.subClass( { brancher: 1 } ), // We don't support sounds (but disassemble the branch address)
-/* gestalt */ 1030: opcode_builder( Storer, function() { return 'e.gestalt(' + this.args() + ')'; } )
-/* parchment */ //1031: opcode_builder( Storer, function() { return 'e.op_parchment(' + this.args() + ')'; } )
-	
+/* gestalt */ 1030: opcode_builder( Storer, function() { return 'e.gestalt(' + this.args() + ')'; } ),
+/* parchment */ //1031: opcode_builder( Storer, function() { return 'e.op_parchment(' + this.args() + ')'; } ),
+
 };

@@ -10,20 +10,30 @@ http://github.com/curiousdannii/ifvms.js
 */
 
 /*
-	
+
 TODO:
 	Check when restoring that it's a savefile for this storyfile
 	Save/restore: table, name, prompt support
-	
+
 */
 
-// These functions will be added to the object literal in api.js
+/*eslint no-console: "off" */
+
+var utils = require( '../common/utils.js' ),
+extend = utils.extend,
+U2S = utils.U2S16,
+S2U = utils.S2U16,
+byte_to_word = utils.byte_to_word,
+
+file = require( '../common/file.js' );
+
+module.exports = {
 
 	art_shift: function( number, places )
 	{
 		return places > 0 ? number << places : number >> -places;
 	},
-	
+
 	// Call a routine
 	call: function( addr, storer, next, args )
 	{
@@ -36,18 +46,18 @@ TODO:
 			}
 			return this.pc = next;
 		}
-		
+
 		var i,
 		locals_count,
 		old_locals_count = this.l.length,
-		
+
 		// Keep the number of provided args for @check_arg_count
 		provided_args = args.length;
-		
+
 		// Get the number of locals and advance the pc
 		this.pc = addr * this.addr_multipler;
 		locals_count = this.m.getUint8( this.pc++ );
-		
+
 		// Add the locals
 		// Trim args to the count if needed
 		args = args.slice( 0, locals_count );
@@ -58,17 +68,17 @@ TODO:
 		}
 		// Prepend to the locals array
 		this.l = args.concat( this.l );
-		
+
 		// Push the call stack (well unshift really)
 		this.call_stack.unshift( [ next, storer, locals_count, this.s.length, provided_args, old_locals_count ] );
 	},
-	
+
 	clear_attr: function( object, attribute )
 	{
 		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
 	},
-	
+
 	copy_table: function( first, second, size )
 	{
 		size = U2S( size );
@@ -76,7 +86,7 @@ TODO:
 		i = 0,
 		allowcorrupt = size < 0;
 		size = Math.abs( size );
-		
+
 		// Simple case, zeroes
 		if ( second === 0 )
 		{
@@ -86,7 +96,7 @@ TODO:
 			}
 			return;
 		}
-		
+
 		if ( allowcorrupt )
 		{
 			while ( i < size )
@@ -99,12 +109,12 @@ TODO:
 			memory.setBuffer( second, memory.getBuffer( first, size ) );
 		}
 	},
-	
+
 	encode_text: function( zscii, length, from, target )
 	{
 		this.m.setBuffer( target, this.encode( this.m.getBuffer( zscii + from, length ) ) );
 	},
-	
+
 	// Access the extension table
 	extension_table: function( word, value )
 	{
@@ -120,25 +130,25 @@ TODO:
 		}
 		this.e.setUint16( addr, value );
 	},
-	
+
 	// Find the address of a property, or given the previous property, the number of the next
 	find_prop: function( object, property, prev )
 	{
 		var memory = this.m,
-		
+
 		this_property_byte, this_property,
 		last_property = 0,
-		
+
 		// Get this property table
 		properties = memory.getUint16( this.objects + 14 * object + 12 );
 		properties += memory.getUint8( properties ) * 2 + 1;
-		
+
 		// Run through the properties
-		while (1)
+		while ( 1 )
 		{
 			this_property_byte = memory.getUint8( properties );
 			this_property = this_property_byte & 0x3F;
-		
+
 			// Found the previous property, so return this one's number
 			if ( last_property === prev )
 			{
@@ -155,10 +165,10 @@ TODO:
 			{
 				return 0;
 			}
-			
+
 			// Go to next property
 			last_property = this_property;
-			
+
 			// Second size byte
 			if ( this_property_byte & 0x80 )
 			{
@@ -171,7 +181,7 @@ TODO:
 			}
 		}
 	},
-	
+
 	// 1.2 spec @gestalt
 	gestalt: function( id /*, arg*/ )
 	{
@@ -188,42 +198,42 @@ TODO:
 		}
 		return 0;
 	},
-	
+
 	// Get the first child of an object
 	get_child: function( obj )
 	{
 		return this.m.getUint16( this.objects + 14 * obj + 10 );
 	},
-	
+
 	get_sibling: function( obj )
 	{
 		return this.m.getUint16( this.objects + 14 * obj + 8 );
 	},
-	
+
 	get_parent: function( obj )
 	{
 		return this.m.getUint16( this.objects + 14 * obj + 6 );
 	},
-	
+
 	get_prop: function( object, property )
 	{
 		var memory = this.m,
-		
+
 		// Try to find the property
 		addr = this.find_prop( object, property );
-		
+
 		// If we have the property
 		if ( addr )
 		{
 			// Assume we're being called for a valid short property
 			return ( memory.getUint8( addr - 1 ) & 0x40 ? memory.getUint16 : memory.getUint8 )( addr );
 		}
-		
+
 		// Use the default properties table
 		// Remember that properties are 1-indexed
 		return memory.getUint16( this.properties + 2 * ( property - 1 ) );
 	},
-	
+
 	// Get the length of a property
 	// This opcode expects the address of the property data, not a property block
 	get_prop_len: function( addr )
@@ -233,9 +243,9 @@ TODO:
 		{
 			return 0;
 		}
-		
+
 		var value = this.m.getUint8( addr - 1 );
-		
+
 		// Two size/number bytes
 		if ( value & 0x80 )
 		{
@@ -245,7 +255,7 @@ TODO:
 		// One byte size/number
 		return value & 0x40 ? 2 : 1;
 	},
-	
+
 	// Quick hack for @inc/@dec/@inc_chk/@dec_chk
 	incdec: function( varnum, change )
 	{
@@ -266,7 +276,7 @@ TODO:
 			return this.m.setUint16( offset, this.m.getUint16( offset ) + change );
 		}
 	},
-	
+
 	// Indirect variables
 	indirect: function( variable, value )
 	{
@@ -283,7 +293,7 @@ TODO:
 		}
 		return this.variable( variable, value );
 	},
-	
+
 	insert_obj: function( obj, dest )
 	{
 		// First remove the obj from wherever it was
@@ -291,12 +301,12 @@ TODO:
 		// Now add it to the destination
 		this.set_family( obj, dest, dest, obj, obj, this.get_child( dest ) );
 	},
-	
+
 	// @jeq
 	jeq: function()
-	{	
+	{
 		var i = 1;
-		
+
 		// Account for many arguments
 		while ( i < arguments.length )
 		{
@@ -306,17 +316,25 @@ TODO:
 			}
 		}
 	},
-	
+
 	jin: function( child, parent )
 	{
 		return this.get_parent( child ) === parent;
 	},
-	
+
+	log: function()
+	{
+		if ( this.env.debug && typeof console !== 'undefined' && console.log )
+		{
+			console.log.apply( console, arguments );
+		}
+	},
+
 	log_shift: function( number, places )
 	{
 		return places > 0 ? number << places : number >>> -places;
 	},
-	
+
 	// Manage output streams
 	output_stream: function( stream, addr )
 	{
@@ -327,10 +345,7 @@ TODO:
 		}
 		if ( stream === -1 )
 		{
-			if ( DEBUG )
-			{
-				console.info( 'Disabling stream one - it actually happened!' );
-			}
+			this.log( 'Disabling stream one - it actually happened!' );
 			this.streams[0] = 0;
 		}
 		if ( stream === 3 )
@@ -345,7 +360,7 @@ TODO:
 			this.m.setBuffer( data[0] + 2, text );
 		}
 	},
-	
+
 	// Print text!
 	_print: function( text )
 	{
@@ -372,7 +387,7 @@ TODO:
 			this.ui.buffer += text;
 		}
 	},
-	
+
 	// Print many things
 	print: function( type, val )
 	{
@@ -408,7 +423,7 @@ TODO:
 		}
 		this._print( val );
 	},
-	
+
 	print_table: function( zscii, width, height, skip )
 	{
 		height = height || 1;
@@ -420,44 +435,44 @@ TODO:
 			zscii += width + skip;
 		}
 	},
-	
+
 	put_prop: function( object, property, value )
 	{
 		var memory = this.m,
-		
+
 		// Try to find the property
 		addr = this.find_prop( object, property );
-		
+
 		( memory.getUint8( addr - 1 ) & 0x40 ? memory.setUint16 : memory.setUint8 )( addr, value );
 	},
-	
+
 	random: function( range )
 	{
 		var seed = this.xorshift_seed;
-		
+
 		// Switch to the Xorshift RNG (or switch off if range == 0)
 		if ( range < 1 )
 		{
 			this.xorshift_seed = range;
 			return 0;
 		}
-		
+
 		// Pure randomness
 		if ( seed === 0 )
 		{
 			return 1 + ( Math.random() * range ) | 0;
 		}
-		
+
 		// Based on the discussions in this forum topic, we will not implement the sequential mode recommended in the standard
 		// http://www.intfiction.org/forum/viewtopic.php?f=38&t=16023
-		
+
 		// Instead implement a 32 bit Xorshift generator
 		seed ^= ( seed << 13 );
 		seed ^= ( seed >> 17 );
 		this.xorshift_seed = ( seed ^= ( seed << 5 ) );
 		return 1 + ( ( seed & 0x7FFF ) % range );
 	},
-	
+
 	// Request line input
 	read: function( text, parse, time, routine, storer )
 	{
@@ -467,7 +482,7 @@ TODO:
 			storer = time;
 			time = routine = 0;
 		}
-	
+
 		// Add the order
 		this.act( 'read', {
 			buffer: text, // text-buffer
@@ -476,10 +491,10 @@ TODO:
 			initiallen: this.m.getUint8( text + 1 ),
 			time: time,
 			routine: routine,
-			storer: storer
+			storer: storer,
 		});
 	},
-	
+
 	// Request character input
 	read_char: function( one, time, routine, storer )
 	{
@@ -489,31 +504,31 @@ TODO:
 			storer = time;
 			time = routine = 0;
 		}
-	
+
 		// Add the order
 		this.act( 'char', {
 			time: time,
 			routine: routine,
-			storer: storer
+			storer: storer,
 		});
 	},
-	
+
 	remove_obj: function( obj )
 	{
 		var parent = this.get_parent( obj ),
 		older_sibling,
 		younger_sibling,
 		temp_younger;
-		
+
 		// No parent, do nothing
 		if ( parent === 0 )
 		{
 			return;
 		}
-		
+
 		older_sibling = this.get_child( parent );
 		younger_sibling = this.get_sibling( obj );
-		
+
 		// obj is first child
 		if ( older_sibling === obj )
 		{
@@ -535,43 +550,43 @@ TODO:
 			this.set_family( obj, 0, 0, 0, older_sibling, younger_sibling );
 		}
 	},
-	
+
 	// (Re)start the VM
 	restart: function()
 	{
 		// Set up the memory
-		var memory = ByteArray( this.data ),
-		
+		var memory = new DataView( this.data ),
+
 		version = memory.getUint8( 0x00 ),
 		addr_multipler = version === 5 ? 4 : 8,
 		property_defaults = memory.getUint16( 0x0A ),
 		extension = memory.getUint16( 0x36 );
-		
+
 		// Check if the version is supported
 		if ( version !== 5 && version !== 8 )
 		{
 			throw new Error( 'Unsupported Z-Machine version: ' + version );
 		}
-		
+
 		// Preserve flags 2 - the fixed pitch bit is surely the lamest part of the Z-Machine spec!
 		if ( this.m )
 		{
 			memory.setUint8( 0x11, this.m.getUint8( 0x11 ) );
 		}
-		
+
 		extend( this, {
-			
+
 			// Memory, locals and stacks of various kinds
 			m: memory,
 			s: [],
 			l: [],
 			call_stack: [],
 			undo: [],
-			
+
 			// IO stuff
 			orders: [],
 			streams: [ 1, 0, [], 0 ],
-			
+
 			// Get some header variables
 			version: version,
 			pc: memory.getUint16( 0x06 ),
@@ -582,22 +597,22 @@ TODO:
 			eof: ( memory.getUint16( 0x1A ) || 65536 ) * addr_multipler,
 			extension: extension,
 			extension_count: extension ? memory.getUint16( extension ) : 0,
-			
+
 			// Routine and string multiplier
-			addr_multipler: addr_multipler
-			
+			addr_multipler: addr_multipler,
+
 		});
 
-		this.ui = new ZVMUI( this, memory.getUint8( 0x11 ) & 0x02 );
+		this.ui = new ( require( './ui.js' ) )( this, memory.getUint8( 0x11 ) & 0x02 );
 		this.init_text();
-		
+
 		// Update the header
 		this.update_header();
 	},
-	
+
 	restore: function( data )
 	{
-		var quetzal = new Quetzal( data ),
+		var quetzal = new file.Quetzal( data ),
 		qmem = quetzal.memory,
 		qstacks = quetzal.stacks,
 		pc = quetzal.pc,
@@ -607,7 +622,7 @@ TODO:
 		call_stack = [],
 		newlocals = [],
 		newstack;
-		
+
 		// Memory chunk
 		this.m.setBuffer( 0, this.data.slice( 0, this.staticmem ) );
 		if ( quetzal.compressed )
@@ -632,7 +647,7 @@ TODO:
 		}
 		// Preserve flags 1
 		this.m.setUint8( 0x11, flags2 );
-		
+
 		// Stacks chunk
 		i = 6;
 		// Dummy call frame
@@ -643,7 +658,11 @@ TODO:
 		{
 			call_stack.unshift( [
 				qstacks[i++] << 16 | qstacks[i++] << 8 | qstacks[i++], // pc
-				0, 0, newstack.length, 0, newlocals.length
+				0,
+				0,
+				newstack.length,
+				0,
+				newlocals.length,
 			] );
 			call_stack[0][1] = qstacks[i] & 0x10 ? -1 : qstacks[i + 1]; // storer
 			call_stack[0][2] = qstacks[i] & 0x0F; // local count
@@ -661,15 +680,15 @@ TODO:
 		this.call_stack = call_stack;
 		this.l = newlocals;
 		this.s = newstack;
-		
+
 		// Update the header
 		this.update_header();
-		
+
 		// Set the storer
 		this.variable( this.m.getUint8( pc++ ), 2 );
 		this.pc = pc;
 	},
-	
+
 	restore_undo: function()
 	{
 		if ( this.undo.length === 0 )
@@ -687,33 +706,33 @@ TODO:
 		this.variable( state[1], 2 );
 		return 1;
 	},
-	
+
 	// Return from a routine
 	ret: function( result )
 	{
 		var call_stack = this.call_stack.shift(),
 		storer = call_stack[1];
-		
+
 		// Correct everything again
 		this.pc = call_stack[0];
 		// With @throw we can now be skipping some call stack frames, so use the old locals length rather than this function's local count
 		this.l = this.l.slice( this.l.length - call_stack[5] );
 		this.s.length = call_stack[3];
-		
+
 		// Store the result if there is one
 		if ( storer >= 0 )
 		{
 			this.variable( storer, result | 0 );
 		}
 	},
-	
+
 	// pc must be the address of the storer operand
 	save: function( pc, storer )
 	{
 		var memory = this.m,
 		stack = this.s,
 		locals = this.l,
-		quetzal = new Quetzal(),
+		quetzal = new file.Quetzal(),
 		compressed_mem = [],
 		i, j,
 		abyte,
@@ -722,13 +741,13 @@ TODO:
 		frame,
 		stack_len,
 		stacks = [ 0, 0, 0, 0, 0, 0 ]; // Dummy call frame
-		
+
 		// IFhd chunk
 		quetzal.release = memory.getBuffer( 0x02, 2 );
 		quetzal.serial = memory.getBuffer( 0x12, 6 );
 		quetzal.checksum = memory.getBuffer( 0x1C, 2 );
 		quetzal.pc = pc;
-		
+
 		// Memory chunk
 		quetzal.compressed = 1;
 		for ( i = 0; i < this.staticmem; i++ )
@@ -753,7 +772,7 @@ TODO:
 			}
 		}
 		quetzal.memory = compressed_mem;
-		
+
 		// Stacks
 		// Finish the dummy call frame
 		stacks.push( call_stack[0][3] >> 8, call_stack[0][3] & 0xFF );
@@ -785,14 +804,14 @@ TODO:
 		}
 		call_stack.reverse();
 		quetzal.stacks = stacks;
-		
+
 		// Send the event
 		this.act( 'save', {
 			data: quetzal.write(),
-			storer: storer
+			storer: storer,
 		} );
 	},
-	
+
 	save_undo: function( pc, variable )
 	{
 		this.undo.push( [
@@ -801,18 +820,18 @@ TODO:
 			this.m.getBuffer( 0, this.staticmem ),
 			this.l.slice(),
 			this.s.slice(),
-			this.call_stack.slice()
+			this.call_stack.slice(),
 		] );
 		return 1;
 	},
-	
+
 	scan_table: function( key, addr, length, form )
 	{
 		form = form || 0x82;
 		var memoryfunc = form & 0x80 ? this.m.getUint16 : this.m.getUint8;
 		form &= 0x7F;
 		length = addr + length * form;
-		
+
 		while ( addr < length )
 		{
 			if ( memoryfunc( addr ) === key )
@@ -823,13 +842,13 @@ TODO:
 		}
 		return 0;
 	},
-	
+
 	set_attr: function( object, attribute )
 	{
 		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) | 0x80 >> attribute % 8 );
 	},
-	
+
 	set_family: function( obj, newparent, parent, child, bigsis, lilsis )
 	{
 		// Set the new parent of the obj
@@ -845,25 +864,25 @@ TODO:
 			this.m.setUint16( this.objects + 14 * bigsis + 8, lilsis );
 		}
 	},
-	
+
 	test: function( bitmap, flag )
 	{
 		return bitmap & flag === flag;
 	},
-	
+
 	test_attr: function( object, attribute )
 	{
 		return ( this.m.getUint8( this.objects + 14 * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
 	},
-	
+
 	// Update the header after restarting or restoring
 	update_header: function()
 	{
 		var memory = this.m;
-		
+
 		// Reset the Xorshift seed
 		this.xorshift_seed = 0;
-		
+
 		// Flags 1: Set bits 0, 2, 3, 4: typographic styles are OK
 		// Set bit 7 only if timed input is supported
 		memory.setUint8( 0x01, 0x1D | ( this.env.timed ? 0x80 : 0 ) );
@@ -880,10 +899,10 @@ TODO:
 		memory.setUint16( 0x32, 0x0102 );
 		// Clear flags three, we don't support any of that stuff
 		this.extension_table( 4, 0 );
-		
+
 		this.ui.update_header();
 	},
-	
+
 	// Read or write a variable
 	variable: function( variable, value )
 	{
@@ -925,7 +944,17 @@ TODO:
 		}
 		return value;
 	},
-	
+
+	warn: function()
+	{
+		if ( this.env.debug && typeof console !== 'undefined' && console.warn )
+		{
+			console.warn.apply( console, arguments );
+		}
+	},
+
 	// Utilities for signed arithmetic
 	U2S: U2S,
-	S2U: S2U
+	S2U: S2U,
+
+};

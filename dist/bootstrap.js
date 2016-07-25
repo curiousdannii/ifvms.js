@@ -16,7 +16,12 @@ Once the list is complete, the VM is handed back to you, and you can do what you
 
 */
 
-(function(){ 'use strict';
+/*eslint one-var: "off" */
+
+(function()
+{
+
+'use strict';
 
 // Convert text into an array
 function text_to_array( text, array )
@@ -42,21 +47,21 @@ function run( vm, walkthrough )
 {
 	var orders, order, code, i, l;
 	walkthrough = walkthrough || [];
-	
+
 	vm.run();
-	
+
 	while ( true )
 	{
 		orders = vm.orders;
 		i = 0;
 		l = orders.length;
-		
+
 		// Process the orders
 		while ( i < l )
 		{
 			order = orders[i++];
 			code = order.code;
-			
+
 			// Text output
 			// We don't do much, just add it to a string on the vm object
 			if ( code === 'stream' )
@@ -68,19 +73,19 @@ function run( vm, walkthrough )
 				}
 				vm.log += order.text || '';
 			}
-			
+
 			// Line input
 			else if ( code === 'read' && walkthrough.length )
 			{
 				order.response = walkthrough.shift();
 				vm.inputEvent( order ); // Calls run
 			}
-			
+
 			else if ( code === 'find' )
 			{
 				continue;
 			}
-			
+
 			// Return on anything else
 			else
 			{
@@ -95,14 +100,14 @@ exports.zvm = function( path, walkthrough )
 {
 	var fs = require( 'fs' );
 	var iconv = require( 'iconv-lite' );
-	var ZVM = require( './zvm.js' );
-	
+	var ZVM = require( '../src/zvm/zvm.js' );
+
 	var data = iconv.decode( fs.readFileSync( path ), 'latin1' );
-	
+
 	var vm = new ZVM();
 	vm.inputEvent({
 		code: 'load',
-		data: text_to_array( data )
+		data: text_to_array( data ),
 	});
 	vm.restart();
 	vm.log = '';

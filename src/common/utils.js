@@ -9,67 +9,33 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
-// Array.indexOf compatibility (Support: IE8)
-if ( ![].indexOf )
-{
-	Array.prototype.indexOf = function( obj, fromIndex )
-	{
-		for ( var i = fromIndex || 0, l = this.length; i < l; i++ )
-		{
-			if ( this[i] === obj )
-			{
-				return i;
-			}
-		}
-		return -1;
-	};
-}
-
-// Bind, with compatiblity (Support: IE8)
-function bind( func, obj )
-{
-	if ( Function.prototype.bind )
-	{
-		return func.bind( obj );
-	}
-	else
-	{
-		return function()
-		{
-			func.apply( obj, [].slice.call( arguments ) );
-		};
-	}
-}
-
 // Utility to extend objects
-function extend( old, add )
+module.exports.extend = function()
 {
-	for ( var name in add )
+	var old = arguments[0], i = 1, add, name;
+	while ( i < arguments.length )
 	{
-		old[name] = add[name];
+		add = arguments[i++];
+		for ( name in add )
+		{
+			old[name] = add[name];
+		}
 	}
 	return old;
-}
-
-// Console dummy funcs
-var console = typeof console !== 'undefined' ? console : {
-	log: function(){},
-	info: function(){},
-	warn: function(){}
 };
 
 // Utilities for 16-bit signed arithmetic
-function U2S( value )
+module.exports.U2S16 = function( value )
 {
 	return value << 16 >> 16;
-}
-function S2U( value )
+};
+module.exports.S2U16 = function( value )
 {
 	return value & 0xFFFF;
-}
+};
 
 // Utility to convert from byte arrays to word arrays
-function byte_to_word( array )
+module.exports.byte_to_word = function( array )
 {
 	var i = 0, l = array.length,
 	result = [];
@@ -78,17 +44,17 @@ function byte_to_word( array )
 		result[i / 2] = array[i++] << 8 | array[i++];
 	}
 	return result;
-}
-	
-// Perform some micro optimisations
+};
+
+/*// Perform some micro optimisations
 function optimise( code )
 {
 	return code
-	
+
 	// Sign conversions
 	.replace( /(e\.)?U2S\(([^(]+?)\)/g, '(($2)<<16>>16)' )
 	.replace( /(e\.)?S2U\(([^(]+?)\)/g, '(($2)&65535)' )
-	
+
 	// Bytearray
 	.replace( /([\w.]+)\.getUint8\(([^(]+?)\)/g, '$1[$2]' )
 	.replace( /([\w.]+)\.getUint16\(([^(]+?)\)/g, '($1[$2]<<8|$1[$2+1])' );
@@ -113,9 +79,9 @@ function optimise_obj( obj, funcnames )
 		}
 	}
 	extend( obj, eval( '({' + newfuncs.join() + '})' ) );
-}
+}*/
 
-if ( DEBUG ) {
+/*if ( DEBUG ) {
 
 	// Debug flags
 	var debugflags = {},
@@ -125,7 +91,7 @@ if ( DEBUG ) {
 		var i = 0;
 		while ( i < data.length )
 		{
-			debugflags[data[i++]] = 1; 
+			debugflags[data[i++]] = 1;
 		}
 	};
 	if ( typeof parchment !== 'undefined' && parchment.options && parchment.options.debug )
@@ -134,3 +100,4 @@ if ( DEBUG ) {
 	}
 
 } // ENDDEBUG
+*/

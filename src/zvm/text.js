@@ -3,31 +3,31 @@
 Z-Machine text functions
 ========================
 
-Copyright (c) 2013 The ifvms.js team
+Copyright (c) 2016 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
 */
 
 /*
-	
+
 TODO:
 	Consider quote suggestions from 1.1 spec
-	
+
 */
 
-// These functions will be added to the object literal in api.js
+module.exports = {
 
 	init_text: function()
 	{
 		var self = this,
 		memory = this.m,
-		
+
 		alphabet_addr = memory.getUint16( 0x34 ),
 		unicode_addr = this.extension_table( 3 ),
 		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
-		
-		
+
+
 		// Generate alphabets
 		function make_alphabet( data )
 		{
@@ -41,7 +41,7 @@ TODO:
 			alphabets[2][1] = 13;
 			self.alphabets = alphabets;
 		}
-		
+
 		// Make the unicode tables
 		function make_unicode( data )
 		{
@@ -62,22 +62,22 @@ TODO:
 			self.unicode_table = table;
 			self.reverse_unicode_table = reverse;
 		}
-		
+
 		// Check for custom alphabets
 		make_alphabet( alphabet_addr ? memory.getBuffer( alphabet_addr, 78 )
 			// Or use the standard alphabet
 			: this.text_to_zscii( 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \r0123456789.,!?_#\'"/\\-:()', 1 ) );
-		
+
 		// Check for a custom unicode table
 		make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
 			// Or use the default
 			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
-		
+
 		// Parse the standard dictionary
 		this.dictionaries = {};
 		this.dict = memory.getUint16( 0x08 );
 		this.parse_dict( this.dict );
-		
+
 		// Optimise our own functions
 		/*if ( DEBUG )
 		{
@@ -85,12 +85,12 @@ TODO:
 			optimise_obj( this, 'TEXT' );
 		}*/
 	},
-	
+
 	// Decode Z-chars into ZSCII and then Unicode
 	decode: function( addr, length )
 	{
 		var memory = this.m,
-		
+
 		start_addr = addr,
 		temp,
 		buffer = [],
@@ -102,37 +102,37 @@ TODO:
 		usesabbr,
 		tenbit,
 		unicodecount = 0;
-		
+
 		// Check if this one's been cached already
 		if ( this.jit[addr] )
 		{
 			return this.jit[addr];
 		}
-		
+
 		// If we've been given a length, then use it as the finaladdr,
 		// Otherwise don't go past the end of the file
 		length = length ? length + addr : this.eof;
-		
+
 		// Go through until we've reached the end of the text or a stop bit
 		while ( addr < length )
 		{
 			temp = memory.getUint16( addr );
 			addr += 2;
-			
+
 			buffer.push( temp >> 10 & 0x1F, temp >> 5 & 0x1F, temp & 0x1F );
-			
+
 			// Stop bit
 			if ( temp & 0x8000 )
 			{
 				break;
 			}
 		}
-		
+
 		// Process the Z-chars
 		while ( i < buffer.length )
 		{
 			zchar = buffer[i++];
-			
+
 			// Special chars
 			// Space
 			if ( zchar === 0 )
@@ -186,10 +186,10 @@ TODO:
 			{
 				result.push( this.alphabets[alphabet][ zchar - 6 ] );
 			}
-			
+
 			// Reset the alphabet
 			alphabet = alphabet < 4 ? 0 : alphabet - 3;
-			
+
 			// Add to the index if we've had raw unicode
 			if ( ( i % 3 ) === 0 )
 			{
@@ -197,13 +197,13 @@ TODO:
 				unicodecount = 0;
 			}
 		}
-		
+
 		result = this.zscii_to_text( result, resulttexts );
 		// Abbreviations must be extracted at run time, so return a function instead
 		if ( usesabbr )
 		{
 			result = {
-				toString: bind( Function( 'return"' + result.replace( /\\/g, '\\\\' ).replace( /"/g, '\\"' ).replace( /\r/g, '\\r' ).replace( /\uE000/g, '"' ) + '"' ), this )
+				toString: ( Function( 'return"' + result.replace( /\\/g, '\\\\' ).replace( /"/g, '\\"' ).replace( /\r/g, '\\r' ).replace( /\uE000/g, '"' ) + '"' ) ).bind( this ),
 			};
 		}
 		// Cache and return
@@ -213,7 +213,7 @@ TODO:
 		}
 		return result;
 	},
-	
+
 	// Encode ZSCII into Z-chars
 	encode: function( zscii )
 	{
@@ -223,7 +223,7 @@ TODO:
 		achar,
 		temp,
 		result = [];
-		
+
 		// Encode the Z-chars
 		while ( zchars.length < 9 )
 		{
@@ -247,7 +247,7 @@ TODO:
 				zchars.push( 5, temp + 6 );
 			}
 			// 10-bit ZSCII / Unicode table
-			else if ( temp = this.reverse_unicode_table[achar] )
+			else if ( ( temp = this.reverse_unicode_table[achar] ) )
 			{
 				zchars.push( 5, 6, temp >> 5, temp & 0x1F );
 			}
@@ -258,7 +258,7 @@ TODO:
 			}
 		}
 		zchars.length = 9;
-		
+
 		// Encode to bytes
 		i = 0;
 		while ( i < 9 )
@@ -268,7 +268,7 @@ TODO:
 		result[4] |= 0x80;
 		return result;
 	},
-	
+
 	// In these two functions zscii means an array of ZSCII codes and text means a regular Javascript unicode string
 	zscii_to_text: function( zscii, texts )
 	{
@@ -276,7 +276,7 @@ TODO:
 		charr,
 		j = 0,
 		result = '';
-		
+
 		while ( i < l )
 		{
 			charr = zscii[i++];
@@ -286,14 +286,14 @@ TODO:
 				result += texts[j++];
 			}
 			// Regular characters
-			if ( charr = this.unicode_table[charr] )
+			if ( ( charr = this.unicode_table[charr] ) )
 			{
 				result += charr;
 			}
 		}
 		return result;
 	},
-	
+
 	// If the second argument is set then don't use the unicode table
 	text_to_zscii: function( text, notable )
 	{
@@ -310,22 +310,22 @@ TODO:
 		}
 		return array;
 	},
-	
+
 	// Parse and cache a dictionary
 	parse_dict: function( addr )
 	{
 		var memory = this.m,
-		
+
 		addr_start = addr,
 		dict = {},
 		entry_len,
 		endaddr,
-		
+
 		// Get the word separators
 		seperators_len = memory.getUint8( addr++ );
 		dict.separators = memory.getBuffer( addr, seperators_len );
 		addr += seperators_len;
-		
+
 		// Go through the dictionary and cache its entries
 		entry_len = memory.getUint8( addr++ );
 		endaddr = addr + 2 + entry_len * memory.getUint16( addr );
@@ -336,28 +336,28 @@ TODO:
 			addr += entry_len;
 		}
 		this.dictionaries[addr_start] = dict;
-		
+
 		return dict;
 	},
-	
+
 	// Print an abbreviation
 	abbr: function( abbrnum )
 	{
 		var memory = this.m;
 		return this.decode( memory.getUint16( memory.getUint16( 0x18 ) + 2 * abbrnum ) * 2 );
 	},
-	
+
 	// Tokenise a text
 	tokenise: function( text, buffer, dictionary, flag )
 	{
 		// Use the default dictionary if one wasn't provided
 		dictionary = dictionary || this.dict;
-		
+
 		// Parse the dictionary if needed
 		dictionary = this.dictionaries[dictionary] || this.parse_dict( dictionary );
-		
+
 		var memory = this.m,
-		
+
 		i = 2,
 		textend = i + memory.getUint8( text + 1 ),
 		letter,
@@ -367,7 +367,7 @@ TODO:
 		wordstart = i,
 		max_words,
 		wordcount = 0;
-		
+
 		// Find the words, separated by the separators, but as well as the separators themselves
 		while ( i < textend )
 		{
@@ -395,13 +395,13 @@ TODO:
 		{
 			words.push( [word, wordstart] );
 		}
-		
+
 		// Go through the text until we either have reached the max number of words, or we're out of words
 		max_words = Math.min( words.length, memory.getUint8( buffer ) );
 		while ( wordcount < max_words )
 		{
 			word = dictionary['' + this.encode( words[wordcount][0] )];
-			
+
 			// If the flag is set then don't overwrite words which weren't found
 			if ( !flag || word )
 			{
@@ -412,24 +412,28 @@ TODO:
 			}
 			wordcount++;
 		}
-		
+
 		// Update the number of found words
 		memory.setUint8( buffer + 1, wordcount );
 	},
-	
+
 	// Handle key input
 	keyinput: function( data )
 	{
 		var charCode = data.charCode,
 		keyCode = data.keyCode,
-		
+
 		// Key codes accepted by the Z-Machine
-		ZSCII_keyCodes = (function(){
+		ZSCII_keyCodes = (function()
+		{
 			var keycodes = {
 				8: 8, // delete/backspace
 				13: 13, // enter
 				27: 27, // escape
-				37: 131, 38: 129, 39: 132, 40: 130 // arrow keys
+				37: 131, // arrow keys
+				38: 129,
+				39: 132,
+				40: 130,
 			},
 			i = 96;
 			while ( i < 106 )
@@ -443,13 +447,15 @@ TODO:
 			}
 			return keycodes;
 		})();
-		
+
 		// Handle keyCodes first
 		if ( ZSCII_keyCodes[keyCode] )
 		{
 			return ZSCII_keyCodes[keyCode];
 		}
-		
+
 		// Check the character table or return a '?'
 		return this.reverse_unicode_table[charCode] || 63;
-	}
+	},
+
+};

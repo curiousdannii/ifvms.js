@@ -1,9 +1,9 @@
+/*eslint one-var: "off" */
+
 module.exports = function( grunt )
 {
-	"use strict";
-	
-	/* jshint -W070 */ // Allow trailing commas only in the Gruntfile
-	
+	'use strict';
+
 	grunt.initConfig({
 		concat: {
 			options: {
@@ -27,11 +27,11 @@ module.exports = function( grunt )
 				],
 			},
 		},
-		
+
 		curl: {
 			'tests/tests.zip': 'https://github.com/curiousdannii/if/archive/gh-pages.zip',
 		},
-		
+
 		jshint: {
 			options: {
 				// Enforcing options
@@ -42,13 +42,13 @@ module.exports = function( grunt )
 				strict: true, // ES5 strict mode
 				undef: true, // all vars must be defined
 				unused: true, // warn for unused vars
-				
+
 				// Relaxing options
-				"-W064": false, // Don't warn about missing new with ByteArray
+				'-W064': false, // Don't warn about missing new with ByteArray
 				boss: true, // Allow assignments in if, return etc
 				evil: true, // eval() :)
 				funcscope: true, // don't complain about using variables defined inside if statements
-				
+
 				// Environment
 				browser: true,
 				node: true,
@@ -69,14 +69,14 @@ module.exports = function( grunt )
 				'dist/zvm.js',
 			],
 		},
-		
+
 		watch: {
 			src: {
 				files: [ 'src/common/*.js', 'src/zvm/*.js' ],
 				tasks: [ 'zvm' ],
 			},
 		},
-		
+
 		unzip: {
 			tests: {
 				router: function ( filepath )
@@ -98,7 +98,7 @@ module.exports = function( grunt )
 	grunt.loadNpmTasks( 'grunt-contrib-watch' );
 	grunt.loadNpmTasks( 'grunt-curl' );
 	grunt.loadNpmTasks( 'grunt-zip' );
-	
+
 	// Run the Praxix test suite
 	grunt.registerTask( 'testzvm', function()
 	{
@@ -107,7 +107,7 @@ module.exports = function( grunt )
 		{
 			return grunt.task.run( 'gettests', 'testzvm' );
 		}
-		
+
 		grunt.log.write( 'Running the Praxix test suite: ' );
 		var bootstrap = require( './dist/bootstrap.js' );
 		var vm = bootstrap.zvm( './tests/praxix.z5', ['all'] );
@@ -123,11 +123,11 @@ module.exports = function( grunt )
 			grunt.fail.warncount++;
 		}
 	});
-	
+
 	grunt.registerTask( 'default', [ 'jshint:misc', 'zvm' ] );
-	
+
 	grunt.registerTask( 'dev', [ 'watch' ] );
-	
+
 	grunt.registerTask( 'gettests', [ 'curl', 'unzip' ] );
 
 	grunt.registerTask( 'zvm', [ 'concat:zvm', 'jshint:zvm', 'testzvm' ] );
