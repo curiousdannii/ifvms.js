@@ -10,14 +10,14 @@
     "vm"
   ],
   "main": "dist/node.js",
+  "repository": "curiousdannii/ifvms.js",
   "homepage": "https://github.com/curiousdannii/ifvms.js",
-  "repository": "curiousdannii/ifvms.js.git",
   "bugs": "https://github.com/curiousdannii/ifvms.js/issues",
   "devDependencies": {
     "eslint": "^3.1.1"
   },
   "scripts": {
     "lint": "eslint .",
-    "test": "grunt testzvm"
+    "test": "make test"
   }
 }

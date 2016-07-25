@@ -9,7 +9,7 @@ var result = vm.log;
 
 if ( /All tests passed/.test( result ) )
 {
-	console.log.ok( 'All tests passed!\n' );
+	console.log( 'All tests passed!\n' );
 }
 else
 {

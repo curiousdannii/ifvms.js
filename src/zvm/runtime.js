@@ -273,7 +273,9 @@ module.exports = {
 		else
 		{
 			offset = this.globals + ( varnum - 15 ) * 2;
-			return this.m.setUint16( offset, this.m.getUint16( offset ) + change );
+			result = this.m.getUint16( offset ) + change;
+			this.m.setUint16( offset, result );
+			return result;
 		}
 	},
 
