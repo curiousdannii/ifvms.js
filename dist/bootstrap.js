@@ -100,7 +100,8 @@ exports.zvm = function( path, walkthrough )
 {
 	var fs = require( 'fs' );
 	var iconv = require( 'iconv-lite' );
-	var ZVM = require( '../src/zvm/zvm.js' );
+	var ZVM = require( '../src/zvm.js' );
+	console.log(ZVM.toString())
 
 	var data = iconv.decode( fs.readFileSync( path ), 'latin1' );
 

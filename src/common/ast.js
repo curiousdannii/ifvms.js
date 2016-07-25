@@ -26,9 +26,8 @@ TODO:
 
 */
 
-var Class = require( './class.js' ),
-
-utils = require( '../common/utils.js' ),
+var utils = require( '../common/utils.js' ),
+Class = utils.Class,
 U2S = utils.U2S16,
 //S2U = utils.S2U16;
 

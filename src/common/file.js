@@ -19,7 +19,8 @@ function Uint32_to_string( num )
 	return String.fromCharCode.call( null, ( num >> 24 ) & 0xFF, ( num >> 16 ) & 0xFF, ( num >> 8 ) & 0xFF, num & 0xFF );
 }
 
-var Class = require( './class.js' ),
+var utils = require( './utils.js' ),
+Class = utils.Class,
 
 // A basic IFF file, to be extended later
 // Currently supports string data

@@ -10,7 +10,7 @@ http://github.com/curiousdannii/ifvms.js
 */
 
 // Utility to extend objects
-module.exports.extend = function()
+function extend()
 {
 	var old = arguments[0], i = 1, add, name;
 	while ( i < arguments.length )
@@ -22,7 +22,32 @@ module.exports.extend = function()
 		}
 	}
 	return old;
+}
+module.exports.extend = extend;
+
+// Simple classes
+// Inspired by John Resig's class implementation
+// http://ejohn.org/blog/simple-javascript-inheritance/
+
+function Class()
+{}
+
+Class.subClass = function( props )
+{
+	var newClass = function()
+	{
+		if ( this.init )
+		{
+			this.init.apply( arguments );
+		}
+	},
+	newClass_prototype = newClass.prototype = Object.create( this.prototype );
+	extend( newClass_prototype, props );
+	newClass.subClass = this.subClass;
+	newClass.super = newClass_prototype.super = this.prototype;
+	return newClass;
 };
+module.exports.Class = Class;
 
 // Utilities for 16-bit signed arithmetic
 module.exports.U2S16 = function( value )

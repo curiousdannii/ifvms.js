@@ -28,8 +28,8 @@ TODO:
 
 */
 
-var Class = require( './common/class.js' ),
-utils = require( './common/utils.js' ),
+var utils = require( './common/utils.js' ),
+Class = utils.Class,
 extend = utils.extend,
 
 props = {
@@ -304,7 +304,5 @@ VM = Class.subClass( extend(
 	require( './zvm/text.js' ),
 	require( './zvm/disassembler.js' )
 ) );
-
-VM.ZVMUI = require( './zvm/ui.js' );
 
 module.exports = VM;

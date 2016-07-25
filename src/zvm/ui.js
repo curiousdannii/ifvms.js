@@ -16,8 +16,8 @@ Note: is used by both ZVM and Gnusto. In the case of Gnusto the engine is actual
 
 */
 
-var Class = require( '../common/class.js' ),
-utils = require( '../common/utils.js' );
+var utils = require( '../common/utils.js' ),
+Class = utils.Class;
 
 module.exports = Class.subClass({
 
