@@ -16,6 +16,27 @@ TODO:
 
 */
 
+// Key codes accepted by the Z-Machine
+var ZSCII_keyCodes = {
+	8: 8, // delete/backspace
+	13: 13, // enter
+	27: 27, // escape
+	37: 131, // arrow keys
+	38: 129,
+	39: 132,
+	40: 130,
+},
+i = 96;
+while ( i < 106 )
+{
+	ZSCII_keyCodes[i] = 49 + i++; // keypad
+}
+i = 112;
+while ( i < 124 )
+{
+	ZSCII_keyCodes[i] = 21 + i++; // function keys
+}
+
 module.exports = {
 
 	init_text: function()
@@ -27,6 +48,7 @@ module.exports = {
 		unicode_addr = this.extension_table( 3 ),
 		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
 
+		this.abbr_addr = memory.getUint16( 0x18 );
 
 		// Generate alphabets
 		function make_alphabet( data )
@@ -343,8 +365,7 @@ module.exports = {
 	// Print an abbreviation
 	abbr: function( abbrnum )
 	{
-		var memory = this.m;
-		return this.decode( memory.getUint16( memory.getUint16( 0x18 ) + 2 * abbrnum ) * 2 );
+		return this.decode( this.m.getUint16( this.abbr_addr + 2 * abbrnum ) * 2 );
 	},
 
 	// Tokenise a text
@@ -420,42 +441,8 @@ module.exports = {
 	// Handle key input
 	keyinput: function( data )
 	{
-		var charCode = data.charCode,
-		keyCode = data.keyCode,
-
-		// Key codes accepted by the Z-Machine
-		ZSCII_keyCodes = (function()
-		{
-			var keycodes = {
-				8: 8, // delete/backspace
-				13: 13, // enter
-				27: 27, // escape
-				37: 131, // arrow keys
-				38: 129,
-				39: 132,
-				40: 130,
-			},
-			i = 96;
-			while ( i < 106 )
-			{
-				keycodes[i] = 49 + i++; // keypad
-			}
-			i = 112;
-			while ( i < 124 )
-			{
-				keycodes[i] = 21 + i++; // function keys
-			}
-			return keycodes;
-		})();
-
-		// Handle keyCodes first
-		if ( ZSCII_keyCodes[keyCode] )
-		{
-			return ZSCII_keyCodes[keyCode];
-		}
-
-		// Check the character table or return a '?'
-		return this.reverse_unicode_table[charCode] || 63;
+		// Handle key codes first, then check the character table, or return a '?' if nothing is found
+		return ZSCII_keyCodes[ data.keyCode ] || this.reverse_unicode_table[ data.charCode ] || 63;
 	},
 
 };
