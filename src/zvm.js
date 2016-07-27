@@ -1,6 +1,6 @@
 /*
 
-ZVM - the ifvms.js Z-Machine (versions 5 and 8)
+ZVM - the ifvms.js Z-Machine (versions 3, 5 and 8)
 ===============================================
 
 Copyright (c) 2016 The ifvms.js team

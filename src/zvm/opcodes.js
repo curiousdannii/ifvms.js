@@ -33,14 +33,15 @@ opcode_builder = AST.opcode_builder,
 simple_func = function( a ) { return '' + a; },
 
 // Common opcodes
-alwaysbranch = opcode_builder( AST.Brancher, function() { return 1; } ),
+alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
+not = opcode_builder( Storer, function( a ) { return 'e.S2U(~' + a + ')'; } ),
 
 // Indirect storer opcodes - rather non-generic I'm afraid
 // Not used for inc/dec
 // @load (variable) -> (result)
 // @pull (variable)
 // @store (variable) value
-Indirect = AST.Storer.subClass({
+Indirect = Storer.subClass({
 	storer: 0,
 
 	post: function()
@@ -89,7 +90,10 @@ Incdec = Opcode.subClass({
 /*eslint brace-style: "off" */
 /*eslint indent: "off" */
 
-module.exports = {
+module.exports = function( version )
+{
+
+return {
 
 /* je */ 1: opcode_builder( Brancher, function() { return arguments.length === 2 ? this.args( '===' ) : 'e.jeq(' + this.args() + ')'; } ),
 /* jl */ 2: opcode_builder( Brancher, function( a, b ) { return a.U2S() + '<' + b.U2S(); } ),
@@ -135,18 +139,25 @@ module.exports = {
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + ( this.next - 2 ); } ),
 /* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(2,' + addr + '*' + this.e.addr_multipler + ')'; } ),
 /* load */ 142: Indirect.subClass( { storer: 1 } ),
-/* call_1n */ 143: Caller,
+143: version === 3 ?
+	/* not (v3) */ not :
+	/* call_1n (v5/8) */ Caller,
 /* rtrue */ 176: opcode_builder( Stopper, function() { return 'return 1'; } ),
 /* rfalse */ 177: opcode_builder( Stopper, function() { return 'return 0'; } ),
 // Reconsider a generalised class for @print/@print_ret?
 /* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print(2,' + text + ')'; }, { printer: 1 } ),
 /* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print(2,' + text + ');e.print(1,13);return 1'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
+/* save (v3) */
+/* restore (v3) */
 /* restart */ 183: opcode_builder( Stopper, function() { return 'e.act(183)'; } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( new Variable( this.e, 0 ) ); } } ),
-/* catch */ 185: opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
+185: version === 3 ?
+	/* pop (v3) */ 0 : // TODO :
+	/* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act(186)'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
+/* show_status (v3) */
 /* verify */ 189: alwaysbranch, // Actually check??
 /* piracy */ 191: alwaysbranch,
 /* call_vs */ 224: CallerStorer,
@@ -173,7 +184,7 @@ module.exports = {
 /* sound_effect */ 245: Opcode, // We don't support sounds
 /* read_char */ 246: opcode_builder( Pauser, function() { return 'e.read_char(' + ( this.args() || '1' ) + ',' + this.storer.v + ')'; } ),
 /* scan_table */ 247: opcode_builder( BrancherStorer, function() { return 'e.scan_table(' + this.args() + ')'; } ),
-/* not */ 248: opcode_builder( Storer, function( a ) { return 'e.S2U(~' + a + ')'; } ),
+/* not (v5/8) */ 248: not,
 /* call_vn */ 249: Caller,
 /* call_vn2 */ 250: Caller,
 /* tokenise */ 251: opcode_builder( Opcode, function() { return 'e.tokenise(' + this.args() + ')'; } ),
@@ -196,5 +207,7 @@ module.exports = {
 /* sound_data */ 1014: Opcode.subClass( { brancher: 1 } ), // We don't support sounds (but disassemble the branch address)
 /* gestalt */ 1030: opcode_builder( Storer, function() { return 'e.gestalt(' + this.args() + ')'; } ),
 /* parchment */ //1031: opcode_builder( Storer, function() { return 'e.op_parchment(' + this.args() + ')'; } ),
+
+};
 
 };

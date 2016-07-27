@@ -445,7 +445,7 @@ module.exports = {
 		// Try to find the property
 		addr = this.find_prop( object, property );
 
-		( memory.getUint8( addr - 1 ) & 0x40 ? memory.setUint16 : memory.setUint8 )( addr, value );
+		memory[ memory.getUint8( addr - 1 ) & 0x40 ? 'setUint16' : 'setUint8' ]( addr, value );
 	},
 
 	random: function( range )
@@ -560,12 +560,12 @@ module.exports = {
 		var memory = utils.MemoryView( this.data ),
 
 		version = memory.getUint8( 0x00 ),
-		addr_multipler = version === 5 ? 4 : 8,
+		addr_multipler = version === 3 ? 2 : ( version === 5 ? 4 : 8 ),
 		property_defaults = memory.getUint16( 0x0A ),
 		extension = memory.getUint16( 0x36 );
 
 		// Check if the version is supported
-		if ( version !== 5 && version !== 8 )
+		if ( version !== 3 && version !== 5 && version !== 8 )
 		{
 			throw new Error( 'Unsupported Z-Machine version: ' + version );
 		}
@@ -602,6 +602,9 @@ module.exports = {
 
 			// Routine and string multiplier
 			addr_multipler: addr_multipler,
+
+			// Opcodes for this version of the Z-Machine
+			opcodes: require( './opcodes.js' )( version ),
 
 		});
 
