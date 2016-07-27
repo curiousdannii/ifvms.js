@@ -90,15 +90,8 @@ api = {
 		// Load the story file
 		if ( code === 'load' )
 		{
-			// Check if we were passed an buffer
-			if ( data.data.buffer )
-			{
-				this.data = data.data.buffer;
-			}
-			else
-			{
-				this.data = data.data;
-			}
+			// Convert the data we are given to a Uint8Array
+			this.data = new Uint8Array( data.data );
 			return;
 		}
 

@@ -445,7 +445,7 @@ module.exports = {
 		// Try to find the property
 		addr = this.find_prop( object, property );
 
-		( memory.getUint8( addr - 1 ) & 0x40 ? memory.setUint16 : memory.setUint8 )( addr, value );
+		memory[ memory.getUint8( addr - 1 ) & 0x40 ? 'setUint16' : 'setUint8' ]( addr, value );
 	},
 
 	random: function( range )
@@ -557,7 +557,7 @@ module.exports = {
 	restart: function()
 	{
 		// Set up the memory
-		var memory = utils.MemoryView( this.data ),
+		var memory = utils.MemoryView( this.data.slice().buffer ),
 
 		version = memory.getUint8( 0x00 ),
 		addr_multipler = version === 5 ? 4 : 8,
