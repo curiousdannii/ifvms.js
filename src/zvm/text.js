@@ -23,7 +23,7 @@ module.exports = {
 		var self = this,
 		memory = this.m,
 
-		alphabet_addr = memory.getUint16( 0x34 ),
+		alphabet_addr = this.version > 3 && memory.getUint16( 0x34 ),
 		unicode_addr = this.extension_table( 3 ),
 		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
 
@@ -219,13 +219,14 @@ module.exports = {
 	{
 		var alphabets = this.alphabets,
 		zchars = [],
+		word_len = this.version === 3 ? 6 : 9,
 		i = 0,
 		achar,
 		temp,
 		result = [];
 
 		// Encode the Z-chars
-		while ( zchars.length < 9 )
+		while ( zchars.length < word_len )
 		{
 			achar = zscii[i++];
 			// Space
@@ -257,15 +258,15 @@ module.exports = {
 				zchars.push( 5 );
 			}
 		}
-		zchars.length = 9;
+		zchars.length = word_len;
 
 		// Encode to bytes
 		i = 0;
-		while ( i < 9 )
+		while ( i < word_len )
 		{
 			result.push( zchars[i++] << 2 | zchars[i] >> 3, ( zchars[i++] & 0x07 ) << 5 | zchars[i++] );
 		}
-		result[4] |= 0x80;
+		result[ result.length - 2 ] |= 0x80;
 		return result;
 	},
 

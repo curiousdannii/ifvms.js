@@ -29,10 +29,9 @@ Caller = AST.Caller,
 CallerStorer = AST.CallerStorer,
 opcode_builder = AST.opcode_builder,
 
-// Common functions
+// Common functions, variables and opcodes
 simple_func = function( a ) { return '' + a; },
-
-// Common opcodes
+stack_var = new Variable( this.e, 0 ),
 alwaysbranch = opcode_builder( Brancher, function() { return 1; } ),
 not = opcode_builder( Storer, function( a ) { return 'e.S2U(~' + a + ')'; } ),
 
@@ -63,7 +62,7 @@ Indirect = Storer.subClass({
 		// @pull needs an added stack. If for some reason it was compiled with two operands this will break!
 		if ( operands.length === 0 )
 		{
-			operands.push( new Variable( this.e, 0 ) );
+			operands.push( stack_var );
 		}
 	},
 
@@ -84,6 +83,16 @@ Incdec = Opcode.subClass({
 		}
 
 		return ( varnum < 0 ? 'e.s[e.s.length-1]=e.S2U(e.s[e.s.length-1]+' : ( 'e.l[' + varnum + ']=e.S2U(e.l[' + varnum + ']+' ) ) + operator + ')';
+	},
+}),
+
+// Version 3 @save/restore branch instead of store
+V3SaveRestore = Stopper.subClass({
+	brancher: 1,
+
+	toString: function()
+	{
+		return 'e.' + ( this.code === 181 ? 'save' : 'restore' ) + '(' + ( this.pc + 1 ) + ')';
 	},
 });
 
@@ -148,16 +157,16 @@ return {
 /* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print(2,' + text + ')'; }, { printer: 1 } ),
 /* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print(2,' + text + ');e.print(1,13);return 1'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
-/* save (v3) */
-/* restore (v3) */
+/* save (v3) */ 181: V3SaveRestore,
+/* restore (v3) */ 182: V3SaveRestore,
 /* restart */ 183: opcode_builder( Stopper, function() { return 'e.act(183)'; } ),
-/* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( new Variable( this.e, 0 ) ); } } ),
+/* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( stack_var ); } } ),
 185: version === 3 ?
-	/* pop (v3) */ 0 : // TODO :
+	/* pop (v3) */ opcode_builder( Opcode, function() { return 's.pop()'; } ) :
 	/* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act(186)'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
-/* show_status (v3) */
+/* show_status (v3) */ // TODO
 /* verify */ 189: alwaysbranch, // Actually check??
 /* piracy */ 191: alwaysbranch,
 /* call_vs */ 224: CallerStorer,
@@ -168,7 +177,7 @@ return {
 /* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(4,' + a + ')'; } ),
 /* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.print(0,' + a.U2S() + ')'; } ),
 /* random */ 231: opcode_builder( Storer, function( a ) { return 'e.random(' + a.U2S() + ')'; } ),
-/* push */ 232: opcode_builder( Storer, simple_func, { post: function() { this.storer = new Variable( this.e, 0 ); }, storer: 0 } ),
+/* push */ 232: opcode_builder( Storer, simple_func, { post: function() { this.storer = stack_var; }, storer: 0 } ),
 /* pull */ 233: Indirect,
 /* split_window */ 234: opcode_builder( Opcode, function( lines ) { return 'e.ui.split_window(' + lines + ')'; } ),
 /* set_window */ 235: opcode_builder( Opcode, function( wind ) { return 'e.ui.set_window(' + wind + ')'; } ),
@@ -192,8 +201,8 @@ return {
 /* copy_table */ 253: opcode_builder( Opcode, function() { return 'e.copy_table(' + this.args() + ')'; } ),
 /* print_table */ 254: opcode_builder( Opcode, function() { return 'e.print_table(' + this.args() + ')'; } ),
 /* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return arg + '<=e.call_stack[0][4]'; } ),
-/* save */ 1000: opcode_builder( Pauser, function() { return 'e.save(' + ( this.next - 1 ) + ',' + this.storer.v + ')'; } ),
-/* restore */ 1001: opcode_builder( Pauser, function() { return 'e.act(1001,' + this.storer.v + ')'; } ),
+/* save */ 1000: opcode_builder( Pauser, function() { return 'e.save(' + ( this.next - 1 ) + ')'; } ),
+/* restore */ 1001: opcode_builder( Pauser, function() { return 'e.restore(' + ( this.next - 1 ) + ')'; } ),
 /* log_shift */ 1002: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.log_shift(' + a + ',' + b.U2S() + '))'; } ),
 /* art_shift */ 1003: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.art_shift(' + a.U2S() + ',' + b.U2S() + '))'; } ),
 /* set_font */ 1004: opcode_builder( Storer, function( font ) { return 'e.ui.set_font(' + font + ')'; } ),

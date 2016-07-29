@@ -615,13 +615,20 @@ module.exports = {
 		this.update_header();
 	},
 
-	restore: function( data )
+	// Request a restore
+	restore: function( pc )
 	{
-		var quetzal = new file.Quetzal( data ),
+		this.save_restore_pc = pc;
+		this.act( 'restore' );
+	},
+
+	restore_file: function( data )
+	{
+		var memory = this.m,
+		quetzal = new file.Quetzal( data ),
 		qmem = quetzal.memory,
 		qstacks = quetzal.stacks,
-		pc = quetzal.pc,
-		flags2 = this.m.getUint8( 0x11 ),
+		flags2 = memory.getUint8( 0x11 ),
 		temp,
 		i = 0, j = 0,
 		call_stack = [],
@@ -629,7 +636,7 @@ module.exports = {
 		newstack;
 
 		// Memory chunk
-		this.m.setBuffer8( 0, this.data.slice( 0, this.staticmem ) );
+		memory.setBuffer8( 0, this.data.slice( 0, this.staticmem ) );
 		if ( quetzal.compressed )
 		{
 			while ( i < qmem.length )
@@ -642,16 +649,16 @@ module.exports = {
 				}
 				else
 				{
-					this.m.setUint8( j, temp ^ this.data[j++] );
+					memory.setUint8( j, temp ^ this.data[j++] );
 				}
 			}
 		}
 		else
 		{
-			this.m.setBuffer8( 0, qmem );
+			memory.setBuffer8( 0, qmem );
 		}
 		// Preserve flags 1
-		this.m.setUint8( 0x11, flags2 );
+		memory.setUint8( 0x11, flags2 );
 
 		// Stacks chunk
 		i = 6;
@@ -689,9 +696,9 @@ module.exports = {
 		// Update the header
 		this.update_header();
 
-		// Set the storer
-		this.variable( this.m.getUint8( pc++ ), 2 );
-		this.pc = pc;
+		// Store or branch with the successful result
+		this.save_restore_pc = quetzal.pc;
+		this.save_restore_result( 2 );
 	},
 
 	restore_undo: function()
@@ -731,8 +738,8 @@ module.exports = {
 		}
 	},
 
-	// pc must be the address of the storer operand
-	save: function( pc, storer )
+	// pc is the address of the storer operand (or branch in v3)
+	save: function( pc )
 	{
 		var memory = this.m,
 		stack = this.s,
@@ -810,11 +817,53 @@ module.exports = {
 		call_stack.reverse();
 		quetzal.stacks = stacks;
 
+		// Set up the callback function
+		this.save_restore_pc = pc;
+
 		// Send the event
 		this.act( 'save', {
 			data: quetzal.write(),
-			storer: storer,
 		} );
+	},
+
+	save_restore_result: function( success )
+	{
+		var memory = this.m,
+		pc = this.save_restore_pc,
+		temp, iftrue, offset;
+
+		if ( this.version === 3 )
+		{
+			// Calculate the branch
+			temp = memory.getUint8( pc++ );
+			iftrue = temp & 0x80;
+			offset = temp & 0x40 ?
+				// single byte address
+				temp & 0x3F :
+				// word address, but first get the second byte of it
+				( temp << 8 | memory.getUint8( pc++ ) ) << 18 >> 18;
+
+			if ( !success === !iftrue )
+			{
+				if ( offset === 0 || offset === 1 )
+				{
+					this.ret( offset );
+				}
+				else
+				{
+					this.pc = offset + pc - 2;
+				}
+			}
+			else
+			{
+				this.pc = pc;
+			}
+		}
+		else
+		{
+			this.variable( memory.getUint8( pc++ ), success );
+			this.pc = pc;
+		}
 	},
 
 	save_undo: function( pc, variable )
@@ -887,6 +936,14 @@ module.exports = {
 
 		// Reset the Xorshift seed
 		this.xorshift_seed = 0;
+
+		// For version 3 we only set Flags 1
+		if ( this.version === 3 )
+		{
+			// Flags 1: Set bits 5, 6
+			// TODO: Can we tell from env if the font is fixed pitch?
+			return memory.setUint8( 0x01, memory.getUint8( 0x01 ) | 0x60 );
+		}
 
 		// Flags 1: Set bits 0, 2, 3, 4: typographic styles are OK
 		// Set bit 7 only if timed input is supported

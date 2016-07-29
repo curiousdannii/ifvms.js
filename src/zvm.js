@@ -113,7 +113,7 @@ api = {
 		if ( code === 'save' )
 		{
 			// Set the result variable, assume success
-			this.variable( data.storer, data.result || 1 );
+			this.save_restore_result( data.result || 1 );
 		}
 
 		if ( code === 'restore' )
@@ -127,12 +127,12 @@ api = {
 			// Successful restore
 			if ( data.data )
 			{
-				this.restore( data.data );
+				this.restore_file( data.data );
 			}
 			// Failed restore
 			else
 			{
-				this.variable( data.storer, 0 );
+				this.save_restore_result( 0 );
 			}
 		}
 
@@ -273,11 +273,6 @@ api = {
 		if ( code === 186 )
 		{
 			code = 'quit';
-		}
-		if ( code === 1001 )
-		{
-			code = 'restore';
-			options = { storer: options };
 		}
 
 		// Flush the buffer
