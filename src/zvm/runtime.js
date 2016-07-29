@@ -256,6 +256,52 @@ module.exports = {
 		return value & 0x40 ? 2 : 1;
 	},
 
+	// Handle line input
+	handle_input: function( data )
+	{
+		var memory = this.m,
+		options = this.read_data,
+
+		// Echo the response (7.1.1.1)
+		response = data.response;
+		this._print( response + '\r' );
+
+		// Convert the response to lower case and then to ZSCII
+		response = this.text_to_zscii( response.toLowerCase() );
+
+		// Check if the response is too long, and then set its length
+		if ( response.length > options.len )
+		{
+			response = response.slice( 0, options.len );
+		}
+
+		if ( this.version === 3 )
+		{
+			// Append zero terminator
+			response.push( 0 );
+
+			// Store the response in the buffer
+			memory.setBuffer8( options.buffer + 1, response );
+		}
+		else
+		{
+			// Store the response length
+			memory.setUint8( options.buffer + 1, response.length );
+
+			// Store the response in the buffer
+			memory.setBuffer8( options.buffer + 2, response );
+
+			// Store the terminator
+			this.variable( options.storer, isNaN( data.terminator ) ? 13 : data.terminator );
+		}
+
+		if ( options.parse )
+		{
+			// Tokenise the response
+			this.tokenise( options.buffer, options.parse );
+		}
+	},
+
 	// Quick hack for @inc/@dec/@inc_chk/@dec_chk
 	incdec: function( varnum, change )
 	{
@@ -476,42 +522,49 @@ module.exports = {
 	},
 
 	// Request line input
-	read: function( text, parse, time, routine, storer )
+	read: function( storer, text, parse, time, routine )
 	{
-		// Check if not all operands were used
-		if ( arguments.length === 3 )
+		var len = this.m.getUint8( text ),
+		options;
+
+		if ( this.version === 3 )
 		{
-			storer = time;
-			time = routine = 0;
+			len--;
+			options = {
+				len: len,
+			};
+			// TODO: status line
+		}
+		else
+		{
+			options = {
+				len: len,
+				initiallen: this.m.getUint8( text + 1 ),
+				time: time,
+			};
 		}
 
-		// Add the order
-		this.act( 'read', {
+		this.read_data = {
 			buffer: text, // text-buffer
+			len: len,
 			parse: parse, // parse-buffer
-			len: this.m.getUint8( text ),
-			initiallen: this.m.getUint8( text + 1 ),
-			time: time,
 			routine: routine,
 			storer: storer,
-		});
+		};
+
+		this.act( 'read', options );
 	},
 
 	// Request character input
-	read_char: function( one, time, routine, storer )
+	read_char: function( storer, one, time, routine )
 	{
-		// Check if not all operands were used
-		if ( arguments.length === 2 )
-		{
-			storer = time;
-			time = routine = 0;
-		}
-
-		// Add the order
-		this.act( 'char', {
-			time: time,
+		this.read_data = {
 			routine: routine,
 			storer: storer,
+		};
+
+		this.act( 'char', {
+			time: time,
 		});
 	},
 

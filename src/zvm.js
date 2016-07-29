@@ -62,8 +62,7 @@ api = {
 	inputEvent: function( data )
 	{
 		var memory = this.m,
-		code = data.code,
-		response;
+		code = data.code;
 
 		// Update environment variables
 		if ( data.env )
@@ -139,37 +138,13 @@ api = {
 		// Handle line input
 		if ( code === 'read' )
 		{
-			// Store the terminating character, or 13 if not provided
-			this.variable( data.storer, isNaN( data.terminator ) ? 13 : data.terminator );
-
-			// Echo the response (7.1.1.1)
-			response = data.response;
-			this._print( response + '\r' );
-
-			// Convert the response to lower case and then to ZSCII
-			response = this.text_to_zscii( response.toLowerCase() );
-
-			// Check if the response is too long, and then set its length
-			if ( response.length > data.len )
-			{
-				response = response.slice( 0, data.len );
-			}
-			memory.setUint8( data.buffer + 1, response.length );
-
-			// Store the response in the buffer
-			memory.setBuffer8( data.buffer + 2, response );
-
-			if ( data.parse )
-			{
-				// Tokenise the response
-				this.tokenise( data.buffer, data.parse );
-			}
+			this.handle_input( data );
 		}
 
 		// Handle character input
 		if ( code === 'char' )
 		{
-			this.variable( data.storer, this.keyinput( data.response ) );
+			this.variable( this.read_data.storer, this.keyinput( data.response ) );
 		}
 
 		// Write the status window's cursor position
