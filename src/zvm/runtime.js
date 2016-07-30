@@ -178,10 +178,10 @@ module.exports = {
 			// Go to next property
 			last_property = this_property;
 
-			// Second size byte
+			// Calculate the size of this property and skip to the next
 			if ( version3 )
 			{
-				properties += ( this_property_byte >> 5 ) + 1;
+				properties += ( this_property_byte >> 5 ) + 2;
 			}
 			else
 			{
@@ -535,10 +535,15 @@ module.exports = {
 
 		// Try to find the property
 		addr = this.find_prop( object, property ),
-		len = memory.getUint8( addr - 1 );
+		len;
 
-		// Assume we're being called for a valid short property
-		memory[ ( this.version3 ? len >> 5 : len & 0x40 ) ? 'setUint16' : 'setUint8' ]( addr, value );
+		if ( addr )
+		{
+			len = memory.getUint8( addr - 1 );
+
+			// Assume we're being called for a valid short property
+			memory[ ( this.version3 ? len >> 5 : len & 0x40 ) ? 'setUint16' : 'setUint8' ]( addr, value );
+		}
 	},
 
 	random: function( range )
@@ -1013,35 +1018,37 @@ module.exports = {
 
 	set_family: function( obj, newparent, parent, child, bigsis, lilsis )
 	{
-		var objects = this.objects;
+		var memory = this.m,
+		objects = this.objects;
+
 		if ( this.version3 )
 		{
 			// Set the new parent of the obj
-			this.m.setUint8( objects + 9 * obj + 4, newparent );
+			memory.setUint8( objects + 9 * obj + 4, newparent );
 			// Update the parent's first child if needed
 			if ( parent )
 			{
-				this.m.setUint8( objects + 9 * parent + 6, child );
+				memory.setUint8( objects + 9 * parent + 6, child );
 			}
 			// Update the little sister of a big sister
 			if ( bigsis )
 			{
-				this.m.setUint8( objects + 9 * bigsis + 5, lilsis );
+				memory.setUint8( objects + 9 * bigsis + 5, lilsis );
 			}
 		}
 		else
 		{
 			// Set the new parent of the obj
-			this.m.setUint16( objects + 14 * obj + 6, newparent );
+			memory.setUint16( objects + 14 * obj + 6, newparent );
 			// Update the parent's first child if needed
 			if ( parent )
 			{
-				this.m.setUint16( objects + 14 * parent + 10, child );
+				memory.setUint16( objects + 14 * parent + 10, child );
 			}
 			// Update the little sister of a big sister
 			if ( bigsis )
 			{
-				this.m.setUint16( objects + 14 * bigsis + 8, lilsis );
+				memory.setUint16( objects + 14 * bigsis + 8, lilsis );
 			}
 		}
 	},

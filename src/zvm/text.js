@@ -355,7 +355,7 @@ module.exports = {
 		addr += 2;
 		while ( addr < endaddr )
 		{
-			dict[Array.prototype.toString.call(memory.getBuffer8( addr, 6 ))] = addr;
+			dict[ Array.prototype.toString.call( memory.getBuffer8( addr, this.version3 ? 4 : 6 ) ) ] = addr;
 			addr += entry_len;
 		}
 		this.dictionaries[addr_start] = dict;
@@ -379,56 +379,61 @@ module.exports = {
 		dictionary = this.dictionaries[dictionary] || this.parse_dict( dictionary );
 
 		var memory = this.m,
-
-		i = 2,
-		textend = i + memory.getUint8( text + 1 ),
+		bufferlength = 1e3,
+		i = 1,
 		letter,
 		separators = dictionary.separators,
-		word = [],
+		word,
 		words = [],
-		wordstart = i,
 		max_words,
+		dictword,
 		wordcount = 0;
 
-		// Find the words, separated by the separators, but as well as the separators themselves
-		while ( i < textend )
+		// In versions 5 and 8 we can get the actual buffer length
+		if ( !this.version3 )
 		{
-			letter = memory.getUint8( text + i++ );
-			if ( letter === 32 || separators.indexOf( letter ) >= 0 )
+			bufferlength = memory.getUint8( text + i++ ) + 2;
+		}
+
+		// Find the words, separated by the separators, but as well as the separators themselves
+		while ( i < bufferlength )
+		{
+			letter = memory.getUint8( text + i );
+			if ( letter === 0 )
 			{
-				if ( word.length )
-				{
-					words.push( [word, wordstart] );
-					wordstart += word.length;
-					word = [];
-				}
+				break;
+			}
+			else if ( letter === 32 || separators.indexOf( letter ) >= 0 )
+			{
 				if ( letter !== 32 )
 				{
-					words.push( [[letter], wordstart] );
+					words.push( [ [letter], i ] );
 				}
-				wordstart++;
+				word = null;
 			}
 			else
 			{
+				if ( !word )
+				{
+					words.push( [ [], i ] );
+					word = words[ words.length - 1 ][0];
+				}
 				word.push( letter );
 			}
-		}
-		if ( word.length )
-		{
-			words.push( [word, wordstart] );
+			i++;
 		}
 
 		// Go through the text until we either have reached the max number of words, or we're out of words
 		max_words = Math.min( words.length, memory.getUint8( buffer ) );
 		while ( wordcount < max_words )
 		{
-			word = dictionary['' + this.encode( words[wordcount][0] )];
+			dictword = dictionary['' + this.encode( words[wordcount][0] )];
 
 			// If the flag is set then don't overwrite words which weren't found
-			if ( !flag || word )
+			if ( !flag || dictword )
 			{
 				// Fill out the buffer
-				memory.setUint16( buffer + 2 + wordcount * 4, word || 0 );
+				memory.setUint16( buffer + 2 + wordcount * 4, dictword || 0 );
 				memory.setUint8( buffer + 4 + wordcount * 4, words[wordcount][0].length );
 				memory.setUint8( buffer + 5 + wordcount * 4, words[wordcount][1] );
 			}
