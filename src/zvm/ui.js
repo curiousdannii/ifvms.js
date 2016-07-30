@@ -426,11 +426,14 @@ module.exports = Class.subClass({
 	v3_status: function()
 	{
 		var engine = this.e,
+		width = engine.env.width,
 		hours_score = engine.m.getUint16( engine.globals + 2 ),
 		mins_turns = engine.m.getUint16( engine.globals + 4 ),
 		rhs;
 		this.set_window( 1 );
-		this.erase_line( 1 );
+		this.set_style( 1 );
+		engine._print( Array( width + 1 ).join( ' ' ) );
+		this.set_cursor( 1, 1 );
 
 		// Handle the turns/score or time
 		if ( this.time )
@@ -439,15 +442,17 @@ module.exports = Class.subClass({
 		}
 		else
 		{
-			rhs = 'Score: ' + hours_score + ' Turns: ' + mins_turns;
+			rhs = 'Score: ' + hours_score + '  Turns: ' + mins_turns;
 		}
 
 		engine.print( 3, engine.m.getUint16( engine.globals ) );
 		// this.buffer now has the room name, so ensure it is not too long
-		this.buffer = ' ' + this.buffer.slice( 0, engine.env.width - rhs.length - 4 );
+		this.buffer = ' ' + this.buffer.slice( 0, width - rhs.length - 4 );
 
-		this.set_cursor( 1, engine.env.width - rhs.length );
+		this.set_cursor( 1, width - rhs.length );
 		engine._print( rhs );
+		this.set_style( 0 );
+		this.set_window( 0 );
 	},
 
 	// Formatters allow you to change how styles are marked

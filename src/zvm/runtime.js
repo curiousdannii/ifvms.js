@@ -322,8 +322,6 @@ module.exports = {
 
 		if ( this.version3 )
 		{
-			this.ui.v3_status();
-
 			// Append zero terminator
 			response.push( 0 );
 
@@ -582,7 +580,7 @@ module.exports = {
 			options = {
 				len: len,
 			};
-			// TODO: status line
+			this.ui.v3_status();
 		}
 		else
 		{
