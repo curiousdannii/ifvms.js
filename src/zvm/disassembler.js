@@ -19,13 +19,13 @@ TODO:
 
 */
 
-var AST = require( '../common/ast.js' ),
-opcodes = require( './opcodes.js' );
+var AST = require( '../common/ast.js' );
 
 module.exports.disassemble = function()
 {
 	var pc, offset, // Set in the loop below
 	memory = this.m,
+	opcodes = this.opcodes,
 	temp,
 	code,
 	opcode_class,

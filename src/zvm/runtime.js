@@ -64,8 +64,14 @@ module.exports = {
 		// Add any extras
 		for ( i = args.length; i < locals_count; i++ )
 		{
-			args.push(0);
+			// Use provided arguments in version 3, or 0 in later versions
+			args.push( this.version3 ? this.m.getUint16( this.pc + i * 2 ) : 0 );
 		}
+		if ( this.version3 )
+		{
+			this.pc += locals_count * 2;
+		}
+
 		// Prepend to the locals array
 		this.l = args.concat( this.l );
 
@@ -75,7 +81,7 @@ module.exports = {
 
 	clear_attr: function( object, attribute )
 	{
-		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
+		var addr = this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
 	},
 
@@ -135,30 +141,33 @@ module.exports = {
 	find_prop: function( object, property, prev )
 	{
 		var memory = this.m,
+		version3 = this.version3,
 
 		this_property_byte, this_property,
 		last_property = 0,
 
 		// Get this property table
-		properties = memory.getUint16( this.objects + 14 * object + 12 );
+		properties = memory.getUint16( this.objects + ( version3 ? 9 : 14 ) * object + ( version3 ? 7 : 12 ) );
+
+		// Skip over the object's short name
 		properties += memory.getUint8( properties ) * 2 + 1;
 
 		// Run through the properties
 		while ( 1 )
 		{
 			this_property_byte = memory.getUint8( properties );
-			this_property = this_property_byte & 0x3F;
+			this_property = this_property_byte & ( version3 ? 0x1F : 0x3F );
 
 			// Found the previous property, so return this one's number
 			if ( last_property === prev )
 			{
 				return this_property;
 			}
-			// Found the property! Return it's address
+			// Found the property! Return its address
 			if ( this_property === property )
 			{
 				// Must include the offset
-				return properties + ( this_property_byte & 0x80 ? 2 : 1 );
+				return properties + ( !version3 && this_property_byte & 0x80 ? 2 : 1 );
 			}
 			// Gone past the property
 			if ( this_property < property )
@@ -170,14 +179,21 @@ module.exports = {
 			last_property = this_property;
 
 			// Second size byte
-			if ( this_property_byte & 0x80 )
+			if ( version3 )
 			{
-				this_property = memory.getUint8( properties + 1 ) & 0x3F;
-				properties += this_property ? this_property + 2 : 66;
+				properties += ( this_property_byte >> 5 ) + 1;
 			}
 			else
 			{
-				properties += this_property_byte & 0x40 ? 3 : 2;
+				if ( this_property_byte & 0x80 )
+				{
+					this_property = memory.getUint8( properties + 1 ) & 0x3F;
+					properties += this_property ? this_property + 2 : 66;
+				}
+				else
+				{
+					properties += this_property_byte & 0x40 ? 3 : 2;
+				}
 			}
 		}
 	},
@@ -202,17 +218,38 @@ module.exports = {
 	// Get the first child of an object
 	get_child: function( obj )
 	{
-		return this.m.getUint16( this.objects + 14 * obj + 10 );
+		if ( this.version3 )
+		{
+			return this.m.getUint8( this.objects + 9 * obj + 6 );
+		}
+		else
+		{
+			return this.m.getUint16( this.objects + 14 * obj + 10 );
+		}
 	},
 
 	get_sibling: function( obj )
 	{
-		return this.m.getUint16( this.objects + 14 * obj + 8 );
+		if ( this.version3 )
+		{
+			return this.m.getUint8( this.objects + 9 * obj + 5 );
+		}
+		else
+		{
+			return this.m.getUint16( this.objects + 14 * obj + 8 );
+		}
 	},
 
 	get_parent: function( obj )
 	{
-		return this.m.getUint16( this.objects + 14 * obj + 6 );
+		if ( this.version3 )
+		{
+			return this.m.getUint8( this.objects + 9 * obj + 4 );
+		}
+		else
+		{
+			return this.m.getUint16( this.objects + 14 * obj + 6 );
+		}
 	},
 
 	get_prop: function( object, property )
@@ -220,13 +257,15 @@ module.exports = {
 		var memory = this.m,
 
 		// Try to find the property
-		addr = this.find_prop( object, property );
+		addr = this.find_prop( object, property ),
+		len;
 
 		// If we have the property
 		if ( addr )
 		{
+			len = memory.getUint8( addr - 1 );
 			// Assume we're being called for a valid short property
-			return memory[ memory.getUint8( addr - 1 ) & 0x40 ? 'getUint16' : 'getUint8' ]( addr );
+			return memory[ ( this.version3 ? len >> 5 : len & 0x40 ) ? 'getUint16' : 'getUint8' ]( addr );
 		}
 
 		// Use the default properties table
@@ -246,6 +285,12 @@ module.exports = {
 
 		var value = this.m.getUint8( addr - 1 );
 
+		// Version 3
+		if ( this.version3 )
+		{
+			return ( value >> 5 ) + 1;
+		}
+
 		// Two size/number bytes
 		if ( value & 0x80 )
 		{
@@ -254,6 +299,54 @@ module.exports = {
 		}
 		// One byte size/number
 		return value & 0x40 ? 2 : 1;
+	},
+
+	// Handle line input
+	handle_input: function( data )
+	{
+		var memory = this.m,
+		options = this.read_data,
+
+		// Echo the response (7.1.1.1)
+		response = data.response;
+		this._print( response + '\r' );
+
+		// Convert the response to lower case and then to ZSCII
+		response = this.text_to_zscii( response.toLowerCase() );
+
+		// Check if the response is too long, and then set its length
+		if ( response.length > options.len )
+		{
+			response = response.slice( 0, options.len );
+		}
+
+		if ( this.version3 )
+		{
+			this.ui.v3_status();
+
+			// Append zero terminator
+			response.push( 0 );
+
+			// Store the response in the buffer
+			memory.setBuffer8( options.buffer + 1, response );
+		}
+		else
+		{
+			// Store the response length
+			memory.setUint8( options.buffer + 1, response.length );
+
+			// Store the response in the buffer
+			memory.setBuffer8( options.buffer + 2, response );
+
+			// Store the terminator
+			this.variable( options.storer, isNaN( data.terminator ) ? 13 : data.terminator );
+		}
+
+		if ( options.parse )
+		{
+			// Tokenise the response
+			this.tokenise( options.buffer, options.parse );
+		}
 	},
 
 	// Quick hack for @inc/@dec/@inc_chk/@dec_chk
@@ -411,7 +504,7 @@ module.exports = {
 		// Object
 		if ( type === 3 )
 		{
-			var proptable = this.m.getUint16( this.objects + 14 * val + 12 );
+			var proptable = this.m.getUint16( this.objects + ( this.version3 ? 9 : 14 ) * val + ( this.version3 ? 7 : 12 ) );
 			val = this.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
 		}
 		// ZSCII
@@ -443,9 +536,11 @@ module.exports = {
 		var memory = this.m,
 
 		// Try to find the property
-		addr = this.find_prop( object, property );
+		addr = this.find_prop( object, property ),
+		len = memory.getUint8( addr - 1 );
 
-		memory[ memory.getUint8( addr - 1 ) & 0x40 ? 'setUint16' : 'setUint8' ]( addr, value );
+		// Assume we're being called for a valid short property
+		memory[ ( this.version3 ? len >> 5 : len & 0x40 ) ? 'setUint16' : 'setUint8' ]( addr, value );
 	},
 
 	random: function( range )
@@ -476,42 +571,49 @@ module.exports = {
 	},
 
 	// Request line input
-	read: function( text, parse, time, routine, storer )
+	read: function( storer, text, parse, time, routine )
 	{
-		// Check if not all operands were used
-		if ( arguments.length === 3 )
+		var len = this.m.getUint8( text ),
+		options;
+
+		if ( this.version3 )
 		{
-			storer = time;
-			time = routine = 0;
+			len--;
+			options = {
+				len: len,
+			};
+			// TODO: status line
+		}
+		else
+		{
+			options = {
+				len: len,
+				initiallen: this.m.getUint8( text + 1 ),
+				time: time,
+			};
 		}
 
-		// Add the order
-		this.act( 'read', {
+		this.read_data = {
 			buffer: text, // text-buffer
+			len: len,
 			parse: parse, // parse-buffer
-			len: this.m.getUint8( text ),
-			initiallen: this.m.getUint8( text + 1 ),
-			time: time,
 			routine: routine,
 			storer: storer,
-		});
+		};
+
+		this.act( 'read', options );
 	},
 
 	// Request character input
-	read_char: function( one, time, routine, storer )
+	read_char: function( storer, one, time, routine )
 	{
-		// Check if not all operands were used
-		if ( arguments.length === 2 )
-		{
-			storer = time;
-			time = routine = 0;
-		}
-
-		// Add the order
-		this.act( 'char', {
-			time: time,
+		this.read_data = {
 			routine: routine,
 			storer: storer,
+		};
+
+		this.act( 'char', {
+			time: time,
 		});
 	},
 
@@ -560,12 +662,13 @@ module.exports = {
 		var memory = utils.MemoryView( this.data.slice().buffer ),
 
 		version = memory.getUint8( 0x00 ),
-		addr_multipler = version === 5 ? 4 : 8,
+		version3 = version === 3,
+		addr_multipler = version3 ? 2 : ( version === 5 ? 4 : 8 ),
 		property_defaults = memory.getUint16( 0x0A ),
 		extension = memory.getUint16( 0x36 );
 
 		// Check if the version is supported
-		if ( version !== 5 && version !== 8 )
+		if ( version !== 3 && version !== 5 && version !== 8 )
 		{
 			throw new Error( 'Unsupported Z-Machine version: ' + version );
 		}
@@ -591,9 +694,10 @@ module.exports = {
 
 			// Get some header variables
 			version: version,
+			version3: version === 3,
 			pc: memory.getUint16( 0x06 ),
 			properties: property_defaults,
-			objects: property_defaults + 112, // 126-14 - if we take this now then we won't need to always decrement the object number
+			objects: property_defaults + ( version3 ? 53 : 112 ), // 62-9 or 126-14 - if we take this now then we won't need to always decrement the object number
 			globals: memory.getUint16( 0x0C ),
 			staticmem: memory.getUint16( 0x0E ),
 			eof: ( memory.getUint16( 0x1A ) || 65536 ) * addr_multipler,
@@ -603,22 +707,32 @@ module.exports = {
 			// Routine and string multiplier
 			addr_multipler: addr_multipler,
 
+			// Opcodes for this version of the Z-Machine
+			opcodes: require( './opcodes.js' )( version3 ),
+
 		});
 
-		this.ui = new ( require( './ui.js' ) )( this, memory.getUint8( 0x11 ) & 0x02 );
+		this.ui = new ( require( './ui.js' ) )( this );
 		this.init_text();
 
 		// Update the header
 		this.update_header();
 	},
 
-	restore: function( data )
+	// Request a restore
+	restore: function( pc )
 	{
-		var quetzal = new file.Quetzal( data ),
+		this.save_restore_pc = pc;
+		this.act( 'restore' );
+	},
+
+	restore_file: function( data )
+	{
+		var memory = this.m,
+		quetzal = new file.Quetzal( data ),
 		qmem = quetzal.memory,
 		qstacks = quetzal.stacks,
-		pc = quetzal.pc,
-		flags2 = this.m.getUint8( 0x11 ),
+		flags2 = memory.getUint8( 0x11 ),
 		temp,
 		i = 0, j = 0,
 		call_stack = [],
@@ -626,7 +740,7 @@ module.exports = {
 		newstack;
 
 		// Memory chunk
-		this.m.setBuffer8( 0, this.data.slice( 0, this.staticmem ) );
+		memory.setBuffer8( 0, this.data.slice( 0, this.staticmem ) );
 		if ( quetzal.compressed )
 		{
 			while ( i < qmem.length )
@@ -639,16 +753,16 @@ module.exports = {
 				}
 				else
 				{
-					this.m.setUint8( j, temp ^ this.data[j++] );
+					memory.setUint8( j, temp ^ this.data[j++] );
 				}
 			}
 		}
 		else
 		{
-			this.m.setBuffer8( 0, qmem );
+			memory.setBuffer8( 0, qmem );
 		}
 		// Preserve flags 1
-		this.m.setUint8( 0x11, flags2 );
+		memory.setUint8( 0x11, flags2 );
 
 		// Stacks chunk
 		i = 6;
@@ -686,9 +800,15 @@ module.exports = {
 		// Update the header
 		this.update_header();
 
-		// Set the storer
-		this.variable( this.m.getUint8( pc++ ), 2 );
-		this.pc = pc;
+		// Store or branch with the successful result
+		this.save_restore_pc = quetzal.pc;
+		this.save_restore_result( 2 );
+
+		// Collapse the upper window (8.6.1.3)
+		if ( this.version3 )
+		{
+			this.ui.split_window( 0 );
+		}
 	},
 
 	restore_undo: function()
@@ -728,8 +848,8 @@ module.exports = {
 		}
 	},
 
-	// pc must be the address of the storer operand
-	save: function( pc, storer )
+	// pc is the address of the storer operand (or branch in v3)
+	save: function( pc )
 	{
 		var memory = this.m,
 		stack = this.s,
@@ -807,11 +927,53 @@ module.exports = {
 		call_stack.reverse();
 		quetzal.stacks = stacks;
 
+		// Set up the callback function
+		this.save_restore_pc = pc;
+
 		// Send the event
 		this.act( 'save', {
 			data: quetzal.write(),
-			storer: storer,
 		} );
+	},
+
+	save_restore_result: function( success )
+	{
+		var memory = this.m,
+		pc = this.save_restore_pc,
+		temp, iftrue, offset;
+
+		if ( this.version3 )
+		{
+			// Calculate the branch
+			temp = memory.getUint8( pc++ );
+			iftrue = temp & 0x80;
+			offset = temp & 0x40 ?
+				// single byte address
+				temp & 0x3F :
+				// word address, but first get the second byte of it
+				( temp << 8 | memory.getUint8( pc++ ) ) << 18 >> 18;
+
+			if ( !success === !iftrue )
+			{
+				if ( offset === 0 || offset === 1 )
+				{
+					this.ret( offset );
+				}
+				else
+				{
+					this.pc = offset + pc - 2;
+				}
+			}
+			else
+			{
+				this.pc = pc;
+			}
+		}
+		else
+		{
+			this.variable( memory.getUint8( pc++ ), success );
+			this.pc = pc;
+		}
 	},
 
 	save_undo: function( pc, variable )
@@ -847,23 +1009,42 @@ module.exports = {
 
 	set_attr: function( object, attribute )
 	{
-		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
+		var addr = this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) | 0x80 >> attribute % 8 );
 	},
 
 	set_family: function( obj, newparent, parent, child, bigsis, lilsis )
 	{
-		// Set the new parent of the obj
-		this.m.setUint16( this.objects + 14 * obj + 6, newparent );
-		// Update the a parent's first child if needed
-		if ( parent )
+		var objects = this.objects;
+		if ( this.version3 )
 		{
-			this.m.setUint16( this.objects + 14 * parent + 10, child );
+			// Set the new parent of the obj
+			this.m.setUint8( objects + 9 * obj + 4, newparent );
+			// Update the parent's first child if needed
+			if ( parent )
+			{
+				this.m.setUint8( objects + 9 * parent + 6, child );
+			}
+			// Update the little sister of a big sister
+			if ( bigsis )
+			{
+				this.m.setUint8( objects + 9 * bigsis + 5, lilsis );
+			}
 		}
-		// Update the little sister of a big sister
-		if ( bigsis )
+		else
 		{
-			this.m.setUint16( this.objects + 14 * bigsis + 8, lilsis );
+			// Set the new parent of the obj
+			this.m.setUint16( objects + 14 * obj + 6, newparent );
+			// Update the parent's first child if needed
+			if ( parent )
+			{
+				this.m.setUint16( objects + 14 * parent + 10, child );
+			}
+			// Update the little sister of a big sister
+			if ( bigsis )
+			{
+				this.m.setUint16( objects + 14 * bigsis + 8, lilsis );
+			}
 		}
 	},
 
@@ -874,7 +1055,7 @@ module.exports = {
 
 	test_attr: function( object, attribute )
 	{
-		return ( this.m.getUint8( this.objects + 14 * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
+		return ( this.m.getUint8( this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
 	},
 
 	// Update the header after restarting or restoring
@@ -884,6 +1065,14 @@ module.exports = {
 
 		// Reset the Xorshift seed
 		this.xorshift_seed = 0;
+
+		// For version 3 we only set Flags 1
+		if ( this.version3 )
+		{
+			// Flags 1: Set bits 5, 6
+			// TODO: Can we tell from env if the font is fixed pitch?
+			return memory.setUint8( 0x01, memory.getUint8( 0x01 ) | 0x60 );
+		}
 
 		// Flags 1: Set bits 0, 2, 3, 4: typographic styles are OK
 		// Set bit 7 only if timed input is supported

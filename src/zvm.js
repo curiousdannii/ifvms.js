@@ -1,6 +1,6 @@
 /*
 
-ZVM - the ifvms.js Z-Machine (versions 5 and 8)
+ZVM - the ifvms.js Z-Machine (versions 3, 5 and 8)
 ===============================================
 
 Copyright (c) 2016 The ifvms.js team
@@ -62,8 +62,7 @@ api = {
 	inputEvent: function( data )
 	{
 		var memory = this.m,
-		code = data.code,
-		response;
+		code = data.code;
 
 		// Update environment variables
 		if ( data.env )
@@ -106,7 +105,7 @@ api = {
 		if ( code === 'save' )
 		{
 			// Set the result variable, assume success
-			this.variable( data.storer, data.result || 1 );
+			this.save_restore_result( data.result || 1 );
 		}
 
 		if ( code === 'restore' )
@@ -120,49 +119,25 @@ api = {
 			// Successful restore
 			if ( data.data )
 			{
-				this.restore( data.data );
+				this.restore_file( data.data );
 			}
 			// Failed restore
 			else
 			{
-				this.variable( data.storer, 0 );
+				this.save_restore_result( 0 );
 			}
 		}
 
 		// Handle line input
 		if ( code === 'read' )
 		{
-			// Store the terminating character, or 13 if not provided
-			this.variable( data.storer, isNaN( data.terminator ) ? 13 : data.terminator );
-
-			// Echo the response (7.1.1.1)
-			response = data.response;
-			this._print( response + '\r' );
-
-			// Convert the response to lower case and then to ZSCII
-			response = this.text_to_zscii( response.toLowerCase() );
-
-			// Check if the response is too long, and then set its length
-			if ( response.length > data.len )
-			{
-				response = response.slice( 0, data.len );
-			}
-			memory.setUint8( data.buffer + 1, response.length );
-
-			// Store the response in the buffer
-			memory.setBuffer8( data.buffer + 2, response );
-
-			if ( data.parse )
-			{
-				// Tokenise the response
-				this.tokenise( data.buffer, data.parse );
-			}
+			this.handle_input( data );
 		}
 
 		// Handle character input
 		if ( code === 'char' )
 		{
-			this.variable( data.storer, this.keyinput( data.response ) );
+			this.variable( this.read_data.storer, this.keyinput( data.response ) );
 		}
 
 		// Write the status window's cursor position
@@ -266,11 +241,6 @@ api = {
 		if ( code === 186 )
 		{
 			code = 'quit';
-		}
-		if ( code === 1001 )
-		{
-			code = 'restore';
-			options = { storer: options };
 		}
 
 		// Flush the buffer
