@@ -166,7 +166,9 @@ return {
 	/* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act(186)'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
-/* show_status (v3) */ // TODO
+188: version === 3 ?
+	/* show_status (v3) */ opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.ui.v3_status();e.act()'; } ) :
+	/* act as a nop in later versions */ Opcode,
 /* verify */ 189: alwaysbranch, // Actually check??
 /* piracy */ 191: alwaysbranch,
 /* call_vs */ 224: CallerStorer,

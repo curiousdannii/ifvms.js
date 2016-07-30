@@ -277,6 +277,8 @@ module.exports = {
 
 		if ( this.version === 3 )
 		{
+			this.ui.v3_status();
+
 			// Append zero terminator
 			response.push( 0 );
 
@@ -661,7 +663,7 @@ module.exports = {
 
 		});
 
-		this.ui = new ( require( './ui.js' ) )( this, memory.getUint8( 0x11 ) & 0x02 );
+		this.ui = new ( require( './ui.js' ) )( this );
 		this.init_text();
 
 		// Update the header
@@ -752,6 +754,12 @@ module.exports = {
 		// Store or branch with the successful result
 		this.save_restore_pc = quetzal.pc;
 		this.save_restore_result( 2 );
+
+		// Collapse the upper window (8.6.1.3)
+		if ( this.version === 3 )
+		{
+			this.ui.split_window( 0 );
+		}
 	},
 
 	restore_undo: function()

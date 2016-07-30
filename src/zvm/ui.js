@@ -21,7 +21,7 @@ Class = utils.Class;
 
 module.exports = Class.subClass({
 
-	init: function( engine, headerbit )
+	init: function( engine )
 	{
 		this.e = engine;
 		this.buffer = '';
@@ -38,8 +38,11 @@ module.exports = Class.subClass({
 			this.fg = undefined;
 			this.bg = undefined;
 		}
+		// Version 3 time header bit
+		this.time = engine.m.getUint8( 0x01 ) & 0x02;
+		// A variable for whether we are outputing in a monospaced font. If non-zero then we are
 		// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
-		this.mono = headerbit;
+		this.mono = engine.m.getUint8( 0x11 ) & 0x02;
 
 		this.process_colours();
 
@@ -401,6 +404,11 @@ module.exports = Class.subClass({
 			code: 'height',
 			lines: lines,
 		});
+		// 8.6.1.1.2
+		if ( this.e.version === 3 )
+		{
+			this.status.push( { code: 'clear' } );
+		}
 	},
 
 	// Update ZVM's header with correct colour information
@@ -412,6 +420,34 @@ module.exports = Class.subClass({
 		memory.setUint8( 0x2D, isNaN( this.env.fg ) ? 1 : this.env.fg );
 		this.e.extension_table( 5, this.env.fg_true );
 		this.e.extension_table( 6, this.env.bg_true );
+	},
+
+	// Output the version 3 status line
+	v3_status: function()
+	{
+		var engine = this.e,
+		hours_score = engine.m.getUint16( engine.globals + 2 ),
+		mins_turns = engine.m.getUint16( engine.globals + 4 ),
+		rhs;
+		this.set_window( 1 );
+		this.erase_line( 1 );
+
+		// Handle the turns/score or time
+		if ( this.time )
+		{
+			rhs = 'Time: ' + ( hours_score % 12 === 0 ? 12 : hours_score % 12 ) + ':' + ( mins_turns < 10 ? '0' : '' ) + mins_turns + ' ' + ( hours_score > 11 ? 'PM' : 'AM' );
+		}
+		else
+		{
+			rhs = 'Score: ' + hours_score + ' Turns: ' + mins_turns;
+		}
+
+		engine.print( 3, engine.m.getUint16( engine.globals ) );
+		// this.buffer now has the room name, so ensure it is not too long
+		this.buffer = ' ' + this.buffer.slice( 0, engine.env.width - rhs.length - 4 );
+
+		this.set_cursor( 1, engine.env.width - rhs.length );
+		engine._print( rhs );
 	},
 
 	// Formatters allow you to change how styles are marked
