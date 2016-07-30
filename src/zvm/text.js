@@ -354,7 +354,7 @@ module.exports = {
 		addr += 2;
 		while ( addr < endaddr )
 		{
-			dict['' + memory.getBuffer8( addr, 6 )] = addr;
+			dict[Array.prototype.toString.call(memory.getBuffer8( addr, 6 ))] = addr;
 			addr += entry_len;
 		}
 		this.dictionaries[addr_start] = dict;
