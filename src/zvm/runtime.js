@@ -64,8 +64,14 @@ module.exports = {
 		// Add any extras
 		for ( i = args.length; i < locals_count; i++ )
 		{
-			args.push(0);
+			// Use provided arguments in version 3, or 0 in later versions
+			args.push( this.version3 ? this.m.getUint16( this.pc + i * 2 ) : 0 );
 		}
+		if ( this.version3 )
+		{
+			this.pc += locals_count * 2;
+		}
+
 		// Prepend to the locals array
 		this.l = args.concat( this.l );
 
@@ -75,7 +81,7 @@ module.exports = {
 
 	clear_attr: function( object, attribute )
 	{
-		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
+		var addr = this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
 	},
 
@@ -135,30 +141,33 @@ module.exports = {
 	find_prop: function( object, property, prev )
 	{
 		var memory = this.m,
+		version3 = this.version3,
 
 		this_property_byte, this_property,
 		last_property = 0,
 
 		// Get this property table
-		properties = memory.getUint16( this.objects + 14 * object + 12 );
+		properties = memory.getUint16( this.objects + ( version3 ? 9 : 14 ) * object + ( version3 ? 7 : 12 ) );
+
+		// Skip over the object's short name
 		properties += memory.getUint8( properties ) * 2 + 1;
 
 		// Run through the properties
 		while ( 1 )
 		{
 			this_property_byte = memory.getUint8( properties );
-			this_property = this_property_byte & 0x3F;
+			this_property = this_property_byte & ( version3 ? 0x1F : 0x3F );
 
 			// Found the previous property, so return this one's number
 			if ( last_property === prev )
 			{
 				return this_property;
 			}
-			// Found the property! Return it's address
+			// Found the property! Return its address
 			if ( this_property === property )
 			{
 				// Must include the offset
-				return properties + ( this_property_byte & 0x80 ? 2 : 1 );
+				return properties + ( !version3 && this_property_byte & 0x80 ? 2 : 1 );
 			}
 			// Gone past the property
 			if ( this_property < property )
@@ -170,14 +179,21 @@ module.exports = {
 			last_property = this_property;
 
 			// Second size byte
-			if ( this_property_byte & 0x80 )
+			if ( version3 )
 			{
-				this_property = memory.getUint8( properties + 1 ) & 0x3F;
-				properties += this_property ? this_property + 2 : 66;
+				properties += ( this_property_byte >> 5 ) + 1;
 			}
 			else
 			{
-				properties += this_property_byte & 0x40 ? 3 : 2;
+				if ( this_property_byte & 0x80 )
+				{
+					this_property = memory.getUint8( properties + 1 ) & 0x3F;
+					properties += this_property ? this_property + 2 : 66;
+				}
+				else
+				{
+					properties += this_property_byte & 0x40 ? 3 : 2;
+				}
 			}
 		}
 	},
@@ -202,17 +218,38 @@ module.exports = {
 	// Get the first child of an object
 	get_child: function( obj )
 	{
-		return this.m.getUint16( this.objects + 14 * obj + 10 );
+		if ( this.version3 )
+		{
+			return this.m.getUint8( this.objects + 9 * obj + 6 );
+		}
+		else
+		{
+			return this.m.getUint16( this.objects + 14 * obj + 10 );
+		}
 	},
 
 	get_sibling: function( obj )
 	{
-		return this.m.getUint16( this.objects + 14 * obj + 8 );
+		if ( this.version3 )
+		{
+			return this.m.getUint8( this.objects + 9 * obj + 5 );
+		}
+		else
+		{
+			return this.m.getUint16( this.objects + 14 * obj + 8 );
+		}
 	},
 
 	get_parent: function( obj )
 	{
-		return this.m.getUint16( this.objects + 14 * obj + 6 );
+		if ( this.version3 )
+		{
+			return this.m.getUint8( this.objects + 9 * obj + 4 );
+		}
+		else
+		{
+			return this.m.getUint16( this.objects + 14 * obj + 6 );
+		}
 	},
 
 	get_prop: function( object, property )
@@ -220,13 +257,15 @@ module.exports = {
 		var memory = this.m,
 
 		// Try to find the property
-		addr = this.find_prop( object, property );
+		addr = this.find_prop( object, property ),
+		len;
 
 		// If we have the property
 		if ( addr )
 		{
+			len = memory.getUint8( addr - 1 );
 			// Assume we're being called for a valid short property
-			return memory[ memory.getUint8( addr - 1 ) & 0x40 ? 'getUint16' : 'getUint8' ]( addr );
+			return memory[ ( this.version3 ? len >> 5 : len & 0x40 ) ? 'getUint16' : 'getUint8' ]( addr );
 		}
 
 		// Use the default properties table
@@ -245,6 +284,12 @@ module.exports = {
 		}
 
 		var value = this.m.getUint8( addr - 1 );
+
+		// Version 3
+		if ( this.version3 )
+		{
+			return ( value >> 5 ) + 1;
+		}
 
 		// Two size/number bytes
 		if ( value & 0x80 )
@@ -275,7 +320,7 @@ module.exports = {
 			response = response.slice( 0, options.len );
 		}
 
-		if ( this.version === 3 )
+		if ( this.version3 )
 		{
 			this.ui.v3_status();
 
@@ -459,7 +504,7 @@ module.exports = {
 		// Object
 		if ( type === 3 )
 		{
-			var proptable = this.m.getUint16( this.objects + 14 * val + 12 );
+			var proptable = this.m.getUint16( this.objects + ( this.version3 ? 9 : 14 ) * val + ( this.version3 ? 7 : 12 ) );
 			val = this.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
 		}
 		// ZSCII
@@ -491,9 +536,11 @@ module.exports = {
 		var memory = this.m,
 
 		// Try to find the property
-		addr = this.find_prop( object, property );
+		addr = this.find_prop( object, property ),
+		len = memory.getUint8( addr - 1 );
 
-		memory[ memory.getUint8( addr - 1 ) & 0x40 ? 'setUint16' : 'setUint8' ]( addr, value );
+		// Assume we're being called for a valid short property
+		memory[ ( this.version3 ? len >> 5 : len & 0x40 ) ? 'setUint16' : 'setUint8' ]( addr, value );
 	},
 
 	random: function( range )
@@ -529,7 +576,7 @@ module.exports = {
 		var len = this.m.getUint8( text ),
 		options;
 
-		if ( this.version === 3 )
+		if ( this.version3 )
 		{
 			len--;
 			options = {
@@ -615,7 +662,8 @@ module.exports = {
 		var memory = utils.MemoryView( this.data ),
 
 		version = memory.getUint8( 0x00 ),
-		addr_multipler = version === 3 ? 2 : ( version === 5 ? 4 : 8 ),
+		version3 = version === 3,
+		addr_multipler = version3 ? 2 : ( version === 5 ? 4 : 8 ),
 		property_defaults = memory.getUint16( 0x0A ),
 		extension = memory.getUint16( 0x36 );
 
@@ -646,9 +694,10 @@ module.exports = {
 
 			// Get some header variables
 			version: version,
+			version3: version === 3,
 			pc: memory.getUint16( 0x06 ),
 			properties: property_defaults,
-			objects: property_defaults + 112, // 126-14 - if we take this now then we won't need to always decrement the object number
+			objects: property_defaults + ( version3 ? 53 : 112 ), // 62-9 or 126-14 - if we take this now then we won't need to always decrement the object number
 			globals: memory.getUint16( 0x0C ),
 			staticmem: memory.getUint16( 0x0E ),
 			eof: ( memory.getUint16( 0x1A ) || 65536 ) * addr_multipler,
@@ -659,7 +708,7 @@ module.exports = {
 			addr_multipler: addr_multipler,
 
 			// Opcodes for this version of the Z-Machine
-			opcodes: require( './opcodes.js' )( version ),
+			opcodes: require( './opcodes.js' )( version3 ),
 
 		});
 
@@ -756,7 +805,7 @@ module.exports = {
 		this.save_restore_result( 2 );
 
 		// Collapse the upper window (8.6.1.3)
-		if ( this.version === 3 )
+		if ( this.version3 )
 		{
 			this.ui.split_window( 0 );
 		}
@@ -893,7 +942,7 @@ module.exports = {
 		pc = this.save_restore_pc,
 		temp, iftrue, offset;
 
-		if ( this.version === 3 )
+		if ( this.version3 )
 		{
 			// Calculate the branch
 			temp = memory.getUint8( pc++ );
@@ -960,23 +1009,42 @@ module.exports = {
 
 	set_attr: function( object, attribute )
 	{
-		var addr = this.objects + 14 * object + ( attribute / 8 ) | 0;
+		var addr = this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0;
 		this.m.setUint8( addr, this.m.getUint8( addr ) | 0x80 >> attribute % 8 );
 	},
 
 	set_family: function( obj, newparent, parent, child, bigsis, lilsis )
 	{
-		// Set the new parent of the obj
-		this.m.setUint16( this.objects + 14 * obj + 6, newparent );
-		// Update the a parent's first child if needed
-		if ( parent )
+		var objects = this.objects;
+		if ( this.version3 )
 		{
-			this.m.setUint16( this.objects + 14 * parent + 10, child );
+			// Set the new parent of the obj
+			this.m.setUint8( objects + 9 * obj + 4, newparent );
+			// Update the parent's first child if needed
+			if ( parent )
+			{
+				this.m.setUint8( objects + 9 * parent + 6, child );
+			}
+			// Update the little sister of a big sister
+			if ( bigsis )
+			{
+				this.m.setUint8( objects + 9 * bigsis + 5, lilsis );
+			}
 		}
-		// Update the little sister of a big sister
-		if ( bigsis )
+		else
 		{
-			this.m.setUint16( this.objects + 14 * bigsis + 8, lilsis );
+			// Set the new parent of the obj
+			this.m.setUint16( objects + 14 * obj + 6, newparent );
+			// Update the parent's first child if needed
+			if ( parent )
+			{
+				this.m.setUint16( objects + 14 * parent + 10, child );
+			}
+			// Update the little sister of a big sister
+			if ( bigsis )
+			{
+				this.m.setUint16( objects + 14 * bigsis + 8, lilsis );
+			}
 		}
 	},
 
@@ -987,7 +1055,7 @@ module.exports = {
 
 	test_attr: function( object, attribute )
 	{
-		return ( this.m.getUint8( this.objects + 14 * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
+		return ( this.m.getUint8( this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
 	},
 
 	// Update the header after restarting or restoring
@@ -999,7 +1067,7 @@ module.exports = {
 		this.xorshift_seed = 0;
 
 		// For version 3 we only set Flags 1
-		if ( this.version === 3 )
+		if ( this.version3 )
 		{
 			// Flags 1: Set bits 5, 6
 			// TODO: Can we tell from env if the font is fixed pitch?

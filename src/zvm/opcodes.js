@@ -99,7 +99,7 @@ V3SaveRestore = Stopper.subClass({
 /*eslint brace-style: "off" */
 /*eslint indent: "off" */
 
-module.exports = function( version )
+module.exports = function( version3 )
 {
 
 return {
@@ -148,7 +148,7 @@ return {
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + ( this.next - 2 ); } ),
 /* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(2,' + addr + '*' + this.e.addr_multipler + ')'; } ),
 /* load */ 142: Indirect.subClass( { storer: 1 } ),
-143: version === 3 ?
+143: version3 ?
 	/* not (v3) */ not :
 	/* call_1n (v5/8) */ Caller,
 /* rtrue */ 176: opcode_builder( Stopper, function() { return 'return 1'; } ),
@@ -161,12 +161,12 @@ return {
 /* restore (v3) */ 182: V3SaveRestore,
 /* restart */ 183: opcode_builder( Stopper, function() { return 'e.act(183)'; } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( stack_var ); } } ),
-185: version === 3 ?
+185: version3 ?
 	/* pop (v3) */ opcode_builder( Opcode, function() { return 's.pop()'; } ) :
 	/* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.act(186)'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
-188: version === 3 ?
+188: version3 ?
 	/* show_status (v3) */ opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.ui.v3_status();e.act()'; } ) :
 	/* act as a nop in later versions */ Opcode,
 /* verify */ 189: alwaysbranch, // Actually check??
@@ -175,7 +175,7 @@ return {
 /* storew */ 225: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint16(e.S2U(' + array + '+2*' + index.U2S() + '),' + value + ')'; } ),
 /* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint8(e.S2U(' + array + '+' + index.U2S() + '),' + value + ')'; } ),
 /* put_prop */ 227: opcode_builder( Opcode, function() { return 'e.put_prop(' + this.args() + ')'; } ),
-/* read */ 228: version === 3 ?
+/* read */ 228: version3 ?
 	opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.read(0,' + this.args() + ')'; } ) :
 	opcode_builder( Pauser, function() { return 'e.read(' + this.storer.v + ',' + this.args() + ')'; } ),
 /* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(4,' + a + ')'; } ),

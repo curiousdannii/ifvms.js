@@ -405,7 +405,7 @@ module.exports = Class.subClass({
 			lines: lines,
 		});
 		// 8.6.1.1.2
-		if ( this.e.version === 3 )
+		if ( this.e.version3 )
 		{
 			this.status.push( { code: 'clear' } );
 		}

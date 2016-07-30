@@ -23,7 +23,7 @@ module.exports = {
 		var self = this,
 		memory = this.m,
 
-		alphabet_addr = this.version > 3 && memory.getUint16( 0x34 ),
+		alphabet_addr = !this.version3 && memory.getUint16( 0x34 ),
 		unicode_addr = this.extension_table( 3 ),
 		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
 
@@ -219,7 +219,7 @@ module.exports = {
 	{
 		var alphabets = this.alphabets,
 		zchars = [],
-		word_len = this.version === 3 ? 6 : 9,
+		word_len = this.version3 ? 6 : 9,
 		i = 0,
 		achar,
 		temp,
