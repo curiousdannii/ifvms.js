@@ -662,7 +662,7 @@ module.exports = {
 	restart: function()
 	{
 		// Set up the memory
-		var memory = utils.MemoryView( this.data.slice().buffer ),
+		var memory = utils.MemoryView( this.data.buffer.slice() ),
 
 		version = memory.getUint8( 0x00 ),
 		version3 = version === 3,

@@ -346,7 +346,11 @@ module.exports = {
 
 		// Get the word separators
 		seperators_len = memory.getUint8( addr++ );
-		dict.separators = memory.getBuffer8( addr, seperators_len );
+
+		// Support: IE, Safari, Firefox<38, Chrome<45, Opera<32, Node<4
+		// These browsers don't support Uint8Array.indexOf() so convert to a normal array
+		dict.separators = Array.prototype.slice.call( memory.getBuffer8( addr, seperators_len ) );
+
 		addr += seperators_len;
 
 		// Go through the dictionary and cache its entries

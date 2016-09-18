@@ -1,0 +1,14 @@
+notifications:
+  email: false
+
+language: node_js
+node_js:
+  - node
+
+cache:
+  directories:
+    - node_modules
+
+script:
+  - npm run lint
+  - make test
