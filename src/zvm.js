@@ -258,18 +258,6 @@ api = {
 			code = 'quit';
 		}
 
-		// Flush the status if we need to
-		// Should instead it be the first order? Might be better for screen readers etc
-		if ( this.ui.status.length )
-		{
-			this.orders.push({
-				code: 'stream',
-				to: 'status',
-				data: this.ui.status,
-			});
-			this.ui.status = [];
-		}
-
 		options.code = code;
 		this.orders.push( options );
 		this.stop = 1;

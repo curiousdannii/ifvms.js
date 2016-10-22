@@ -26,21 +26,16 @@ module.exports = {
 			// A variable for whether we are outputing in a monospaced font. If non-zero then we are
 			// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
 			mono: this.m.getUint8( 0x11 ) & 0x02,
-			
-			windows: [],
 		};
 
 		this.process_colours();
 
-		// Upper window stuff
-		this.ui.status = []; // Status window orders
-
 		// Construct the windows if they do not already exist
 		var Glk = this.glk;
-		if ( !Glk.glk_window_iterate() )
+		if ( !this.mainwin )
 		{
-			this.ui.windows[0] = Glk.glk_window_open( 0, 0, 0, 3, 201 );
-			this.ui.windows[1] = Glk.glk_window_open( this.ui.windows[0], 0x12, 0, 4, 202 );
+			this.mainwin = Glk.glk_window_open( 0, 0, 0, 3, 201 );
+			this.statuswin = Glk.glk_window_open( this.mainwin, 0x12, 0, 4, 202 );
 		}
 		this.set_window( 0 );
 	},
@@ -55,16 +50,15 @@ module.exports = {
 
 	erase_window: function( window )
 	{
-		var Glk = this.glk,
-		windows = this.ui.windows;
+		var Glk = this.glk;
 		
 		if ( window < 1 )
 		{
-			Glk.glk_window_clear( windows[0] );
+			Glk.glk_window_clear( this.mainwin );
 		}
 		if ( window === 1 || window === -2 )
 		{
-			Glk.glk_window_clear( windows[1] );
+			Glk.glk_window_clear( this.statuswin );
 		}
 		if ( window === -1 )
 		{
@@ -295,23 +289,16 @@ module.exports = {
 	read: function( storer, text, parse, time, routine )
 	{
 		var len = this.m.getUint8( text ),
-		options;
+		initiallen = 0;
 
 		if ( this.version3 )
 		{
 			len--;
-			options = {
-				len: len,
-			};
 			this.v3_status();
 		}
 		else
 		{
-			options = {
-				len: len,
-				initiallen: this.m.getUint8( text + 1 ),
-				time: time,
-			};
+			//initiallen = this.m.getUint8( text + 1 );
 		}
 
 		this.read_data = {
@@ -320,9 +307,11 @@ module.exports = {
 			parse: parse, // parse-buffer
 			routine: routine,
 			storer: storer,
+			time: time,
 		};
-
-		this.act( 'read', options );
+		
+		// TODO: pre-existing input
+		this.glk.glk_request_line_event_uni( this.mainwin, [], /*len,*/ initiallen );
 	},
 
 	// Request character input
@@ -331,11 +320,9 @@ module.exports = {
 		this.read_data = {
 			routine: routine,
 			storer: storer,
-		};
-
-		this.act( 'char', {
 			time: time,
-		});
+		};
+		this.glk.glk_request_char_event_uni( this.mainwin );
 	},
 
 	set_colour: function( foreground, background )
@@ -360,11 +347,8 @@ module.exports = {
 
 	set_cursor: function( row, col )
 	{
-		var Glk = this.glk,
-		upper_window = this.ui.windows[1];
-
 		// TODO: cursor variables
-		Glk.glk_window_move_cursor( upper_window, col - 1, row - 1 );
+		this.glk.glk_window_move_cursor( this.statuswin, col - 1, row - 1 );
 	},
 
 	set_font: function( font )
@@ -450,30 +434,28 @@ module.exports = {
 
 	set_window: function( window )
 	{
-		var Glk = this.glk,
-		windows = this.ui.windows;
+		var Glk = this.glk;
 		
-		Glk.glk_set_window( windows[window] );
+		Glk.glk_set_window( window ? this.statuswin : this.mainwin );
 		
 		// Focusing the upper window resets the cursor to the top left
 		if ( window )
 		{
 			// TODO: cursor variables
-			Glk.glk_window_move_cursor( windows[1], 0, 0 );
+			Glk.glk_window_move_cursor( this.statuswin, 0, 0 );
 		}
 	},
 
 	split_window: function( lines )
 	{
-		var Glk = this.glk,
-		upper_window = this.ui.windows[1];
+		var Glk = this.glk;
 		
-		Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( upper_window ), 0x12, lines, null );
+		Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.statuswin ), 0x12, lines, null );
 		
 		// 8.6.1.1.2: In version three the upper window is always cleared
 		if ( this.version3 )
 		{
-			Glk.glk_window_clear( upper_window );
+			Glk.glk_window_clear( this.statuswin );
 		}
 	},
 

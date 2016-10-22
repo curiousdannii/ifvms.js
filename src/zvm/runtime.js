@@ -570,7 +570,6 @@ module.exports = {
 			undo: [],
 
 			// IO stuff
-			orders: [],
 			streams: [ 1, 0, [], 0 ],
 
 			// Get some header variables
