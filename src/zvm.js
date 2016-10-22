@@ -178,10 +178,8 @@ api = {
 	// Run
 	run: function()
 	{
-		var now = new Date(),
-		pc,
-		result,
-		count = 0;
+		var pc,
+		result;
 
 		// Stop when ordered to
 		this.stop = 0;
@@ -199,15 +197,8 @@ api = {
 			{
 				this.ret( result );
 			}
-
-			// Or if more than five seconds has passed, however only check every 50k times
-			// What's the best time for this?
-			if ( ++count % 50000 === 0 && ( (new Date()) - now ) > 5000 )
-			{
-				this.act( 'tick' );
-				return;
-			}
 		}
+		this.glk.update();
 	},
 
 	// Compile a JIT routine
@@ -267,9 +258,6 @@ api = {
 			code = 'quit';
 		}
 
-		// Flush the buffer
-		this.ui.flush();
-
 		// Flush the status if we need to
 		// Should instead it be the first order? Might be better for screen readers etc
 		if ( this.ui.status.length )
@@ -297,6 +285,7 @@ VM = Class.subClass( extend(
 	api,
 	require( './zvm/runtime.js' ),
 	require( './zvm/text.js' ),
+	require( './zvm/io.js' ),
 	require( './zvm/disassembler.js' )
 ) );
 

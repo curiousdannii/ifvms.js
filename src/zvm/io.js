@@ -1,6 +1,6 @@
 /*
 
-Z-Machine UI
+Z-Machine IO
 ============
 
 Copyright (c) 2016 The ifvms.js team
@@ -9,120 +9,72 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
-/*
+module.exports = {
 
-Note: is used by both ZVM and Gnusto. In the case of Gnusto the engine is actually GnustoRunner.
-	The engine must have a StructIO modified env
-
-*/
-
-var utils = require( '../common/utils.js' ),
-Class = utils.Class;
-
-module.exports = Class.subClass({
-
-	init: function( engine )
+	init_ui: function()
 	{
-		this.e = engine;
-		this.buffer = '';
-
-		// Use the requested formatter (classes is default)
-		utils.extend( this, this.formatters[engine.env.formatter] || {} );
-
-		// TODO: why is this debug?
-		if ( this.e.env.debug )
-		{
-			this.reverse = 0;
-			this.bold = 0;
-			this.italic = 0;
-			this.fg = undefined;
-			this.bg = undefined;
-		}
-		// Version 3 time header bit
-		this.time = engine.m.getUint8( 0x01 ) & 0x02;
-		// A variable for whether we are outputing in a monospaced font. If non-zero then we are
-		// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
-		this.mono = engine.m.getUint8( 0x11 ) & 0x02;
+		this.ui = {
+			reverse: 0,
+			bold: 0,
+			italic: 0,
+			fg: undefined,
+			bg: undefined,
+			
+			// Version 3 time header bit
+			time: this.m.getUint8( 0x01 ) & 0x02,
+			
+			// A variable for whether we are outputing in a monospaced font. If non-zero then we are
+			// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
+			mono: this.m.getUint8( 0x11 ) & 0x02,
+			
+			windows: [],
+		};
 
 		this.process_colours();
 
 		// Upper window stuff
-		this.currentwin = 0;
-		this.status = []; // Status window orders
+		this.ui.status = []; // Status window orders
 
-		// Construct the basic windows
-		engine.orders.push(
-			{
-				code: 'stream',
-				name: 'status',
-			},
-			{
-				code: 'stream',
-				name: 'main',
-			},
-			{
-				code: 'find',
-				name: 'main',
-			}
-		);
-	},
-
-	// Clear the lower window
-	clear_window: function()
-	{
-		this.e.orders.push({
-			code: 'clear',
-			name: 'main',
-			bg: this.bg,
-		});
+		// Construct the windows if they do not already exist
+		var Glk = this.glk;
+		if ( !Glk.glk_window_iterate() )
+		{
+			this.ui.windows[0] = Glk.glk_window_open( 0, 0, 0, 3, 201 );
+			this.ui.windows[1] = Glk.glk_window_open( this.ui.windows[0], 0x12, 0, 4, 202 );
+		}
+		this.set_window( 0 );
 	},
 
 	erase_line: function( value )
 	{
-		if ( value === 1 )
+		/*if ( value === 1 )
 		{
-			this.flush();
 			this.status.push( { code: 'eraseline' } );
-		}
+		}*/
 	},
 
 	erase_window: function( window )
 	{
-		this.flush();
+		var Glk = this.glk,
+		windows = this.ui.windows;
+		
 		if ( window < 1 )
 		{
-			this.clear_window();
+			Glk.glk_window_clear( windows[0] );
+		}
+		if ( window === 1 || window === -2 )
+		{
+			Glk.glk_window_clear( windows[1] );
 		}
 		if ( window === -1 )
 		{
 			this.split_window( 0 );
 		}
-		if ( window === -2 || window === 1 )
-		{
-			this.status.push( { code: 'clear' } );
-		}
-	},
-
-	// Flush the buffer to the orders
-	flush: function()
-	{
-		// If we have a buffer transfer it to the orders
-		if ( this.buffer !== '' )
-		{
-			var order = {
-				code: 'stream',
-				text: this.buffer,
-				props: this.format(),
-			};
-
-			( this.currentwin ? this.status : this.e.orders ).push( order );
-			this.buffer = '';
-		}
 	},
 
 	format: function()
 	{
-		var props = {},
+		/*var props = {},
 		temp,
 		classes = [],
 		fg = this.fg,
@@ -176,17 +128,91 @@ module.exports = Class.subClass({
 		{
 			props['class'] = classes.join( ' ' );
 		}
-		return props;
+		return props;*/
 	},
 
 	get_cursor: function( array )
 	{
-		// act() will flush
-		this.status.push({
+		/*this.status.push({
 			code: 'get_cursor',
 			addr: array,
 		});
-		this.e.act();
+		this.e.act();*/
+	},
+
+	// Print text!
+	_print: function( text )
+	{
+		// Stream 3 gets the text first
+		if ( this.streams[2].length )
+		{
+			this.streams[2][0][1] += text;
+		}
+		// Don't print if stream 1 was switched off (why would you do that?!)
+		else if ( this.streams[0] )
+		{
+			// Convert CR into LF
+			text = text.replace( /\r/g, '\n' );
+			
+			// Check if the monospace font bit has changed
+			// Unfortunately, even now Inform changes this bit for the font statement, even though the 1.1 standard depreciated it :(
+			if ( ( this.m.getUint8( 0x11 ) & 0x02 ) !== ( this.ui.mono & 0x02 ) )
+			{
+				this.ui.mono ^= 0x02;
+				// TODO: send font
+			}
+			this.glk.glk_put_jstring( text );
+		}
+	},
+
+	// Print many things
+	print: function( type, val )
+	{
+		var proptable, result;
+		
+		// Number
+		if ( type === 0 )
+		{
+			result = val;
+		}
+		// Unicode
+		if ( type === 1 )
+		{
+			result = String.fromCharCode( val );
+		}
+		// Text from address
+		if ( type === 2 )
+		{
+			result = this.jit[ val ] || this.decode( val );
+		}
+		// Object
+		if ( type === 3 )
+		{
+			proptable = this.m.getUint16( this.objects + ( this.version3 ? 9 : 14 ) * val + ( this.version3 ? 7 : 12 ) );
+			result = this.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
+		}
+		// ZSCII
+		if ( type === 4 )
+		{
+			if ( !this.unicode_table[ val ] )
+			{
+				return;
+			}
+			result = this.unicode_table[ val ];
+		}
+		this._print( '' + result );
+	},
+
+	print_table: function( zscii, width, height, skip )
+	{
+		height = height || 1;
+		skip = skip || 0;
+		var i = 0;
+		while ( i++ < height )
+		{
+			this._print( this.zscii_to_text( this.m.getBuffer8( zscii, width ) ) + ( i < height ? '\r' : '' ) );
+			zscii += width + skip;
+		}
 	},
 
 	// Process CSS default colours
@@ -221,7 +247,7 @@ module.exports = Class.subClass({
 		}
 
 		// Standard colours
-		var colours = [
+		/*var colours = [
 			0xFFFE, // Current
 			0xFFFF, // Default
 			0x0000, // Black
@@ -262,13 +288,59 @@ module.exports = Class.subClass({
 			bg: bg,
 			fg_true: fg_true,
 			bg_true: bg_true,
+		};*/
+	},
+
+	// Request line input
+	read: function( storer, text, parse, time, routine )
+	{
+		var len = this.m.getUint8( text ),
+		options;
+
+		if ( this.version3 )
+		{
+			len--;
+			options = {
+				len: len,
+			};
+			this.v3_status();
+		}
+		else
+		{
+			options = {
+				len: len,
+				initiallen: this.m.getUint8( text + 1 ),
+				time: time,
+			};
+		}
+
+		this.read_data = {
+			buffer: text, // text-buffer
+			len: len,
+			parse: parse, // parse-buffer
+			routine: routine,
+			storer: storer,
 		};
+
+		this.act( 'read', options );
+	},
+
+	// Request character input
+	read_char: function( storer, one, time, routine )
+	{
+		this.read_data = {
+			routine: routine,
+			storer: storer,
+		};
+
+		this.act( 'char', {
+			time: time,
+		});
 	},
 
 	set_colour: function( foreground, background )
 	{
-		this.flush();
-		if ( foreground === 1 )
+		/*if ( foreground === 1 )
 		{
 			this.fg = undefined;
 		}
@@ -283,39 +355,37 @@ module.exports = Class.subClass({
 		if ( background > 1 && background < 13 )
 		{
 			this.bg = background;
-		}
+		}*/
 	},
 
 	set_cursor: function( row, col )
 	{
-		this.flush();
-		this.status.push({
-			code: 'cursor',
-			to: [row - 1, col - 1],
-		});
+		var Glk = this.glk,
+		upper_window = this.ui.windows[1];
+
+		// TODO: cursor variables
+		Glk.glk_window_move_cursor( upper_window, col - 1, row - 1 );
 	},
 
 	set_font: function( font )
 	{
 		// We only support fonts 1 and 4
-		if ( font !== 1 && font !== 4 )
+		/*if ( font !== 1 && font !== 4 )
 		{
 			return 0;
 		}
 		var returnval = this.mono & 0x04 ? 4 : 1;
 		if ( font !== returnval )
 		{
-			this.flush();
 			this.mono ^= 0x04;
 		}
-		return returnval;
+		return returnval;*/
 	},
 
 	// Set styles
 	set_style: function( stylebyte )
 	{
-		this.flush();
-
+		/*
 		// Setting the style to Roman will clear the others
 		if ( stylebyte === 0 )
 		{
@@ -337,14 +407,14 @@ module.exports = Class.subClass({
 		if ( stylebyte & 0x08 )
 		{
 			this.mono |= 0x01;
-		}
+		}*/
 	},
 
 	// Set true colours
 	set_true_colour: function( foreground, background )
 	{
 		// Convert a 15 bit colour to RGB
-		function convert_true_colour( colour )
+		/*function convert_true_colour( colour )
 		{
 			// Stretch the five bits per colour out to 8 bits
 			var newcolour = Math.round( ( colour & 0x1F ) * 8.226 ) << 16
@@ -358,8 +428,6 @@ module.exports = Class.subClass({
 			}
 			return '#' + newcolour;
 		}
-
-		this.flush();
 
 		if ( foreground === 0xFFFF )
 		{
@@ -377,37 +445,35 @@ module.exports = Class.subClass({
 		else if ( background < 0x8000 )
 		{
 			this.bg = convert_true_colour( background );
-		}
+		}*/
 	},
 
 	set_window: function( window )
 	{
-		this.flush();
-		this.currentwin = window;
-		this.e.orders.push({
-			code: 'find',
-			name: window ? 'status' : 'main',
-		});
+		var Glk = this.glk,
+		windows = this.ui.windows;
+		
+		Glk.glk_set_window( windows[window] );
+		
+		// Focusing the upper window resets the cursor to the top left
 		if ( window )
 		{
-			this.status.push({
-				code: 'cursor',
-				to: [0, 0],
-			});
+			// TODO: cursor variables
+			Glk.glk_window_move_cursor( windows[1], 0, 0 );
 		}
 	},
 
 	split_window: function( lines )
 	{
-		this.flush();
-		this.status.push({
-			code: 'height',
-			lines: lines,
-		});
-		// 8.6.1.1.2
-		if ( this.e.version3 )
+		var Glk = this.glk,
+		upper_window = this.ui.windows[1];
+		
+		Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( upper_window ), 0x12, lines, null );
+		
+		// 8.6.1.1.2: In version three the upper window is always cleared
+		if ( this.version3 )
 		{
-			this.status.push( { code: 'clear' } );
+			Glk.glk_window_clear( upper_window );
 		}
 	},
 
@@ -415,17 +481,17 @@ module.exports = Class.subClass({
 	// If colours weren't provided then the default colour will be used for both
 	update_header: function()
 	{
-		var memory = this.e.m;
+		/*var memory = this.m;
 		memory.setUint8( 0x2C, isNaN( this.env.bg ) ? 1 : this.env.bg );
 		memory.setUint8( 0x2D, isNaN( this.env.fg ) ? 1 : this.env.fg );
-		this.e.extension_table( 5, this.env.fg_true );
-		this.e.extension_table( 6, this.env.bg_true );
+		this.extension_table( 5, this.env.fg_true );
+		this.extension_table( 6, this.env.bg_true );*/
 	},
 
 	// Output the version 3 status line
 	v3_status: function()
 	{
-		var engine = this.e,
+		/*var engine = this.e,
 		width = engine.env.width,
 		hours_score = engine.m.getUint16( engine.globals + 2 ),
 		mins_turns = engine.m.getUint16( engine.globals + 4 ),
@@ -452,10 +518,7 @@ module.exports = Class.subClass({
 		this.set_cursor( 1, width - rhs.length );
 		engine._print( rhs );
 		this.set_style( 0 );
-		this.set_window( 0 );
+		this.set_window( 0 );*/
 	},
 
-	// Formatters allow you to change how styles are marked
-	// The desired formatter should be passed in through env
-	formatters: {},
-});
+};

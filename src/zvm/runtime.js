@@ -454,81 +454,6 @@ module.exports = {
 		}
 	},
 
-	// Print text!
-	_print: function( text )
-	{
-		// Stream 3 gets the text first
-		if ( this.streams[2].length )
-		{
-			this.streams[2][0][1] += text;
-		}
-		// Don't print if stream 1 was switched off (why would you do that?!)
-		else if ( this.streams[0] )
-		{
-			// Check if the monospace font bit has changed
-			// Unfortunately, even now Inform changes this bit for the font statement, even though the 1.1 standard depreciated it :(
-			var fontbit = this.m.getUint8( 0x11 ) & 0x02;
-			if ( fontbit !== ( this.ui.mono & 0x02 ) )
-			{
-				// Flush if we're actually changing font (ie, the other bits are off)
-				if ( !( this.ui.mono & 0xFD ) )
-				{
-					this.ui.flush();
-				}
-				this.ui.mono ^= 0x02;
-			}
-			this.ui.buffer += text;
-		}
-	},
-
-	// Print many things
-	print: function( type, val )
-	{
-		// Number
-		if ( type === 0 )
-		{
-			val = '' + val;
-		}
-		// Unicode
-		if ( type === 1 )
-		{
-			val = String.fromCharCode( val );
-		}
-		// Text from address
-		if ( type === 2 )
-		{
-			val = this.jit[ val ] || this.decode( val );
-		}
-		// Object
-		if ( type === 3 )
-		{
-			var proptable = this.m.getUint16( this.objects + ( this.version3 ? 9 : 14 ) * val + ( this.version3 ? 7 : 12 ) );
-			val = this.decode( proptable + 1, this.m.getUint8( proptable ) * 2 );
-		}
-		// ZSCII
-		if ( type === 4 )
-		{
-			if ( !this.unicode_table[ val ] )
-			{
-				return;
-			}
-			val = this.unicode_table[ val ];
-		}
-		this._print( val );
-	},
-
-	print_table: function( zscii, width, height, skip )
-	{
-		height = height || 1;
-		skip = skip || 0;
-		var i = 0;
-		while ( i++ < height )
-		{
-			this._print( this.zscii_to_text( this.m.getBuffer8( zscii, width ) ) + ( i < height ? '\r' : '' ) );
-			zscii += width + skip;
-		}
-	},
-
 	put_prop: function( object, property, value )
 	{
 		var memory = this.m,
@@ -571,53 +496,6 @@ module.exports = {
 		seed ^= ( seed >> 17 );
 		this.xorshift_seed = ( seed ^= ( seed << 5 ) );
 		return 1 + ( ( seed & 0x7FFF ) % range );
-	},
-
-	// Request line input
-	read: function( storer, text, parse, time, routine )
-	{
-		var len = this.m.getUint8( text ),
-		options;
-
-		if ( this.version3 )
-		{
-			len--;
-			options = {
-				len: len,
-			};
-			this.ui.v3_status();
-		}
-		else
-		{
-			options = {
-				len: len,
-				initiallen: this.m.getUint8( text + 1 ),
-				time: time,
-			};
-		}
-
-		this.read_data = {
-			buffer: text, // text-buffer
-			len: len,
-			parse: parse, // parse-buffer
-			routine: routine,
-			storer: storer,
-		};
-
-		this.act( 'read', options );
-	},
-
-	// Request character input
-	read_char: function( storer, one, time, routine )
-	{
-		this.read_data = {
-			routine: routine,
-			storer: storer,
-		};
-
-		this.act( 'char', {
-			time: time,
-		});
 	},
 
 	remove_obj: function( obj )
@@ -715,8 +593,8 @@ module.exports = {
 
 		});
 
-		this.ui = new ( require( './ui.js' ) )( this );
 		this.init_text();
+		this.init_ui();
 
 		// Update the header
 		this.update_header();
@@ -810,7 +688,7 @@ module.exports = {
 		// Collapse the upper window (8.6.1.3)
 		if ( this.version3 )
 		{
-			this.ui.split_window( 0 );
+			this.split_window( 0 );
 		}
 	},
 
@@ -1066,7 +944,8 @@ module.exports = {
 	// Update the header after restarting or restoring
 	update_header: function()
 	{
-		var memory = this.m;
+		var memory = this.m,
+		width = new this.glk.RefBox();
 
 		// Reset the Xorshift seed
 		this.xorshift_seed = 0;
@@ -1079,16 +958,20 @@ module.exports = {
 			return memory.setUint8( 0x01, memory.getUint8( 0x01 ) | 0x60 );
 		}
 
-		// Flags 1: Set bits 0, 2, 3, 4: typographic styles are OK
+		// Get the window width
+		this.glk.glk_window_get_size( this.ui.windows[0], width );
+		width = width.get_value();
+		
+		// Flags 1: Set bits (0), 2, 3, 4: typographic styles are OK
 		// Set bit 7 only if timed input is supported
-		memory.setUint8( 0x01, 0x1D | ( this.env.timed ? 0x80 : 0 ) );
+		memory.setUint8( 0x01, 0x1C | ( this.env.timed ? 0x80 : 0 ) );
 		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects
 		// This is really a word, but we only care about the lower byte
 		memory.setUint8( 0x11, memory.getUint8( 0x11 ) & 0x57 );
 		// Screen settings
 		memory.setUint8( 0x20, 255 ); // Infinite height
-		memory.setUint8( 0x21, this.env.width );
-		memory.setUint16( 0x22, this.env.width );
+		memory.setUint8( 0x21, width );
+		memory.setUint16( 0x22, width );
 		memory.setUint16( 0x24, 255 );
 		memory.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
 		// Z Machine Spec revision
@@ -1096,7 +979,7 @@ module.exports = {
 		// Clear flags three, we don't support any of that stuff
 		this.extension_table( 4, 0 );
 
-		this.ui.update_header();
+		//TODO: this.ui.update_header();
 	},
 
 	// Read or write a variable
