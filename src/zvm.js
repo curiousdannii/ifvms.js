@@ -7,7 +7,12 @@ Copyright (c) 2016 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
-================
+*/
+
+/*
+
+This file is the public API of ZVM, which is based on the API of Quixe:
+https://github.com/erkyrath/quixe/wiki/Quixe-Without-GlkOte#quixes-api
 
 ZVM willfully ignores the standard in these ways:
 	Non-buffered output is not supported
@@ -16,15 +21,6 @@ ZVM willfully ignores the standard in these ways:
 	No interpreter number or version is set
 
 Any other non-standard behaviour should be considered a bug
-
-================
-
-This file represents the public API of the ZVM class.
-It is designed to be compatible with Web Workers, with everything passing through inputEvent() and outputEvent() (which must be provided by the user).
-
-TODO:
-	Specifically handle saving?
-	Try harder to find default colours
 
 */
 
@@ -41,21 +37,49 @@ api = {
 		this.env = {
 			width: 80, // Default width of 80 characters
 		};
+		
+		// The Quixe API expects the start function to be named init
+		this.init = this.start;
+	},
 
-		// TODO: Probably won't work now
-		/*// Optimise our own functions
-		if ( this.env.debug )
+	prepare: function( storydata, options )
+	{
+		// If we are not given a glk option then we cannot continue
+		if ( !options.glk )
 		{
-			// Skip if we must
-			if ( !debugflags.nooptimise )
-			{
-				optimise_obj( this, ['find_prop'] );
-			}
+			throw new Error( 'a reference to Glk is required' );
 		}
-		else
+		this.glk = options.glk;
+		
+		// Convert the storyfile we are given to a Uint8Array
+		this.data = new Uint8Array( storydata );
+		
+		// TODO: check that we are given a valid storyfile
+	},
+
+	start: function()
+	{
+		try {
+			this.restart();
+			this.run();
+		}
+		catch ( e )
 		{
-			optimise_obj( this, ['find_prop'] );
-		}*/
+			this.glk.fatal_error("ZVM start: " + e );
+			throw e;
+		}
+	},
+
+	resume: function()
+	{
+		try {
+			this.run();
+		}
+		catch ( e )
+		{
+			this.glk.fatal_error("ZVM: " + e );
+			throw e;
+		}
 	},
 
 	// An input event, or some other event from the runner
