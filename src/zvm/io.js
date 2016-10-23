@@ -31,7 +31,27 @@ var ZSCII_keyCodes = (function()
 		codes[i] = 0xffffffef - i++; // function keys
 	}
 	return codes;
-})();
+})(),
+
+/*
+
+Try to support as many of the Z-Machine's formatting combinations as possible.
+There are not enough styles to support them all, so sometimes bold formatting misses out.
+This spreadsheet shows how the Z-Machine formatting is mapped to Glk styles
+
+http://docs.google.com/spreadsheets/d/1Nvwyb_twC3_fPYDrjQu86b3KRAmLFDllIUvPUpMz108
+
+The index bits are (lowest to highest): mono, italic, bold, reverse
+
+We use the default GlkOte styles as much as possible, but for full support zvm.css must also be used
+
+*/
+style_mappings = [
+	// main window
+	[ 0, 2, 1, 7, 4, 7, 5, 7, 9, 10, 6, 3, 6, 3, 6, 3 ],
+	// status window
+	[ 0, 0, 1, 1, 4, 4, 5, 5, 9, 9, 6, 6, 3, 3, 7, 7 ],
+];
 
 module.exports = {
 
@@ -50,6 +70,8 @@ module.exports = {
 			// A variable for whether we are outputing in a monospaced font. If non-zero then we are
 			// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
 			mono: this.m.getUint8( 0x11 ) & 0x02,
+			
+			currentwin: 0,
 		};
 
 		this.process_colours();
@@ -89,61 +111,7 @@ module.exports = {
 
 	format: function()
 	{
-		/*var props = {},
-		temp,
-		classes = [],
-		fg = this.fg,
-		bg = this.bg;
-
-		if ( this.bold )
-		{
-			classes.push( 'zvm-bold' );
-		}
-		if ( this.italic )
-		{
-			classes.push( 'zvm-italic' );
-		}
-		if ( this.mono )
-		{
-			classes.push( 'zvm-mono' );
-		}
-		if ( this.reverse )
-		{
-			temp = fg;
-			fg = bg || this.env.bg;
-			bg = temp || this.env.fg;
-		}
-		if ( typeof fg !== 'undefined' )
-		{
-			if ( isNaN( fg ) )
-			{
-				props.css = { color: fg };
-			}
-			else
-			{
-				classes.push( 'zvm-fg-' + fg );
-			}
-		}
-		if ( typeof bg !== 'undefined' )
-		{
-			if ( isNaN( bg ) )
-			{
-				if ( !props.css )
-				{
-					props.css = {};
-				}
-				props.css['background-color'] = bg;
-			}
-			else
-			{
-				classes.push( 'zvm-bg-' + bg );
-			}
-		}
-		if ( classes.length )
-		{
-			props['class'] = classes.join( ' ' );
-		}
-		return props;*/
+		this.glk.glk_set_style( style_mappings[ this.io.currentwin ][ !!this.io.mono | this.io.italic | this.io.bold | this.io.reverse ] );
 	},
 
 	get_cursor: function( /*array*/ )
@@ -219,7 +187,7 @@ module.exports = {
 			if ( ( this.m.getUint8( 0x11 ) & 0x02 ) !== ( this.io.mono & 0x02 ) )
 			{
 				this.io.mono ^= 0x02;
-				// TODO: send font
+				this.format();
 			}
 			this.glk.glk_put_jstring( text );
 		}
@@ -419,47 +387,48 @@ module.exports = {
 		this.glk.glk_window_move_cursor( this.statuswin, col - 1, row - 1 );
 	},
 
-	set_font: function( /*font*/ )
+	set_font: function( font )
 	{
 		// We only support fonts 1 and 4
-		/*if ( font !== 1 && font !== 4 )
+		if ( font !== 1 && font !== 4 )
 		{
 			return 0;
 		}
-		var returnval = this.mono & 0x04 ? 4 : 1;
+		var returnval = this.io.mono & 0x04 ? 4 : 1;
 		if ( font !== returnval )
 		{
-			this.mono ^= 0x04;
+			this.io.mono ^= 0x04;
+			this.format();
 		}
-		return returnval;*/
+		return returnval;
 	},
 
 	// Set styles
-	set_style: function( /*stylebyte*/ )
+	set_style: function( stylebyte )
 	{
-		/*
 		// Setting the style to Roman will clear the others
 		if ( stylebyte === 0 )
 		{
-			this.reverse = this.bold = this.italic = 0;
-			this.mono &= 0xFE;
+			this.io.reverse = this.io.bold = this.io.italic = 0;
+			this.io.mono &= 0xFE;
 		}
 		if ( stylebyte & 0x01 )
 		{
-			this.reverse = 1;
+			this.io.reverse = 0x08;
 		}
 		if ( stylebyte & 0x02 )
 		{
-			this.bold = 1;
+			this.io.bold = 0x04;
 		}
 		if ( stylebyte & 0x04 )
 		{
-			this.italic = 1;
+			this.io.italic = 0x02;
 		}
 		if ( stylebyte & 0x08 )
 		{
-			this.mono |= 0x01;
-		}*/
+			this.io.mono |= 0x01;
+		}
+		this.format();
 	},
 
 	// Set true colours
@@ -503,6 +472,8 @@ module.exports = {
 	set_window: function( window )
 	{
 		this.glk.glk_set_window( window ? this.statuswin : this.mainwin );
+		this.io.currentwin = window;
+		this.format();
 		
 		// Focusing the upper window resets the cursor to the top left
 		if ( window )

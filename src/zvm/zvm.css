@@ -1,0 +1,77 @@
+/*
+
+ZVM - the ifvms.js Z-Machine
+============================
+
+Copyright (c) 2016 The ifvms.js team
+BSD licenced
+http://github.com/curiousdannii/ifvms.js
+
+*/
+
+/*
+
+Try to support as many of the Z-Machine's formatting combinations as possible.
+There are not enough styles to support them all, so sometimes bold formatting misses out.
+This spreadsheet shows how the Z-Machine formatting is mapped to Glk styles
+
+http://docs.google.com/spreadsheets/d/1Nvwyb_twC3_fPYDrjQu86b3KRAmLFDllIUvPUpMz108
+
+This stylesheet is to be used in addition to a GlkOte stylesheet. The DarkTheme class is for Lectrote's dark theme
+
+*/
+
+/* Clear some default GlkOte styles */
+.BufferWindow .Style_header
+{
+	font-size: inherit;
+	font-weight: normal;
+}
+
+.Style_blockquote
+{
+	background: inherit;
+}
+
+/* Monospaced styles */
+.BufferWindow .Style_header,
+.BufferWindow .Style_blockquote,
+.Style_user2
+{
+	font-family: "Source Code Pro", Monaco, Courier, monospace;
+}
+
+/* Italic styles */
+.BufferWindow .Style_header,
+.Style_alert,
+.Style_blockquote
+{
+	font-style: italic;
+}
+
+/* Bold styles */
+.GridWindow .Style_blockquote
+{
+	font-weight: bold;
+}
+
+/* Reverse */
+.Style_header,
+.Style_note,
+.GridWindow .Style_blockquote,
+.Style_user1,
+.Style_user2
+{
+	background: #000;
+	color: #fff;
+}
+
+.DarkTheme .Style_header,
+.DarkTheme .Style_note,
+.DarkTheme .GridWindow .Style_blockquote,
+.DarkTheme .Style_user1,
+.DarkTheme .Style_user2
+{
+	background: #fff;
+	color: #000;
+}

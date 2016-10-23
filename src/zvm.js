@@ -57,39 +57,53 @@ api = {
 
 	start: function()
 	{
+		var Glk = this.glk;
 		try
 		{
+			// Initiate the engine, run, and wait for our first Glk event
 			this.restart();
 			this.run();
+			this.glk_event = new Glk.RefStruct();
+			Glk.glk_select( this.glk_event );
+			Glk.update();
 		}
 		catch ( e )
 		{
-			this.glk.fatal_error( 'ZVM start: ' + e );
+			Glk.fatal_error( 'ZVM start: ' + e );
 			throw e;
 		}
 	},
 
 	resume: function()
 	{
-		var glk_event = this.glk_event;
+		var Glk = this.glk,
+		glk_event = this.glk_event,
+		event_type;
+		
 		try
 		{
+			event_type = glk_event.get_field( 0 );
+			
 			// Process the event
-			switch ( glk_event.get_field( 0 ) )
+			if ( event_type === 2 )
 			{
-				case 2: // Char event
-					this.handle_char_input( glk_event.get_field( 2 ) );
-					break;
-
-				case 3: // Line event
-					this.handle_line_input( glk_event.get_field( 2 ), glk_event.get_field( 3 ) );
-					break;
+				this.handle_char_input( glk_event.get_field( 2 ) );
+				this.run();
 			}
-			this.run();
+			if ( event_type === 3 )
+			{
+				this.handle_line_input( glk_event.get_field( 2 ), glk_event.get_field( 3 ) );
+				this.run();
+			}
+			
+			// Wait for another event
+			this.glk_event = new Glk.RefStruct();
+			Glk.glk_select( this.glk_event );
+			Glk.update();
 		}
 		catch ( e )
 		{
-			this.glk.fatal_error( 'ZVM: ' + e );
+			Glk.fatal_error( 'ZVM: ' + e );
 			throw e;
 		}
 	},
@@ -97,8 +111,7 @@ api = {
 	// Run
 	run: function()
 	{
-		var Glk = this.glk,
-		pc,
+		var pc,
 		result;
 
 		// Stop when ordered to
@@ -118,9 +131,6 @@ api = {
 				this.ret( result );
 			}
 		}
-		this.glk_event = new Glk.RefStruct();
-		Glk.glk_select( this.glk_event );
-		Glk.update();
 	},
 
 	// Compile a JIT routine
