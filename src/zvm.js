@@ -1,7 +1,7 @@
 /*
 
 ZVM - the ifvms.js Z-Machine (versions 3, 5 and 8)
-===============================================
+=================================================
 
 Copyright (c) 2016 The ifvms.js team
 BSD licenced
@@ -25,8 +25,6 @@ Any other non-standard behaviour should be considered a bug
 */
 
 var utils = require( './common/utils.js' ),
-Class = utils.Class,
-extend = utils.extend,
 
 api = {
 
@@ -59,126 +57,48 @@ api = {
 
 	start: function()
 	{
-		try {
+		try
+		{
 			this.restart();
 			this.run();
 		}
 		catch ( e )
 		{
-			this.glk.fatal_error("ZVM start: " + e );
+			this.glk.fatal_error( 'ZVM start: ' + e );
 			throw e;
 		}
 	},
 
 	resume: function()
 	{
-		try {
+		var glk_event = this.glk_event;
+		try
+		{
+			// Process the event
+			switch ( glk_event.get_field( 0 ) )
+			{
+				case 2: // Char event
+					this.handle_char_input( glk_event.get_field( 2 ) );
+					break;
+
+				case 3: // Line event
+					this.handle_line_input( glk_event.get_field( 2 ), glk_event.get_field( 3 ) );
+					break;
+			}
 			this.run();
 		}
 		catch ( e )
 		{
-			this.glk.fatal_error("ZVM: " + e );
+			this.glk.fatal_error( 'ZVM: ' + e );
 			throw e;
 		}
-	},
-
-	// An input event, or some other event from the runner
-	inputEvent: function( data )
-	{
-		var memory = this.m,
-		code = data.code;
-
-		// Update environment variables
-		if ( data.env )
-		{
-			extend( this.env, data.env );
-
-			/*if ( this.env.debug )
-			{
-				if ( data.env.debug )
-				{
-					get_debug_flags( data.env.debug );
-				}
-			}*/
-
-			// Also need to update the header
-
-			// Stop if there's no code - we're being sent live updates
-			if ( !code )
-			{
-				return;
-			}
-		}
-
-		// Load the story file
-		if ( code === 'load' )
-		{
-			// Convert the data we are given to a Uint8Array
-			this.data = new Uint8Array( data.data );
-			return;
-		}
-
-		// Clear the list of orders
-		this.orders = [];
-
-		if ( code === 'restart' )
-		{
-			this.restart();
-		}
-
-		if ( code === 'save' )
-		{
-			// Set the result variable, assume success
-			this.save_restore_result( data.result || 1 );
-		}
-
-		if ( code === 'restore' )
-		{
-			// Restart the VM if we never have before
-			if ( !this.m )
-			{
-				this.restart();
-			}
-
-			// Successful restore
-			if ( data.data )
-			{
-				this.restore_file( data.data );
-			}
-			// Failed restore
-			else
-			{
-				this.save_restore_result( 0 );
-			}
-		}
-
-		// Handle line input
-		if ( code === 'read' )
-		{
-			this.handle_input( data );
-		}
-
-		// Handle character input
-		if ( code === 'char' )
-		{
-			this.variable( this.read_data.storer, this.keyinput( data.response ) );
-		}
-
-		// Write the status window's cursor position
-		if ( code === 'get_cursor' )
-		{
-			memory.setUint16( data.addr, data.pos[0] + 1 );
-			memory.setUint16( data.addr + 2, data.pos[1] + 1 );
-		}
-
-		// Resume normal operation
-		this.run();
 	},
 
 	// Run
 	run: function()
 	{
-		var pc,
+		var Glk = this.glk,
+		pc,
 		result;
 
 		// Stop when ordered to
@@ -198,78 +118,28 @@ api = {
 				this.ret( result );
 			}
 		}
-		this.glk.update();
+		this.glk_event = new Glk.RefStruct();
+		Glk.glk_select( this.glk_event );
+		Glk.update();
 	},
 
 	// Compile a JIT routine
 	compile: function()
 	{
-		var context = this.disassemble(), code, func;
-
+		var context = this.disassemble();
+		
 		// Compile the routine with new Function()
-		if ( this.env.debug )
-		{
-			code = '' + context;
-			/*if ( !debugflags.nooptimise )
-			{
-				code = optimise( code );
-			}
-			if ( debugflags.jit )
-			{
-				console.log( code );
-			}*/
-			// We use eval because Firebug can't profile new Function
-			// The 0, is to make IE8 work. h/t Secrets of the Javascript Ninja
-			func = eval( '(0,function JIT_' + context.pc + '(e){' + code + '})' );
+		this.jit[context.pc] = new Function( 'e', '' + context );
 
-			// Extra stuff for debugging
-			func.context = context;
-			func.code = code;
-			if ( context.name )
-			{
-				func.name = context.name;
-			}
-			this.jit[context.pc] = func;
-		}
-		else // DEBUG
-		{
-			// TODO: optimise
-			//this.jit[context.pc] = new Function( 'e', optimise( '' + context ) );
-			this.jit[context.pc] = new Function( 'e', '' + context );
-		}
 		if ( context.pc < this.staticmem )
 		{
 			this.warn( 'Caching a JIT function in dynamic memory: ' + context.pc );
 		}
 	},
 
-	// Return control to the ZVM runner to perform some action
-	act: function( code, options )
-	{
-		options = options || {};
-
-		// Handle numerical codes from jit-code - these codes are opcode numbers
-		if ( code === 183 )
-		{
-			code = 'restart';
-		}
-		if ( code === 186 )
-		{
-			code = 'quit';
-		}
-
-		options.code = code;
-		this.orders.push( options );
-		this.stop = 1;
-		if ( this.outputEvent )
-		{
-			this.outputEvent( this.orders );
-		}
-	},
-
 },
 
-VM = Class.subClass( extend(
+VM = utils.Class.subClass( utils.extend(
 	api,
 	require( './zvm/runtime.js' ),
 	require( './zvm/text.js' ),

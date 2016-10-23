@@ -66,27 +66,6 @@ function MemoryView( buffer )
 	} );
 }
 
-// DataView doesn't seem to be subclassable in ES5: http://stackoverflow.com/a/36068693/2854284
-/*function MemoryView()
-{
-	DataView.apply( this, arguments );
-}
-MemoryView.prototype = extend( Object.create( DataView.prototype ), {
-	getBuffer8: function( start, length )
-	{
-		return new Uint8Array( this.buffer.slice( start, start + length ) );
-	},
-	getBuffer16: function( start, length )
-	{
-		return new Uint16Array( this.buffer.slice( start, start + length * 2 ) );
-	},
-	setBuffer8: function( start, buffer )
-	{
-		( new Uint8Array( this.buffer ) ).set( buffer, start );
-	},
-	//setBuffer16
-} );*/
-
 // Utilities for 16-bit signed arithmetic
 function U2S16( value )
 {
@@ -152,24 +131,3 @@ function optimise_obj( obj, funcnames )
 	}
 	extend( obj, eval( '({' + newfuncs.join() + '})' ) );
 }*/
-
-/*if ( DEBUG ) {
-
-	// Debug flags
-	var debugflags = {},
-	get_debug_flags = function( data )
-	{
-		data = data.split( ',' );
-		var i = 0;
-		while ( i < data.length )
-		{
-			debugflags[data[i++]] = 1;
-		}
-	};
-	if ( typeof parchment !== 'undefined' && parchment.options && parchment.options.debug )
-	{
-		get_debug_flags( parchment.options.debug );
-	}
-
-} // ENDDEBUG
-*/

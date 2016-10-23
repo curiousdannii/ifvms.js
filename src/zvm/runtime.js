@@ -29,6 +29,30 @@ file = require( '../common/file.js' );
 
 module.exports = {
 
+	// Return control to the ZVM runner to perform some action
+	act: function( code, options )
+	{
+		options = options || {};
+
+		// Handle numerical codes from jit-code - these codes are opcode numbers
+		if ( code === 183 )
+		{
+			code = 'restart';
+		}
+		if ( code === 186 )
+		{
+			code = 'quit';
+		}
+
+		options.code = code;
+		this.orders.push( options );
+		this.stop = 1;
+		if ( this.outputEvent )
+		{
+			this.outputEvent( this.orders );
+		}
+	},
+
 	art_shift: function( number, places )
 	{
 		return places > 0 ? number << places : number >> -places;
@@ -301,52 +325,6 @@ module.exports = {
 		return value & 0x40 ? 2 : 1;
 	},
 
-	// Handle line input
-	handle_input: function( data )
-	{
-		var memory = this.m,
-		options = this.read_data,
-
-		// Echo the response (7.1.1.1)
-		response = data.response;
-		this._print( response + '\r' );
-
-		// Convert the response to lower case and then to ZSCII
-		response = this.text_to_zscii( response.toLowerCase() );
-
-		// Check if the response is too long, and then set its length
-		if ( response.length > options.len )
-		{
-			response = response.slice( 0, options.len );
-		}
-
-		if ( this.version3 )
-		{
-			// Append zero terminator
-			response.push( 0 );
-
-			// Store the response in the buffer
-			memory.setBuffer8( options.buffer + 1, response );
-		}
-		else
-		{
-			// Store the response length
-			memory.setUint8( options.buffer + 1, response.length );
-
-			// Store the response in the buffer
-			memory.setBuffer8( options.buffer + 2, response );
-
-			// Store the terminator
-			this.variable( options.storer, isNaN( data.terminator ) ? 13 : data.terminator );
-		}
-
-		if ( options.parse )
-		{
-			// Tokenise the response
-			this.tokenise( options.buffer, options.parse );
-		}
-	},
-
 	// Quick hack for @inc/@dec/@inc_chk/@dec_chk
 	incdec: function( varnum, change )
 	{
@@ -593,7 +571,7 @@ module.exports = {
 		});
 
 		this.init_text();
-		this.init_ui();
+		this.init_io();
 
 		// Update the header
 		this.update_header();
@@ -958,7 +936,7 @@ module.exports = {
 		}
 
 		// Get the window width
-		this.glk.glk_window_get_size( this.ui.windows[0], width );
+		this.glk.glk_window_get_size( this.mainwin, width );
 		width = width.get_value();
 		
 		// Flags 1: Set bits (0), 2, 3, 4: typographic styles are OK

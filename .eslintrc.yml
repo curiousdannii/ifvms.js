@@ -28,7 +28,6 @@ rules:
     - error
     - tab
     -
-      outerIIFEBody: 0
       SwitchCase: 1
       VariableDeclarator: 0
   linebreak-style:

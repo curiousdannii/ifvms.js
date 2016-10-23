@@ -16,27 +16,6 @@ TODO:
 
 */
 
-// Key codes accepted by the Z-Machine
-var ZSCII_keyCodes = {
-	8: 8, // delete/backspace
-	13: 13, // enter
-	27: 27, // escape
-	37: 131, // arrow keys
-	38: 129,
-	39: 132,
-	40: 130,
-},
-i = 96;
-while ( i < 106 )
-{
-	ZSCII_keyCodes[i] = 49 + i++; // keypad
-}
-i = 112;
-while ( i < 124 )
-{
-	ZSCII_keyCodes[i] = 21 + i++; // function keys
-}
-
 module.exports = {
 
 	init_text: function()
@@ -446,13 +425,6 @@ module.exports = {
 
 		// Update the number of found words
 		memory.setUint8( buffer + 1, wordcount );
-	},
-
-	// Handle key input
-	keyinput: function( data )
-	{
-		// Handle key codes first, then check the character table, or return a '?' if nothing is found
-		return ZSCII_keyCodes[ data.keyCode ] || this.reverse_unicode_table[ data.charCode ] || 63;
 	},
 
 };

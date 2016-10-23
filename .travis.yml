@@ -11,4 +11,3 @@ cache:
 
 script:
   - npm run lint
-  - make test

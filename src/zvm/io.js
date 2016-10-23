@@ -9,11 +9,35 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
+// Glulx key codes accepted by the Z-Machine
+var ZSCII_keyCodes = (function()
+{
+	var codes = {
+		0xfffffff9: 8, // delete/backspace
+		0xfffffffa: 13, // enter
+		0xfffffff8: 27, // escape
+		0xfffffffc: 129, // up
+		0xfffffffb: 130, // down
+		0xfffffffe: 131, // left
+		0xfffffffd: 132, // right
+		0xfffffff3: 146, // End / key pad 1
+		0xfffffff5: 148, // PgDn / key pad 3
+		0xfffffff4: 152, // Home / key pad 7
+		0xfffffff6: 154, // PgUp / key pad 9
+	},
+	i = 0;
+	while ( i < 12 )
+	{
+		codes[i] = 0xffffffef - i++; // function keys
+	}
+	return codes;
+})();
+
 module.exports = {
 
-	init_ui: function()
+	init_io: function()
 	{
-		this.ui = {
+		this.io = {
 			reverse: 0,
 			bold: 0,
 			italic: 0,
@@ -31,16 +55,15 @@ module.exports = {
 		this.process_colours();
 
 		// Construct the windows if they do not already exist
-		var Glk = this.glk;
 		if ( !this.mainwin )
 		{
-			this.mainwin = Glk.glk_window_open( 0, 0, 0, 3, 201 );
-			this.statuswin = Glk.glk_window_open( this.mainwin, 0x12, 0, 4, 202 );
+			this.mainwin = this.glk.glk_window_open( 0, 0, 0, 3, 201 );
+			this.statuswin = this.glk.glk_window_open( this.mainwin, 0x12, 0, 4, 202 );
 		}
 		this.set_window( 0 );
 	},
 
-	erase_line: function( value )
+	erase_line: function( /*value*/ )
 	{
 		/*if ( value === 1 )
 		{
@@ -50,15 +73,13 @@ module.exports = {
 
 	erase_window: function( window )
 	{
-		var Glk = this.glk;
-		
 		if ( window < 1 )
 		{
-			Glk.glk_window_clear( this.mainwin );
+			this.glk.glk_window_clear( this.mainwin );
 		}
 		if ( window === 1 || window === -2 )
 		{
-			Glk.glk_window_clear( this.statuswin );
+			this.glk.glk_window_clear( this.statuswin );
 		}
 		if ( window === -1 )
 		{
@@ -125,13 +146,58 @@ module.exports = {
 		return props;*/
 	},
 
-	get_cursor: function( array )
+	get_cursor: function( /*array*/ )
 	{
 		/*this.status.push({
 			code: 'get_cursor',
 			addr: array,
 		});
 		this.e.act();*/
+	},
+
+	// Handle char input
+	handle_char_input: function( charcode )
+	{
+		this.variable( this.read_data.storer, ZSCII_keyCodes[ charcode ] || this.reverse_unicode_table[ charcode ] || 63 );
+	},
+
+	// Handle line input
+	handle_line_input: function( len, terminator )
+	{
+		var memory = this.m,
+		options = this.read_data,
+		
+		// 7.1.1.1: The response must be echoed, Glk will handle this
+		
+		// Cut the response array to len, convert back to a string, convert to lower case, and then to a ZSCII array
+		response = this.text_to_zscii( String.fromCharCode.apply( null, options.buffer.slice( 0, len ) ).toLowerCase() );
+
+		// Store the response
+		if ( this.version3 )
+		{
+			// Append zero terminator
+			response.push( 0 );
+
+			// Store the response in the buffer
+			memory.setBuffer8( options.bufaddr + 1, response );
+		}
+		else
+		{
+			// Store the response length
+			memory.setUint8( options.bufaddr + 1, len );
+
+			// Store the response in the buffer
+			memory.setBuffer8( options.bufaddr + 2, response );
+
+			// Store the terminator
+			this.variable( options.storer, isNaN( terminator ) ? 13 : terminator );
+		}
+
+		if ( options.parseaddr )
+		{
+			// Tokenise the response
+			this.tokenise( options.bufaddr, options.parseaddr );
+		}
 	},
 
 	// Print text!
@@ -150,9 +216,9 @@ module.exports = {
 			
 			// Check if the monospace font bit has changed
 			// Unfortunately, even now Inform changes this bit for the font statement, even though the 1.1 standard depreciated it :(
-			if ( ( this.m.getUint8( 0x11 ) & 0x02 ) !== ( this.ui.mono & 0x02 ) )
+			if ( ( this.m.getUint8( 0x11 ) & 0x02 ) !== ( this.io.mono & 0x02 ) )
 			{
-				this.ui.mono ^= 0x02;
+				this.io.mono ^= 0x02;
 				// TODO: send font
 			}
 			this.glk.glk_put_jstring( text );
@@ -214,7 +280,7 @@ module.exports = {
 	{
 		// Convert RGB to a Z-Machine true colour
 		// RGB is a css colour code. rgb(), #000000 and #000 formats are supported.
-		function convert_RGB( code )
+		/*function convert_RGB( code )
 		{
 			var round = Math.round,
 			data = /(\d+),\s*(\d+),\s*(\d+)|#(\w{1,2})(\w{1,2})(\w{1,2})/.exec( code ),
@@ -241,7 +307,7 @@ module.exports = {
 		}
 
 		// Standard colours
-		/*var colours = [
+		var colours = [
 			0xFFFE, // Current
 			0xFFFF, // Default
 			0x0000, // Black
@@ -254,7 +320,7 @@ module.exports = {
 			0x7FFF, // White
 			0x5AD6, // Light grey
 			0x4631, // Medium grey
-			0x2D6B,  // Dark grey
+			0x2D6B,	 // Dark grey
 		],
 
 		// Start with CSS colours provided by the runner
@@ -289,7 +355,8 @@ module.exports = {
 	read: function( storer, text, parse, time, routine )
 	{
 		var len = this.m.getUint8( text ),
-		initiallen = 0;
+		initiallen = 0,
+		buffer;
 
 		if ( this.version3 )
 		{
@@ -301,17 +368,18 @@ module.exports = {
 			//initiallen = this.m.getUint8( text + 1 );
 		}
 
+		buffer =  Array( len );
 		this.read_data = {
-			buffer: text, // text-buffer
-			len: len,
-			parse: parse, // parse-buffer
+			buffer: buffer,
+			bufaddr: text, // text-buffer
+			parseaddr: parse, // parse-buffer
 			routine: routine,
 			storer: storer,
 			time: time,
 		};
 		
 		// TODO: pre-existing input
-		this.glk.glk_request_line_event_uni( this.mainwin, [], /*len,*/ initiallen );
+		this.glk.glk_request_line_event_uni( this.mainwin, buffer, initiallen );
 	},
 
 	// Request character input
@@ -325,7 +393,7 @@ module.exports = {
 		this.glk.glk_request_char_event_uni( this.mainwin );
 	},
 
-	set_colour: function( foreground, background )
+	set_colour: function( /*foreground, background*/ )
 	{
 		/*if ( foreground === 1 )
 		{
@@ -351,7 +419,7 @@ module.exports = {
 		this.glk.glk_window_move_cursor( this.statuswin, col - 1, row - 1 );
 	},
 
-	set_font: function( font )
+	set_font: function( /*font*/ )
 	{
 		// We only support fonts 1 and 4
 		/*if ( font !== 1 && font !== 4 )
@@ -367,7 +435,7 @@ module.exports = {
 	},
 
 	// Set styles
-	set_style: function( stylebyte )
+	set_style: function( /*stylebyte*/ )
 	{
 		/*
 		// Setting the style to Roman will clear the others
@@ -395,7 +463,7 @@ module.exports = {
 	},
 
 	// Set true colours
-	set_true_colour: function( foreground, background )
+	set_true_colour: function( /*foreground, background*/ )
 	{
 		// Convert a 15 bit colour to RGB
 		/*function convert_true_colour( colour )
@@ -434,28 +502,24 @@ module.exports = {
 
 	set_window: function( window )
 	{
-		var Glk = this.glk;
-		
-		Glk.glk_set_window( window ? this.statuswin : this.mainwin );
+		this.glk.glk_set_window( window ? this.statuswin : this.mainwin );
 		
 		// Focusing the upper window resets the cursor to the top left
 		if ( window )
 		{
 			// TODO: cursor variables
-			Glk.glk_window_move_cursor( this.statuswin, 0, 0 );
+			this.glk.glk_window_move_cursor( this.statuswin, 0, 0 );
 		}
 	},
 
 	split_window: function( lines )
 	{
-		var Glk = this.glk;
-		
-		Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.statuswin ), 0x12, lines, null );
+		this.glk.glk_window_set_arrangement( this.glk.glk_window_get_parent( this.statuswin ), 0x12, lines, null );
 		
 		// 8.6.1.1.2: In version three the upper window is always cleared
 		if ( this.version3 )
 		{
-			Glk.glk_window_clear( this.statuswin );
+			this.glk.glk_window_clear( this.statuswin );
 		}
 	},
 
