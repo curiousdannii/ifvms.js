@@ -72,6 +72,11 @@ module.exports = {
 			mono: this.m.getUint8( 0x11 ) & 0x02,
 			
 			currentwin: 0,
+			
+			width: 0,
+			height: 0,
+			row: 0,
+			col: 0,
 		};
 
 		this.process_colours();
@@ -85,12 +90,16 @@ module.exports = {
 		this.set_window( 0 );
 	},
 
-	erase_line: function( /*value*/ )
+	erase_line: function( value )
 	{
-		/*if ( value === 1 )
+		if ( value === 1 )
 		{
-			this.status.push( { code: 'eraseline' } );
-		}*/
+			var io = this.io,
+			row = io.row,
+			col = io.col;
+			this._print( Array( io.width - io.col + 1 ).join( ' ' ) );
+			this.set_cursor( row, col );
+		}
 	},
 
 	erase_window: function( window )
@@ -102,6 +111,7 @@ module.exports = {
 		if ( window === 1 || window === -2 )
 		{
 			this.glk.glk_window_clear( this.statuswin );
+			this.set_cursor( 0, 0 );
 		}
 		if ( window === -1 )
 		{
@@ -114,13 +124,10 @@ module.exports = {
 		this.glk.glk_set_style( style_mappings[ this.io.currentwin ][ !!this.io.mono | this.io.italic | this.io.bold | this.io.reverse ] );
 	},
 
-	get_cursor: function( /*array*/ )
+	get_cursor: function( array )
 	{
-		/*this.status.push({
-			code: 'get_cursor',
-			addr: array,
-		});
-		this.e.act();*/
+		this.m.setUint16( array, this.io.row + 1 );
+		this.m.setUint16( array + 2, this.io.col + 1 );
 	},
 
 	// Handle char input
@@ -171,6 +178,9 @@ module.exports = {
 	// Print text!
 	_print: function( text )
 	{
+		var io = this.io,
+		i = 0;
+		
 		// Stream 3 gets the text first
 		if ( this.streams[2].length )
 		{
@@ -184,12 +194,32 @@ module.exports = {
 			
 			// Check if the monospace font bit has changed
 			// Unfortunately, even now Inform changes this bit for the font statement, even though the 1.1 standard depreciated it :(
-			if ( ( this.m.getUint8( 0x11 ) & 0x02 ) !== ( this.io.mono & 0x02 ) )
+			if ( ( this.m.getUint8( 0x11 ) & 0x02 ) !== ( io.mono & 0x02 ) )
 			{
-				this.io.mono ^= 0x02;
+				io.mono ^= 0x02;
 				this.format();
 			}
-			this.glk.glk_put_jstring( text );
+			
+			// For the upper window we print each character individually so that we can track the cursor position
+			if ( io.currentwin )
+			{
+				// Don't automatically increase the size of the window
+				// If we confirm that games do need this then we can implement it later
+				while ( i < text.length && io.row < io.height )
+				{
+					this.glk.glk_put_jstring( text[i++] );
+					io.col++;
+					if ( io.col === io.width )
+					{
+						io.col = 0;
+						io.row++;
+					}
+				}
+			}
+			else
+			{
+				this.glk.glk_put_jstring( text );
+			}
 		}
 	},
 
@@ -381,10 +411,16 @@ module.exports = {
 		}*/
 	},
 
+	// Note that row and col must be decremented in JIT code
 	set_cursor: function( row, col )
 	{
-		// TODO: cursor variables
-		this.glk.glk_window_move_cursor( this.statuswin, col - 1, row - 1 );
+		var io = this.io;
+		if ( row >= 0 && row < io.height && col >= 0 && col < io.width )
+		{
+			this.glk.glk_window_move_cursor( this.statuswin, col, row );
+			io.row = row;
+			io.col = col;
+		}
 	},
 
 	set_font: function( font )
@@ -478,14 +514,14 @@ module.exports = {
 		// Focusing the upper window resets the cursor to the top left
 		if ( window )
 		{
-			// TODO: cursor variables
-			this.glk.glk_window_move_cursor( this.statuswin, 0, 0 );
+			this.set_cursor( 0, 0 );
 		}
 	},
 
 	split_window: function( lines )
 	{
 		this.glk.glk_window_set_arrangement( this.glk.glk_window_get_parent( this.statuswin ), 0x12, lines, null );
+		this.io.height = lines;
 		
 		// 8.6.1.1.2: In version three the upper window is always cleared
 		if ( this.version3 )
@@ -540,13 +576,17 @@ module.exports = {
 		this.extension_table( 4, 0 );
 	},
 
-	update_width()
+	update_width: function()
 	{
 		var width, box = new this.glk.RefBox();
 		this.glk.glk_window_get_size( this.statuswin, box );
 		this.io.width = width = box.get_value();
 		this.m.setUint8( 0x21, width );
 		this.m.setUint16( 0x22, width );
+		if ( this.io.col >= width )
+		{
+			this.io.col = width - 1;
+		}
 	},
 	
 	// Output the version 3 status line
@@ -559,7 +599,7 @@ module.exports = {
 		this.set_window( 1 );
 		this.set_style( 1 );
 		engine._print( Array( width + 1 ).join( ' ' ) );
-		this.set_cursor( 1, 1 );
+		this.set_cursor( 0, 0 );
 
 		// Handle the turns/score or time
 		if ( this.time )
@@ -575,7 +615,7 @@ module.exports = {
 		// this.buffer now has the room name, so ensure it is not too long
 		this.buffer = ' ' + this.buffer.slice( 0, width - rhs.length - 4 );
 
-		this.set_cursor( 1, width - rhs.length );
+		this.set_cursor( 0, width - rhs.length );
 		engine._print( rhs );
 		this.set_style( 0 );
 		this.set_window( 0 );*/
