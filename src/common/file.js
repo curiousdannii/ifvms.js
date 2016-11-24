@@ -9,51 +9,45 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
-function string_to_Uint32( str, offset )
-{
-	return str.charCodeAt( offset ) << 24 | str.charCodeAt( offset + 1 ) << 16 | str.charCodeAt( offset + 2 ) << 8 | str.charCodeAt( offset + 3 );
-}
-
-function Uint32_to_string( num )
-{
-	return String.fromCharCode.call( null, ( num >> 24 ) & 0xFF, ( num >> 16 ) & 0xFF, ( num >> 8 ) & 0xFF, num & 0xFF );
-}
+'use strict';
 
 var utils = require( './utils.js' ),
-Class = utils.Class,
 
 // A basic IFF file, to be extended later
-// Currently supports string data
-IFF = Class.subClass({
+// Currently supports buffer data
+IFF = utils. Class.subClass({
 	init: function( data )
 	{
 		this.type = '';
 		this.chunks = [];
+		
 		if ( data )
 		{
+			var view = utils.MemoryView( data ),
+			i = 12, chunk_length;
+			
 			// Check that it is actually an IFF file
-			if ( data.substr( 0, 4 ) !== 'FORM' )
+			if ( view.getFourCC( 0 ) !== 'FORM' )
 			{
 				throw new Error( 'Not an IFF file' );
 			}
 
 			// Parse the file
-			this.type = data.substr( 8, 4 );
+			this.type = view.getFourCC( 8 );
 
-			var i = 12, l = data.length, chunk_length;
-			while ( i < l )
+			while ( i < data.length )
 			{
-				chunk_length = string_to_Uint32( data, i + 4 );
+				chunk_length = view.getUint32( i + 4 );
 
-				if ( chunk_length < 0 || ( chunk_length + i ) > l )
+				if ( chunk_length < 0 || ( chunk_length + i ) > data.length )
 				{
 					throw new Error( 'IFF chunk out of range' );
 				}
 
 				this.chunks.push({
-					type: data.substr( i, 4 ),
+					type: view.getFourCC( i ),
 					offset: i,
-					data: data.substr( i + 8, chunk_length ),
+					data: view.getBuffer8( i + 8, chunk_length ),
 				});
 
 				i += 8 + chunk_length;
@@ -68,24 +62,45 @@ IFF = Class.subClass({
 	write: function()
 	{
 		// Start with the IFF type
-		var out = this.type,
-		i = 0, l = this.chunks.length,
-		chunk, data;
+		var buffer_len = 12, i = 0, index = 12,
+		out, chunk;
 
+		// First calculate the required buffer length
+		while ( i < this.chunks.length )
+		{
+			// Replace typed arrays or dataviews with their buffers
+			if ( this.chunks[i].data.buffer )
+			{
+				this.chunks[i].data = this.chunks[i].data;
+			}
+			buffer_len += 8 + this.chunks[i++].data.length;
+			if ( buffer_len % 2 )
+			{
+				buffer_len++;
+			}
+		}
+		
+		out = utils.MemoryView( new ArrayBuffer( buffer_len ) );
+		out.setFourCC( 0, 'FORM' );
+		out.setUint32( 4, buffer_len - 8 );
+		out.setFourCC( 8, this.type );
+		
 		// Go through the chunks and write them out
-		while ( i < l )
+		i = 0;
+		while ( i < this.chunks.length )
 		{
 			chunk = this.chunks[i++];
-			data = chunk.data;
-			out += chunk.type + Uint32_to_string( data.length ) + data;
-			if ( data.length % 2 )
+			out.setFourCC( index, chunk.type );
+			out.setUint32( index + 4, chunk.data.length );
+			out.setBuffer8( index + 8, chunk.data );
+			index += 8 + chunk.data.length;
+			if ( index % 2 )
 			{
-				out += '\0';
+				index++;
 			}
 		}
 
-		// Add the header and return
-		return 'FORM' + Uint32_to_string( out.length ) + out;
+		return out.buffer;
 	},
 }),
 
@@ -103,31 +118,35 @@ Quetzal = IFF.subClass({
 			}
 
 			// Go through the chunks and extract the useful ones
-			var i = 0, l = this.chunks.length, type, chunk_data;
-			while ( i < l )
+			var i = 0,
+			type, chunk_data, view;
+			
+			while ( i < this.chunks.length )
 			{
 				type = this.chunks[i].type;
 				chunk_data = this.chunks[i++].data;
 
-				// Memory and stack chunks. Overwrites existing data if more than one of each is present!
+				// Memory and stack chunks
 				if ( type === 'CMem' || type === 'UMem' )
 				{
-					this.memory = data;
+					this.memory = chunk_data;
 					this.compressed = ( type === 'CMem' );
 				}
 				else if ( type === 'Stks' )
 				{
-					this.stacks = data;
+					this.stacks = chunk_data;
 				}
 
 				// Story file data
 				else if ( type === 'IFhd' )
 				{
-					this.release = chunk_data.slice( 0, 2 );
-					this.serial = chunk_data.slice( 2, 8 );
+					view = utils.MemoryView( chunk_data );
+					this.release = view.getUint16( 0 );
+					this.serial = view.getBuffer8( 2, 6 );
 					// The checksum isn't used, but if we throw it away we can't round-trip
-					this.checksum = chunk_data.slice( 8, 10 );
-					this.pc = chunk_data[10] << 16 | chunk_data[11] << 8 | chunk_data[12];
+					this.checksum = view.getUint16( 8 );
+					// The pc is only a Uint24, but there's no function for that, so grab an extra byte and then discard it
+					this.pc = view.getUint32( 9 ) & 0xFFFFFF;
 				}
 			}
 		}
@@ -140,12 +159,11 @@ Quetzal = IFF.subClass({
 		this.type = 'IFZS';
 
 		// Format the IFhd chunk correctly
-		var pc = this.pc,
-		ifhd = this.release.concat(
-			this.serial,
-			this.checksum,
-			( pc >> 16 ) & 0xFF, ( pc >> 8 ) & 0xFF, pc & 0xFF
-		);
+		var ifhd = utils.MemoryView( new ArrayBuffer( 13 ) );
+		ifhd.setUint16( 0, this.release );
+		ifhd.setBuffer8( 2, this.serial );
+		ifhd.setUint32( 9, this.pc );
+		ifhd.setUint16( 8, this.checksum );
 
 		// Add the chunks
 		this.chunks = [

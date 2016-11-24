@@ -3,11 +3,13 @@
 Common untility functions
 =================================================
 
-Copyright (c) 2013 The ifvms.js team
+Copyright (c) 2016 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
 */
+
+'use strict';
 
 // Utility to extend objects
 function extend()
@@ -63,6 +65,19 @@ function MemoryView( buffer )
 			( new Uint8Array( this.buffer ) ).set( data, start );
 		},
 		//setBuffer16
+		
+		// For use with IFF files
+		getFourCC: function( index )
+		{
+			return String.fromCharCode( this.getUint8( index ), this.getUint8( index + 1 ), this.getUint8( index + 2 ), this.getUint8( index + 3 ) );
+		},
+		setFourCC: function( index, text )
+		{
+			this.setUint8( index, text.charCodeAt( 0 ) );
+			this.setUint8( index + 1, text.charCodeAt( 1 ) );
+			this.setUint8( index + 2, text.charCodeAt( 2 ) );
+			this.setUint8( index + 3, text.charCodeAt( 3 ) );
+		},
 	} );
 }
 

@@ -9,6 +9,20 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
+'use strict';
+
+/*
+
+TODO:
+
+ - style and colour support
+ - pre-exiting line input
+ - timed input
+ - mouse input
+ - text grid quote boxes
+
+*/
+
 // Glulx key codes accepted by the Z-Machine
 var ZSCII_keyCodes = (function()
 {
@@ -79,7 +93,7 @@ module.exports = {
 			col: 0,
 		};
 
-		this.process_colours();
+		//this.process_colours();
 
 		// Construct the windows if they do not already exist
 		if ( !this.mainwin )
@@ -554,7 +568,7 @@ module.exports = {
 		memory.setUint8( 0x01, 
 			0x00 // Colour is not supported yet
 			| 0x1C // Bold, italic and mono are supported
-			| 0x00 // Time input not supported yet
+			| 0x00 // Timed input not supported yet
 		);
 		
 		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects

@@ -6,12 +6,8 @@ parserOptions:
   ecmaVersion: 5
 
 env:
+  es6: true
   node: true
-
-globals:
-  DataView: false
-  Uint8Array: false
-  Uint16Array: false
 
 rules:
   brace-style:
