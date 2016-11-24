@@ -188,7 +188,7 @@ return {
 /* call_vs2 */ 236: CallerStorer,
 /* erase_window */ 237: opcode_builder( Opcode, function( win ) { return 'e.erase_window(' + win.U2S() + ')'; } ),
 /* erase_line */ 238: opcode_builder( Opcode, function( a ) { return 'e.erase_line(' + a + ')'; } ),
-/* set_cursor */ 239: opcode_builder( Opcode, function( row, col ) { return 'e.set_cursor(' + ( row - 1 ) + ',' + ( col - 1 ) + ')'; } ),
+/* set_cursor */ 239: opcode_builder( Opcode, function( row, col ) { return 'e.set_cursor(' + row + '-1,' + col + '-1)'; } ),
 /* get_cursor */ 240: opcode_builder( Opcode, function( addr ) { return 'e.get_cursor(' + addr + ')'; } ),
 /* set_text_style */ 241: opcode_builder( Opcode, function( stylebyte ) { return 'e.set_style(' + stylebyte + ')'; } ),
 /* buffer_mode */ 242: Opcode, // We don't support non-buffered output

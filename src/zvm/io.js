@@ -522,6 +522,10 @@ module.exports = {
 	{
 		this.glk.glk_window_set_arrangement( this.glk.glk_window_get_parent( this.statuswin ), 0x12, lines, null );
 		this.io.height = lines;
+		if ( this.io.row >= lines )
+		{
+			this.set_cursor( 0, 0 );
+		}
 		
 		// 8.6.1.1.2: In version three the upper window is always cleared
 		if ( this.version3 )
