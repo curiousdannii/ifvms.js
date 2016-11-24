@@ -32,9 +32,7 @@ api = {
 	{
 		// Create this here so that it won't be cleared on restart
 		this.jit = {};
-		this.env = {
-			width: 80, // Default width of 80 characters
-		};
+		this.env = {};
 		
 		// The Quixe API expects the start function to be named init
 		this.init = this.start;
@@ -94,6 +92,11 @@ api = {
 			{
 				this.handle_line_input( glk_event.get_field( 2 ), glk_event.get_field( 3 ) );
 				this.run();
+			}
+			// Arrange events
+			if ( event_type === 5 )
+			{
+				this.update_width();
 			}
 			
 			// Wait for another event

@@ -918,47 +918,6 @@ module.exports = {
 		return ( this.m.getUint8( this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
 	},
 
-	// Update the header after restarting or restoring
-	update_header: function()
-	{
-		var memory = this.m,
-		width = new this.glk.RefBox();
-
-		// Reset the Xorshift seed
-		this.xorshift_seed = 0;
-
-		// For version 3 we only set Flags 1
-		if ( this.version3 )
-		{
-			// Flags 1: Set bits 5, 6
-			// TODO: Can we tell from env if the font is fixed pitch?
-			return memory.setUint8( 0x01, memory.getUint8( 0x01 ) | 0x60 );
-		}
-
-		// Get the window width
-		this.glk.glk_window_get_size( this.mainwin, width );
-		width = width.get_value();
-		
-		// Flags 1: Set bits (0), 2, 3, 4: typographic styles are OK
-		// Set bit 7 only if timed input is supported
-		memory.setUint8( 0x01, 0x1C | ( this.env.timed ? 0x80 : 0 ) );
-		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects
-		// This is really a word, but we only care about the lower byte
-		memory.setUint8( 0x11, memory.getUint8( 0x11 ) & 0x57 );
-		// Screen settings
-		memory.setUint8( 0x20, 255 ); // Infinite height
-		memory.setUint8( 0x21, width );
-		memory.setUint16( 0x22, width );
-		memory.setUint16( 0x24, 255 );
-		memory.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
-		// Z Machine Spec revision
-		memory.setUint16( 0x32, 0x0102 );
-		// Clear flags three, we don't support any of that stuff
-		this.extension_table( 4, 0 );
-
-		//TODO: this.ui.update_header();
-	},
-
 	// Read or write a variable
 	variable: function( variable, value )
 	{

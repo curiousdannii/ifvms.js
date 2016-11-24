@@ -494,22 +494,65 @@ module.exports = {
 		}
 	},
 
-	// Update ZVM's header with correct colour information
-	// If colours weren't provided then the default colour will be used for both
+	// Update the header after restarting or restoring
 	update_header: function()
 	{
-		/*var memory = this.m;
-		memory.setUint8( 0x2C, isNaN( this.env.bg ) ? 1 : this.env.bg );
-		memory.setUint8( 0x2D, isNaN( this.env.fg ) ? 1 : this.env.fg );
-		this.extension_table( 5, this.env.fg_true );
-		this.extension_table( 6, this.env.bg_true );*/
+		var memory = this.m;
+
+		// Reset the Xorshift seed
+		this.xorshift_seed = 0;
+
+		// For version 3 we only set Flags 1
+		if ( this.version3 )
+		{
+			// Flags 1: Set bits 5, 6
+			// TODO: Can we tell from env if the font is fixed pitch?
+			return memory.setUint8( 0x01, memory.getUint8( 0x01 ) | 0x60 );
+		}
+		
+		// Flags 1
+		memory.setUint8( 0x01, 
+			0x00 // Colour is not supported yet
+			| 0x1C // Bold, italic and mono are supported
+			| 0x00 // Time input not supported yet
+		);
+		
+		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects
+		// This is really a word, but we only care about the lower byte
+		memory.setUint8( 0x11, memory.getUint8( 0x11 ) & 0x57 );
+		
+		// Screen settings
+		memory.setUint8( 0x20, 255 ); // Infinite height
+		this.update_width();
+		memory.setUint16( 0x24, 255 );
+		memory.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
+		
+		// Colours
+		//memory.setUint8( 0x2C, isNaN( this.env.bg ) ? 1 : this.env.bg );
+		//memory.setUint8( 0x2D, isNaN( this.env.fg ) ? 1 : this.env.fg );
+		//this.extension_table( 5, this.env.fg_true );
+		//this.extension_table( 6, this.env.bg_true );
+		
+		// Z Machine Spec revision
+		memory.setUint16( 0x32, 0x0102 );
+		
+		// Clear flags three, we don't support any of that stuff
+		this.extension_table( 4, 0 );
 	},
 
+	update_width()
+	{
+		var width, box = new this.glk.RefBox();
+		this.glk.glk_window_get_size( this.statuswin, box );
+		this.io.width = width = box.get_value();
+		this.m.setUint8( 0x21, width );
+		this.m.setUint16( 0x22, width );
+	},
+	
 	// Output the version 3 status line
 	v3_status: function()
 	{
-		/*var engine = this.e,
-		width = engine.env.width,
+		/*var width = this.io.width,
 		hours_score = engine.m.getUint16( engine.globals + 2 ),
 		mins_turns = engine.m.getUint16( engine.globals + 4 ),
 		rhs;
