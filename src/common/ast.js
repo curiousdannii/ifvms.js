@@ -9,6 +9,8 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
+'use strict';
+
 /*
 
 All AST nodes must use these functions, even constants
@@ -177,7 +179,7 @@ Pauser = Stopper.subClass({
 
 	newfunc: function()
 	{
-		return 'e.pc=' + this.next + ';' + this.origfunc.apply( this, arguments );
+		return 'e.stop=1;e.pc=' + this.next + ';' + this.origfunc.apply( this, arguments );
 	},
 }),
 

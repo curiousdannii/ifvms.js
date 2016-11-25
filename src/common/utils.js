@@ -1,7 +1,7 @@
 /*
 
 Common untility functions
-=================================================
+=========================
 
 Copyright (c) 2016 The ifvms.js team
 BSD licenced
@@ -49,8 +49,14 @@ Class.subClass = function( props )
 };
 
 // An enhanced DataView
+// Accepts either an ArrayBuffer or a length number
 function MemoryView( buffer )
 {
+	if ( typeof buffer === 'number' )
+	{
+		buffer = new ArrayBuffer( buffer );
+	}
+	
 	return extend( new DataView( buffer ), {
 		getBuffer8: function( start, length )
 		{
@@ -62,6 +68,10 @@ function MemoryView( buffer )
 		},
 		setBuffer8: function( start, data )
 		{
+			if ( data instanceof ArrayBuffer )
+			{
+				data = new Uint8Array( data );
+			}
 			( new Uint8Array( this.buffer ) ).set( data, start );
 		},
 		//setBuffer16

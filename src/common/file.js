@@ -15,7 +15,7 @@ var utils = require( './utils.js' ),
 
 // A basic IFF file, to be extended later
 // Currently supports buffer data
-IFF = utils. Class.subClass({
+IFF = utils.Class.subClass({
 	init: function( data )
 	{
 		this.type = '';
@@ -24,7 +24,7 @@ IFF = utils. Class.subClass({
 		if ( data )
 		{
 			var view = utils.MemoryView( data ),
-			i = 12, chunk_length;
+			i = 12, length, chunk_length;
 			
 			// Check that it is actually an IFF file
 			if ( view.getFourCC( 0 ) !== 'FORM' )
@@ -34,12 +34,13 @@ IFF = utils. Class.subClass({
 
 			// Parse the file
 			this.type = view.getFourCC( 8 );
+			length = view.getUint32( 4 ) + 8;
 
-			while ( i < data.length )
+			while ( i < length )
 			{
 				chunk_length = view.getUint32( i + 4 );
 
-				if ( chunk_length < 0 || ( chunk_length + i ) > data.length )
+				if ( chunk_length < 0 || ( chunk_length + i ) > length )
 				{
 					throw new Error( 'IFF chunk out of range' );
 				}
@@ -71,16 +72,17 @@ IFF = utils. Class.subClass({
 			// Replace typed arrays or dataviews with their buffers
 			if ( this.chunks[i].data.buffer )
 			{
-				this.chunks[i].data = this.chunks[i].data;
+				this.chunks[i].data = this.chunks[i].data.buffer;
 			}
-			buffer_len += 8 + this.chunks[i++].data.length;
+			this.chunks[i].length = this.chunks[i].data.byteLength || this.chunks[i].data.length;
+			buffer_len += 8 + this.chunks[i++].length;
 			if ( buffer_len % 2 )
 			{
 				buffer_len++;
 			}
 		}
 		
-		out = utils.MemoryView( new ArrayBuffer( buffer_len ) );
+		out = utils.MemoryView( buffer_len );
 		out.setFourCC( 0, 'FORM' );
 		out.setUint32( 4, buffer_len - 8 );
 		out.setFourCC( 8, this.type );
@@ -91,9 +93,9 @@ IFF = utils. Class.subClass({
 		{
 			chunk = this.chunks[i++];
 			out.setFourCC( index, chunk.type );
-			out.setUint32( index + 4, chunk.data.length );
+			out.setUint32( index + 4, chunk.length );
 			out.setBuffer8( index + 8, chunk.data );
-			index += 8 + chunk.data.length;
+			index += 8 + chunk.length;
 			if ( index % 2 )
 			{
 				index++;
@@ -108,7 +110,7 @@ Quetzal = IFF.subClass({
 	// Parse a Quetzal savefile, or make a blank one
 	init: function( data )
 	{
-		this.super.init.call( data );
+		this.super.init.call( this, data );
 		if ( data )
 		{
 			// Check this is a Quetzal savefile
@@ -140,7 +142,7 @@ Quetzal = IFF.subClass({
 				// Story file data
 				else if ( type === 'IFhd' )
 				{
-					view = utils.MemoryView( chunk_data );
+					view = utils.MemoryView( chunk_data.buffer );
 					this.release = view.getUint16( 0 );
 					this.serial = view.getBuffer8( 2, 6 );
 					// The checksum isn't used, but if we throw it away we can't round-trip
@@ -159,7 +161,7 @@ Quetzal = IFF.subClass({
 		this.type = 'IFZS';
 
 		// Format the IFhd chunk correctly
-		var ifhd = utils.MemoryView( new ArrayBuffer( 13 ) );
+		var ifhd = utils.MemoryView( 13 );
 		ifhd.setUint16( 0, this.release );
 		ifhd.setBuffer8( 2, this.serial );
 		ifhd.setUint32( 9, this.pc );

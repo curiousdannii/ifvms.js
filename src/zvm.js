@@ -1,7 +1,7 @@
 /*
 
 ZVM - the ifvms.js Z-Machine (versions 3, 5 and 8)
-=================================================
+==================================================
 
 Copyright (c) 2016 The ifvms.js team
 BSD licenced
@@ -23,6 +23,8 @@ ZVM willfully ignores the standard in these ways:
 Any other non-standard behaviour should be considered a bug
 
 */
+
+'use strict';
 
 var utils = require( './common/utils.js' ),
 
@@ -61,9 +63,12 @@ api = {
 			// Initiate the engine, run, and wait for our first Glk event
 			this.restart();
 			this.run();
-			this.glk_event = new Glk.RefStruct();
-			Glk.glk_select( this.glk_event );
-			Glk.update();
+			if ( !this.quit )
+			{
+				this.glk_event = new Glk.RefStruct();
+				Glk.glk_select( this.glk_event );
+				Glk.update();
+			}
 		}
 		catch ( e )
 		{
@@ -76,7 +81,8 @@ api = {
 	{
 		var Glk = this.glk,
 		glk_event = this.glk_event,
-		event_type;
+		event_type,
+		run;
 		
 		try
 		{
@@ -86,29 +92,55 @@ api = {
 			if ( event_type === 2 )
 			{
 				this.handle_char_input( glk_event.get_field( 2 ) );
-				this.run();
+				run = 1;
 			}
 			if ( event_type === 3 )
 			{
 				this.handle_line_input( glk_event.get_field( 2 ), glk_event.get_field( 3 ) );
-				this.run();
+				run = 1;
 			}
 			// Arrange events
 			if ( event_type === 5 )
 			{
 				this.update_width();
 			}
+			// glk_fileref_create_by_prompt handler
+			if ( event_type === -1 )
+			{
+				this.save_restore_handler( glk_event.get_field( 1 ) );
+				run = 1;
+			}
+			
+			if ( run )
+			{
+				this.run();
+			}
 			
 			// Wait for another event
-			this.glk_event = new Glk.RefStruct();
-			Glk.glk_select( this.glk_event );
-			Glk.update();
+			if ( !this.quit )
+			{
+				this.glk_event = new Glk.RefStruct();
+				Glk.glk_select( this.glk_event );
+				Glk.update();
+			}
 		}
 		catch ( e )
 		{
 			Glk.fatal_error( 'ZVM: ' + e );
 			throw e;
 		}
+	},
+	
+	// Return a game signature from the header
+	get_signature: function()
+	{
+		var data = new Uint8Array( this.data.buffer.slice( 0, 0x1E ) ),
+		i = 0;
+		while ( i < 0x1E )
+		{
+			data[i] = ( data[i] < 0x10 ? '0' : '' ) + data[i++].toString( 16 );
+		}
+		return data.join( '' );
 	},
 
 	// Run

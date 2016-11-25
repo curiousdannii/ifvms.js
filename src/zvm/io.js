@@ -16,7 +16,7 @@ http://github.com/curiousdannii/ifvms.js
 TODO:
 
  - style and colour support
- - pre-exiting line input
+ - pre-existing line input
  - timed input
  - mouse input
  - text grid quote boxes

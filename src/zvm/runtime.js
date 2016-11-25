@@ -9,6 +9,8 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
+'use strict';
+
 /*
 
 TODO:
@@ -25,33 +27,12 @@ U2S = utils.U2S16,
 S2U = utils.S2U16,
 byte_to_word = utils.byte_to_word,
 
-file = require( '../common/file.js' );
+file = require( '../common/file.js' ),
+
+filemode_Read = 0x02,
+filemode_Write = 0x01;
 
 module.exports = {
-
-	// Return control to the ZVM runner to perform some action
-	act: function( code, options )
-	{
-		options = options || {};
-
-		// Handle numerical codes from jit-code - these codes are opcode numbers
-		if ( code === 183 )
-		{
-			code = 'restart';
-		}
-		if ( code === 186 )
-		{
-			code = 'quit';
-		}
-
-		options.code = code;
-		this.orders.push( options );
-		this.stop = 1;
-		if ( this.outputEvent )
-		{
-			this.outputEvent( this.orders );
-		}
-	},
 
 	art_shift: function( number, places )
 	{
@@ -580,8 +561,9 @@ module.exports = {
 	// Request a restore
 	restore: function( pc )
 	{
-		this.save_restore_pc = pc;
-		this.act( 'restore' );
+		this.pc = pc;
+		this.save_mode = filemode_Read;
+		this.glk.glk_fileref_create_by_prompt( 0x01, filemode_Read, 0 );
 	},
 
 	restore_file: function( data )
@@ -596,7 +578,7 @@ module.exports = {
 		call_stack = [],
 		newlocals = [],
 		newstack;
-
+		
 		// Memory chunk
 		memory.setBuffer8( 0, this.data.slice( 0, this.staticmem ) );
 		if ( quetzal.compressed )
@@ -654,13 +636,9 @@ module.exports = {
 		this.call_stack = call_stack;
 		this.l = newlocals;
 		this.s = newstack;
+		this.pc = quetzal.pc;
 
-		// Update the header
 		this.update_header();
-
-		// Store or branch with the successful result
-		this.save_restore_pc = quetzal.pc;
-		this.save_restore_result( 2 );
 
 		// Collapse the upper window (8.6.1.3)
 		if ( this.version3 )
@@ -709,6 +687,13 @@ module.exports = {
 	// pc is the address of the storer operand (or branch in v3)
 	save: function( pc )
 	{
+		this.pc = pc;
+		this.save_mode = filemode_Write;
+		this.glk.glk_fileref_create_by_prompt( 0x01, filemode_Write, 0 );
+	},
+	
+	save_file: function( pc )
+	{
 		var memory = this.m,
 		stack = this.s,
 		locals = this.l,
@@ -723,9 +708,9 @@ module.exports = {
 		stacks = [ 0, 0, 0, 0, 0, 0 ]; // Dummy call frame
 
 		// IFhd chunk
-		quetzal.release = memory.getBuffer8( 0x02, 2 );
+		quetzal.release = memory.getUint16( 0x02 );
 		quetzal.serial = memory.getBuffer8( 0x12, 6 );
-		quetzal.checksum = memory.getBuffer8( 0x1C, 2 );
+		quetzal.checksum = memory.getUint16( 0x1C );
 		quetzal.pc = pc;
 
 		// Memory chunk
@@ -785,33 +770,56 @@ module.exports = {
 		call_stack.reverse();
 		quetzal.stacks = stacks;
 
-		// Set up the callback function
-		this.save_restore_pc = pc;
-
-		// Send the event
-		this.act( 'save', {
-			data: quetzal.write(),
-		} );
+		return quetzal.write();
 	},
-
-	save_restore_result: function( success )
+	
+	// Handle the result of glk_fileref_create_by_prompt()
+	save_restore_handler: function( fref )
 	{
 		var memory = this.m,
-		pc = this.save_restore_pc,
+		Glk = this.glk,
+		str,
+		buffer,
+		result = 0,
 		temp, iftrue, offset;
-
+		
+		if ( fref )
+		{
+			str = Glk.glk_stream_open_file( fref, this.save_mode, 0 );
+			Glk.glk_fileref_destroy( fref );
+			if ( str )
+			{
+				// Save
+				if ( this.save_mode === filemode_Write )
+				{
+					Glk.glk_put_buffer_stream( str, new Uint8Array( this.save_file( this.pc ) ) );
+					result = 1;
+				}
+				// Restore
+				else
+				{
+					buffer = new Uint8Array( 128 * 1024 );
+					Glk.glk_get_buffer_stream( str, buffer );
+					this.restore_file( buffer.buffer );
+					result = 2;
+				}
+				Glk.glk_stream_close( str );
+			}
+		}
+		
+		// Store the result / branch in z3
 		if ( this.version3 )
 		{
 			// Calculate the branch
-			temp = memory.getUint8( pc++ );
+			temp = memory.getUint8( this.pc++ );
 			iftrue = temp & 0x80;
 			offset = temp & 0x40 ?
 				// single byte address
 				temp & 0x3F :
 				// word address, but first get the second byte of it
-				( temp << 8 | memory.getUint8( pc++ ) ) << 18 >> 18;
+				( temp << 8 | memory.getUint8( this.pc++ ) ) << 18 >> 18;
 
-			if ( !success === !iftrue )
+			if ( !result === !iftrue )
 			{
 				if ( offset === 0 || offset === 1 )
 				{
@@ -819,18 +827,13 @@ module.exports = {
 				}
 				else
 				{
-					this.pc = offset + pc - 2;
+					this.pc += offset - 2;
 				}
-			}
-			else
-			{
-				this.pc = pc;
 			}
 		}
 		else
 		{
-			this.variable( memory.getUint8( pc++ ), success );
-			this.pc = pc;
+			this.variable( memory.getUint8( this.pc++ ), result );
 		}
 	},
 

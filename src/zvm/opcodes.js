@@ -9,6 +9,8 @@ http://github.com/curiousdannii/ifvms.js
 
 */
 
+'use strict';
+
 /*
 
 TODO:
@@ -159,12 +161,12 @@ return {
 /* nop */ 180: Opcode,
 /* save (v3) */ 181: V3SaveRestore,
 /* restore (v3) */ 182: V3SaveRestore,
-/* restart */ 183: opcode_builder( Stopper, function() { return 'e.act(183)'; } ),
+/* restart */ 183: opcode_builder( Stopper, function() { return 'e.erase_window(-1);e.restart()'; } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( stack_var ); } } ),
 185: version3 ?
 	/* pop (v3) */ opcode_builder( Opcode, function() { return 's.pop()'; } ) :
 	/* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
-/* quit */ 186: opcode_builder( Stopper, function() { return 'e.act(186)'; } ),
+/* quit */ 186: opcode_builder( Pauser, function() { return 'e.quit=1;e.glk.glk_exit()'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
 188: version3 ?
 	/* show_status (v3) */ opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.v3_status();e.act()'; } ) :
