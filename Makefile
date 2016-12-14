@@ -16,10 +16,13 @@ all: test
 
 clean:
 
-# Download Praxix
+# Download Praxix and regtest
 tests/praxix.z5:
 	$(CURL) -o tests/praxix.z5 https://github.com/curiousdannii/if/raw/gh-pages/tests/praxix.z5
 
+tests/regtest.py:
+	$(CURL) -o tests/regtest.py https://raw.githubusercontent.com/erkyrath/plotex/master/regtest.py
+
 # Run the test suite
-test: tests/praxix.z5
-	cd tests && ./praxix.js
+test: tests/praxix.z5 tests/regtest.py
+	cd tests && python regtest.py praxix.regtest
