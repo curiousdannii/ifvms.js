@@ -43,11 +43,11 @@ api = {
 	prepare: function( storydata, options )
 	{
 		// If we are not given a glk option then we cannot continue
-		if ( !options.glk )
+		if ( !options.Glk )
 		{
 			throw new Error( 'a reference to Glk is required' );
 		}
-		this.glk = options.glk;
+		this.glk = options.Glk;
 		
 		// Convert the storyfile we are given to a Uint8Array
 		this.data = new Uint8Array( storydata );

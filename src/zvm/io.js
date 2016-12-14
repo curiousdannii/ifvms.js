@@ -124,8 +124,11 @@ module.exports = {
 		}
 		if ( window === 1 || window === -2 )
 		{
-			this.glk.glk_window_clear( this.statuswin );
-			this.set_cursor( 0, 0 );
+			if ( this.statuswin )
+			{
+				this.glk.glk_window_clear( this.statuswin );
+				this.set_cursor( 0, 0 );
+			}
 		}
 		if ( window === -1 )
 		{
@@ -429,7 +432,7 @@ module.exports = {
 	set_cursor: function( row, col )
 	{
 		var io = this.io;
-		if ( row >= 0 && row < io.height && col >= 0 && col < io.width )
+		if ( this.statuswin && row >= 0 && row < io.height && col >= 0 && col < io.width )
 		{
 			this.glk.glk_window_move_cursor( this.statuswin, col, row );
 			io.row = row;
@@ -456,27 +459,29 @@ module.exports = {
 	// Set styles
 	set_style: function( stylebyte )
 	{
+		var io = this.io;
+
 		// Setting the style to Roman will clear the others
 		if ( stylebyte === 0 )
 		{
-			this.io.reverse = this.io.bold = this.io.italic = 0;
-			this.io.mono &= 0xFE;
+			io.reverse = io.bold = io.italic = 0;
+			io.mono &= 0xFE;
 		}
 		if ( stylebyte & 0x01 )
 		{
-			this.io.reverse = 0x08;
+			io.reverse = 0x08;
 		}
 		if ( stylebyte & 0x02 )
 		{
-			this.io.bold = 0x04;
+			io.bold = 0x04;
 		}
 		if ( stylebyte & 0x04 )
 		{
-			this.io.italic = 0x02;
+			io.italic = 0x02;
 		}
 		if ( stylebyte & 0x08 )
 		{
-			this.io.mono |= 0x01;
+			io.mono |= 0x01;
 		}
 		this.format();
 	},
@@ -521,7 +526,7 @@ module.exports = {
 
 	set_window: function( window )
 	{
-		this.glk.glk_set_window( window ? this.statuswin : this.mainwin );
+		this.glk.glk_set_window( this.statuswin && window ? this.statuswin : this.mainwin );
 		this.io.currentwin = window;
 		this.format();
 		
@@ -534,17 +539,20 @@ module.exports = {
 
 	split_window: function( lines )
 	{
-		this.glk.glk_window_set_arrangement( this.glk.glk_window_get_parent( this.statuswin ), 0x12, lines, null );
-		this.io.height = lines;
-		if ( this.io.row >= lines )
+		if ( this.statuswin )
 		{
-			this.set_cursor( 0, 0 );
-		}
-		
-		// 8.6.1.1.2: In version three the upper window is always cleared
-		if ( this.version3 )
-		{
-			this.glk.glk_window_clear( this.statuswin );
+			this.glk.glk_window_set_arrangement( this.glk.glk_window_get_parent( this.statuswin ), 0x12, lines, null );
+			this.io.height = lines;
+			if ( this.io.row >= lines )
+			{
+				this.set_cursor( 0, 0 );
+			}
+
+			// 8.6.1.1.2: In version three the upper window is always cleared
+			if ( this.version3 )
+			{
+				this.glk.glk_window_clear( this.statuswin );
+			}
 		}
 	},
 
@@ -565,7 +573,7 @@ module.exports = {
 		}
 		
 		// Flags 1
-		memory.setUint8( 0x01, 
+		memory.setUint8( 0x01,
 			0x00 // Colour is not supported yet
 			| 0x1C // Bold, italic and mono are supported
 			| 0x00 // Timed input not supported yet
@@ -597,7 +605,7 @@ module.exports = {
 	update_width: function()
 	{
 		var width, box = new this.glk.RefBox();
-		this.glk.glk_window_get_size( this.statuswin, box );
+		this.glk.glk_window_get_size( this.statuswin || this.mainwin, box );
 		this.io.width = width = box.get_value();
 		this.m.setUint8( 0x21, width );
 		this.m.setUint16( 0x22, width );
