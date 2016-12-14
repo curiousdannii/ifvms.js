@@ -143,8 +143,8 @@ module.exports = {
 
 	get_cursor: function( array )
 	{
-		this.m.setUint16( array, this.io.row + 1 );
-		this.m.setUint16( array + 2, this.io.col + 1 );
+		this.ram.setUint16( array, this.io.row + 1 );
+		this.ram.setUint16( array + 2, this.io.col + 1 );
 	},
 
 	// Handle char input
@@ -156,7 +156,7 @@ module.exports = {
 	// Handle line input
 	handle_line_input: function( len, terminator )
 	{
-		var memory = this.m,
+		var ram = this.ram,
 		options = this.read_data,
 		
 		// 7.1.1.1: The response must be echoed, Glk will handle this
@@ -171,15 +171,15 @@ module.exports = {
 			response.push( 0 );
 
 			// Store the response in the buffer
-			memory.setBuffer8( options.bufaddr + 1, response );
+			ram.setBuffer8( options.bufaddr + 1, response );
 		}
 		else
 		{
 			// Store the response length
-			memory.setUint8( options.bufaddr + 1, len );
+			ram.setUint8( options.bufaddr + 1, len );
 
 			// Store the response in the buffer
-			memory.setBuffer8( options.bufaddr + 2, response );
+			ram.setBuffer8( options.bufaddr + 2, response );
 
 			// Store the terminator
 			this.variable( options.storer, isNaN( terminator ) ? 13 : terminator );
@@ -559,7 +559,7 @@ module.exports = {
 	// Update the header after restarting or restoring
 	update_header: function()
 	{
-		var memory = this.m;
+		var ram = this.ram;
 
 		// Reset the Xorshift seed
 		this.xorshift_seed = 0;
@@ -569,11 +569,11 @@ module.exports = {
 		{
 			// Flags 1: Set bits 5, 6
 			// TODO: Can we tell from env if the font is fixed pitch?
-			return memory.setUint8( 0x01, memory.getUint8( 0x01 ) | 0x60 );
+			return ram.setUint8( 0x01, ram.getUint8( 0x01 ) | 0x60 );
 		}
 		
 		// Flags 1
-		memory.setUint8( 0x01,
+		ram.setUint8( 0x01,
 			0x00 // Colour is not supported yet
 			| 0x1C // Bold, italic and mono are supported
 			| 0x00 // Timed input not supported yet
@@ -581,22 +581,22 @@ module.exports = {
 		
 		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects
 		// This is really a word, but we only care about the lower byte
-		memory.setUint8( 0x11, memory.getUint8( 0x11 ) & 0x57 );
+		ram.setUint8( 0x11, ram.getUint8( 0x11 ) & 0x57 );
 		
 		// Screen settings
-		memory.setUint8( 0x20, 255 ); // Infinite height
+		ram.setUint8( 0x20, 255 ); // Infinite height
 		this.update_width();
-		memory.setUint16( 0x24, 255 );
-		memory.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
+		ram.setUint16( 0x24, 255 );
+		ram.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
 		
 		// Colours
-		//memory.setUint8( 0x2C, isNaN( this.env.bg ) ? 1 : this.env.bg );
-		//memory.setUint8( 0x2D, isNaN( this.env.fg ) ? 1 : this.env.fg );
+		//ram.setUint8( 0x2C, isNaN( this.env.bg ) ? 1 : this.env.bg );
+		//ram.setUint8( 0x2D, isNaN( this.env.fg ) ? 1 : this.env.fg );
 		//this.extension_table( 5, this.env.fg_true );
 		//this.extension_table( 6, this.env.bg_true );
 		
 		// Z Machine Spec revision
-		memory.setUint16( 0x32, 0x0102 );
+		ram.setUint16( 0x32, 0x0102 );
 		
 		// Clear flags three, we don't support any of that stuff
 		this.extension_table( 4, 0 );
@@ -607,8 +607,8 @@ module.exports = {
 		var width, box = new this.glk.RefBox();
 		this.glk.glk_window_get_size( this.statuswin || this.mainwin, box );
 		this.io.width = width = box.get_value();
-		this.m.setUint8( 0x21, width );
-		this.m.setUint16( 0x22, width );
+		this.ram.setUint8( 0x21, width );
+		this.ram.setUint16( 0x22, width );
 		if ( this.io.col >= width )
 		{
 			this.io.col = width - 1;

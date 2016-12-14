@@ -362,6 +362,7 @@ module.exports = {
 		dictionary = this.dictionaries[dictionary] || this.parse_dict( dictionary );
 
 		var memory = this.m,
+		ram = this.ram,
 		bufferlength = 1e3,
 		i = 1,
 		letter,
@@ -416,15 +417,15 @@ module.exports = {
 			if ( !flag || dictword )
 			{
 				// Fill out the buffer
-				memory.setUint16( buffer + 2 + wordcount * 4, dictword || 0 );
-				memory.setUint8( buffer + 4 + wordcount * 4, words[wordcount][0].length );
-				memory.setUint8( buffer + 5 + wordcount * 4, words[wordcount][1] );
+				ram.setUint16( buffer + 2 + wordcount * 4, dictword || 0 );
+				ram.setUint8( buffer + 4 + wordcount * 4, words[wordcount][0].length );
+				ram.setUint8( buffer + 5 + wordcount * 4, words[wordcount][1] );
 			}
 			wordcount++;
 		}
 
 		// Update the number of found words
-		memory.setUint8( buffer + 1, wordcount );
+		ram.setUint8( buffer + 1, wordcount );
 	},
 
 };

@@ -50,14 +50,14 @@ Class.subClass = function( props )
 
 // An enhanced DataView
 // Accepts either an ArrayBuffer or a length number
-function MemoryView( buffer )
+function MemoryView( buffer, byteOffset, byteLength )
 {
 	if ( typeof buffer === 'number' )
 	{
 		buffer = new ArrayBuffer( buffer );
 	}
 	
-	return extend( new DataView( buffer ), {
+	return extend( new DataView( buffer, byteOffset, byteLength ), {
 		getBuffer8: function( start, length )
 		{
 			return new Uint8Array( this.buffer.slice( start, start + length ) );

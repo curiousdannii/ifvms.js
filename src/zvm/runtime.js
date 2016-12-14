@@ -87,13 +87,13 @@ module.exports = {
 	clear_attr: function( object, attribute )
 	{
 		var addr = this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0;
-		this.m.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
+		this.ram.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
 	},
 
 	copy_table: function( first, second, size )
 	{
 		size = U2S( size );
-		var memory = this.m,
+		var ram = this.ram,
 		i = 0,
 		allowcorrupt = size < 0;
 		size = Math.abs( size );
@@ -103,7 +103,7 @@ module.exports = {
 		{
 			while ( i < size )
 			{
-				memory.setUint8( first + i++, 0 );
+				ram.setUint8( first + i++, 0 );
 			}
 			return;
 		}
@@ -112,18 +112,18 @@ module.exports = {
 		{
 			while ( i < size )
 			{
-				memory.setUint8( second + i, memory.getUint8( first + i++ ) );
+				ram.setUint8( second + i, this.m.getUint8( first + i++ ) );
 			}
 		}
 		else
 		{
-			memory.setBuffer8( second, memory.getBuffer8( first, size ) );
+			ram.setBuffer8( second, this.m.getBuffer8( first, size ) );
 		}
 	},
 
 	encode_text: function( zscii, length, from, target )
 	{
-		this.m.setBuffer8( target, this.encode( this.m.getBuffer8( zscii + from, length ) ) );
+		this.ram.setBuffer8( target, this.encode( this.m.getBuffer8( zscii + from, length ) ) );
 	},
 
 	// Access the extension table
@@ -139,7 +139,7 @@ module.exports = {
 		{
 			return this.m.getUint16( addr );
 		}
-		this.e.setUint16( addr, value );
+		this.ram.setUint16( addr, value );
 	},
 
 	// Find the address of a property, or given the previous property, the number of the next
@@ -324,7 +324,7 @@ module.exports = {
 		{
 			offset = this.globals + ( varnum - 15 ) * 2;
 			result = this.m.getUint16( offset ) + change;
-			this.m.setUint16( offset, result );
+			this.ram.setUint16( offset, result );
 			return result;
 		}
 	},
@@ -408,25 +408,23 @@ module.exports = {
 		{
 			var data = this.streams[2].shift(),
 			text = this.text_to_zscii( data[1] );
-			this.m.setUint16( data[0], text.length );
-			this.m.setBuffer8( data[0] + 2, text );
+			this.ram.setUint16( data[0], text.length );
+			this.ram.setBuffer8( data[0] + 2, text );
 		}
 	},
 
 	put_prop: function( object, property, value )
 	{
-		var memory = this.m,
-
 		// Try to find the property
-		addr = this.find_prop( object, property ),
+		var addr = this.find_prop( object, property ),
 		len;
 
 		if ( addr )
 		{
-			len = memory.getUint8( addr - 1 );
+			len = this.m.getUint8( addr - 1 );
 
 			// Assume we're being called for a valid short property
-			memory[ ( this.version3 ? len >> 5 : len & 0x40 ) ? 'setUint16' : 'setUint8' ]( addr, value );
+			this.ram[ ( this.version3 ? len >> 5 : len & 0x40 ) ? 'setUint16' : 'setUint8' ]( addr, value );
 		}
 	},
 
@@ -500,6 +498,8 @@ module.exports = {
 	{
 		// Set up the memory
 		var memory = utils.MemoryView( this.data.buffer.slice() ),
+		staticmem = memory.getUint16( 0x0E ),
+		ram = utils.MemoryView( memory.buffer, 0, staticmem ),
 
 		version = memory.getUint8( 0x00 ),
 		version3 = version === 3,
@@ -516,13 +516,14 @@ module.exports = {
 		// Preserve flags 2 - the fixed pitch bit is surely the lamest part of the Z-Machine spec!
 		if ( this.m )
 		{
-			memory.setUint8( 0x11, this.m.getUint8( 0x11 ) );
+			ram.setUint8( 0x11, this.m.getUint8( 0x11 ) );
 		}
 
 		extend( this, {
 
 			// Memory, locals and stacks of various kinds
 			m: memory,
+			ram: ram,
 			s: [],
 			l: [],
 			call_stack: [],
@@ -533,12 +534,12 @@ module.exports = {
 
 			// Get some header variables
 			version: version,
-			version3: version === 3,
+			version3: version3,
 			pc: memory.getUint16( 0x06 ),
 			properties: property_defaults,
 			objects: property_defaults + ( version3 ? 53 : 112 ), // 62-9 or 126-14 - if we take this now then we won't need to always decrement the object number
 			globals: memory.getUint16( 0x0C ),
-			staticmem: memory.getUint16( 0x0E ),
+			staticmem: staticmem,
 			eof: ( memory.getUint16( 0x1A ) || 65536 ) * addr_multipler,
 			extension: extension,
 			extension_count: extension ? memory.getUint16( extension ) : 0,
@@ -568,11 +569,11 @@ module.exports = {
 
 	restore_file: function( data )
 	{
-		var memory = this.m,
+		var ram = this.ram,
 		quetzal = new file.Quetzal( data ),
 		qmem = quetzal.memory,
 		qstacks = quetzal.stacks,
-		flags2 = memory.getUint8( 0x11 ),
+		flags2 = this.m.getUint8( 0x11 ),
 		temp,
 		i = 0, j = 0,
 		call_stack = [],
@@ -580,7 +581,7 @@ module.exports = {
 		newstack;
 		
 		// Memory chunk
-		memory.setBuffer8( 0, this.data.slice( 0, this.staticmem ) );
+		ram.setBuffer8( 0, this.data.buffer.slice( 0, this.staticmem ) );
 		if ( quetzal.compressed )
 		{
 			while ( i < qmem.length )
@@ -593,16 +594,16 @@ module.exports = {
 				}
 				else
 				{
-					memory.setUint8( j, temp ^ this.data[j++] );
+					ram.setUint8( j, temp ^ this.data[j++] );
 				}
 			}
 		}
 		else
 		{
-			memory.setBuffer8( 0, qmem );
+			ram.setBuffer8( 0, qmem );
 		}
 		// Preserve flags 1
-		memory.setUint8( 0x11, flags2 );
+		ram.setUint8( 0x11, flags2 );
 
 		// Stacks chunk
 		i = 6;
@@ -657,7 +658,7 @@ module.exports = {
 		this.pc = state[0];
 		// Preserve flags 2
 		state[2][0x11] = this.m.getUint8( 0x11 );
-		this.m.setBuffer8( 0, state[2] );
+		this.ram.setBuffer8( 0, state[2] );
 		this.l = state[3];
 		this.s = state[4];
 		this.call_stack = state[5];
@@ -871,42 +872,42 @@ module.exports = {
 	set_attr: function( object, attribute )
 	{
 		var addr = this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0;
-		this.m.setUint8( addr, this.m.getUint8( addr ) | 0x80 >> attribute % 8 );
+		this.ram.setUint8( addr, this.m.getUint8( addr ) | 0x80 >> attribute % 8 );
 	},
 
 	set_family: function( obj, newparent, parent, child, bigsis, lilsis )
 	{
-		var memory = this.m,
+		var ram = this.ram,
 		objects = this.objects;
 
 		if ( this.version3 )
 		{
 			// Set the new parent of the obj
-			memory.setUint8( objects + 9 * obj + 4, newparent );
+			ram.setUint8( objects + 9 * obj + 4, newparent );
 			// Update the parent's first child if needed
 			if ( parent )
 			{
-				memory.setUint8( objects + 9 * parent + 6, child );
+				ram.setUint8( objects + 9 * parent + 6, child );
 			}
 			// Update the little sister of a big sister
 			if ( bigsis )
 			{
-				memory.setUint8( objects + 9 * bigsis + 5, lilsis );
+				ram.setUint8( objects + 9 * bigsis + 5, lilsis );
 			}
 		}
 		else
 		{
 			// Set the new parent of the obj
-			memory.setUint16( objects + 14 * obj + 6, newparent );
+			ram.setUint16( objects + 14 * obj + 6, newparent );
 			// Update the parent's first child if needed
 			if ( parent )
 			{
-				memory.setUint16( objects + 14 * parent + 10, child );
+				ram.setUint16( objects + 14 * parent + 10, child );
 			}
 			// Update the little sister of a big sister
 			if ( bigsis )
 			{
-				memory.setUint16( objects + 14 * bigsis + 8, lilsis );
+				ram.setUint16( objects + 14 * bigsis + 8, lilsis );
 			}
 		}
 	},
@@ -953,7 +954,7 @@ module.exports = {
 			offset = this.globals + ( variable - 15 ) * 2;
 			if ( havevalue )
 			{
-				this.m.setUint16( offset, value );
+				this.ram.setUint16( offset, value );
 			}
 			else
 			{

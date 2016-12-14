@@ -121,8 +121,8 @@ return {
 /* clear_attr */ 12: opcode_builder( Opcode, function() { return 'e.clear_attr(' + this.args() + ')'; } ),
 /* store */ 13: Indirect,
 /* insert_obj */ 14: opcode_builder( Opcode, function() { return 'e.insert_obj(' + this.args() + ')'; } ),
-/* loadw */ 15: opcode_builder( Storer, function( array, index ) { return 'm.getUint16(e.S2U(' + array + '+2*' + index.U2S() + '))'; } ),
-/* loadb */ 16: opcode_builder( Storer, function( array, index ) { return 'm.getUint8(e.S2U(' + array + '+' + index.U2S() + '))'; } ),
+/* loadw */ 15: opcode_builder( Storer, function( array, index ) { return 'e.m.getUint16(e.S2U(' + array + '+2*' + index.U2S() + '))'; } ),
+/* loadb */ 16: opcode_builder( Storer, function( array, index ) { return 'e.m.getUint8(e.S2U(' + array + '+' + index.U2S() + '))'; } ),
 /* get_prop */ 17: opcode_builder( Storer, function() { return 'e.get_prop(' + this.args() + ')'; } ),
 /* get_prop_addr */ 18: opcode_builder( Storer, function() { return 'e.find_prop(' + this.args() + ')'; } ),
 /* get_next_prop */ 19: opcode_builder( Storer, function() { return 'e.find_prop(' + this.args( ',0,' ) + ')'; } ),
@@ -174,8 +174,8 @@ return {
 /* verify */ 189: alwaysbranch, // Actually check??
 /* piracy */ 191: alwaysbranch,
 /* call_vs */ 224: CallerStorer,
-/* storew */ 225: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint16(e.S2U(' + array + '+2*' + index.U2S() + '),' + value + ')'; } ),
-/* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'm.setUint8(e.S2U(' + array + '+' + index.U2S() + '),' + value + ')'; } ),
+/* storew */ 225: opcode_builder( Opcode, function( array, index, value ) { return 'e.ram.setUint16(e.S2U(' + array + '+2*' + index.U2S() + '),' + value + ')'; } ),
+/* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'e.ram.setUint8(e.S2U(' + array + '+' + index.U2S() + '),' + value + ')'; } ),
 /* put_prop */ 227: opcode_builder( Opcode, function() { return 'e.put_prop(' + this.args() + ')'; } ),
 /* read */ 228: version3 ?
 	opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.read(0,' + this.args() + ');e.stop=1'; } ) :

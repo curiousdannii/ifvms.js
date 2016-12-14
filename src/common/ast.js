@@ -80,7 +80,7 @@ Variable = Operand.subClass({
 			return 'l[' + variable + ']';
 		}
 		// Globals
-		return 'm.getUint16(' + ( this.e.globals + ( variable - 15 ) * 2 ) + ')';
+		return 'e.m.getUint16(' + ( this.e.globals + ( variable - 15 ) * 2 ) + ')';
 	},
 
 	// Store a value
@@ -112,7 +112,7 @@ Variable = Operand.subClass({
 			return 'l[' + variable + ']=' + value;
 		}
 		// Globals
-		return 'm.setUint16(' + ( this.e.globals + ( variable - 15 ) * 2 ) + ',' + value + ')';
+		return 'e.ram.setUint16(' + ( this.e.globals + ( variable - 15 ) * 2 ) + ',' + value + ')';
 	},
 
 	// Convert an Operand into a signed operand
@@ -420,7 +420,7 @@ RoutineContext = Context.subClass({
 		// TODO: Debug: If we have routine names, find this one's name
 
 		// Add in some extra vars and return
-		this.pre.unshift( 'var l=e.l,m=e.m,s=e.s;\n' );
+		this.pre.unshift( 'var l=e.l,s=e.s;\n' );
 		return RoutineContext.super.toString.call( this );
 	},
 });
