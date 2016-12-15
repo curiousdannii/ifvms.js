@@ -27,6 +27,7 @@ Any other non-standard behaviour should be considered a bug
 'use strict';
 
 var utils = require( './common/utils.js' ),
+MemoryView = utils.MemoryView,
 
 api = {
 
@@ -49,8 +50,13 @@ api = {
 		}
 		this.glk = options.Glk;
 		
-		// Convert the storyfile we are given to a Uint8Array
-		this.data = new Uint8Array( storydata );
+		// Load the storyfile we are given into our MemoryView (an enhanced DataView)
+		this.m = MemoryView( new Uint8Array( storydata ) );
+		
+		// Make a seperate MemoryView for the ram, and store the original ram
+		this.staticmem = this.m.getUint16( 0x0E );
+		this.ram = MemoryView( this.m.buffer, 0, this.staticmem );
+		this.origram = this.m.getUint8Array( 0, this.staticmem );
 		
 		// TODO: check that we are given a valid storyfile
 	},
@@ -134,13 +140,13 @@ api = {
 	// Return a game signature from the header
 	get_signature: function()
 	{
-		var data = new Uint8Array( this.data.buffer.slice( 0, 0x1E ) ),
+		var result = [],
 		i = 0;
 		while ( i < 0x1E )
 		{
-			data[i] = ( data[i] < 0x10 ? '0' : '' ) + data[i++].toString( 16 );
+			result.push( ( this.origram[i] < 0x10 ? '0' : '' ) + this.origram[i++].toString( 16 ) );
 		}
-		return data.join( '' );
+		return result.join( '' );
 	},
 
 	// Run

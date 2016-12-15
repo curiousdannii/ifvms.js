@@ -49,12 +49,17 @@ Class.subClass = function( props )
 };
 
 // An enhanced DataView
-// Accepts either an ArrayBuffer or a length number
+// Accepts an ArrayBuffer, typed array, or a length number
 function MemoryView( buffer, byteOffset, byteLength )
 {
 	if ( typeof buffer === 'number' )
 	{
 		buffer = new ArrayBuffer( buffer );
+	}
+	// Typed arrays
+	if ( buffer.buffer )
+	{
+		buffer = buffer.buffer;
 	}
 	
 	return extend( new DataView( buffer, byteOffset, byteLength ), {

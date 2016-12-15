@@ -496,16 +496,13 @@ module.exports = {
 	// (Re)start the VM
 	restart: function()
 	{
-		// Set up the memory
-		var memory = utils.MemoryView( this.data.buffer.slice() ),
-		staticmem = memory.getUint16( 0x0E ),
-		ram = utils.MemoryView( memory.buffer, 0, staticmem ),
-
-		version = memory.getUint8( 0x00 ),
+		var ram = this.ram,
+		version = ram.getUint8( 0x00 ),
 		version3 = version === 3,
 		addr_multipler = version3 ? 2 : ( version === 5 ? 4 : 8 ),
-		property_defaults = memory.getUint16( 0x0A ),
-		extension = memory.getUint16( 0x36 );
+		flags2 = ram.getUint8( 0x11 ),
+		property_defaults = ram.getUint16( 0x0A ),
+		extension = ram.getUint16( 0x36 );
 
 		// Check if the version is supported
 		if ( version !== 3 && version !== 5 && version !== 8 )
@@ -513,17 +510,13 @@ module.exports = {
 			throw new Error( 'Unsupported Z-Machine version: ' + version );
 		}
 
-		// Preserve flags 2 - the fixed pitch bit is surely the lamest part of the Z-Machine spec!
-		if ( this.m )
-		{
-			ram.setUint8( 0x11, this.m.getUint8( 0x11 ) );
-		}
+		// Reset the RAM, but preserve flags 2
+		ram.setUint8Array( 0, this.origram );
+		ram.setUint8( 0x11, flags2 );
 
 		extend( this, {
 
-			// Memory, locals and stacks of various kinds
-			m: memory,
-			ram: ram,
+			// Locals and stacks of various kinds
 			s: [],
 			l: [],
 			call_stack: [],
@@ -535,14 +528,14 @@ module.exports = {
 			// Get some header variables
 			version: version,
 			version3: version3,
-			pc: memory.getUint16( 0x06 ),
+			pc: ram.getUint16( 0x06 ),
 			properties: property_defaults,
 			objects: property_defaults + ( version3 ? 53 : 112 ), // 62-9 or 126-14 - if we take this now then we won't need to always decrement the object number
-			globals: memory.getUint16( 0x0C ),
-			staticmem: staticmem,
-			eof: ( memory.getUint16( 0x1A ) || 65536 ) * addr_multipler,
+			globals: ram.getUint16( 0x0C ),
+			// staticmem: set in prepare()
+			eof: ( ram.getUint16( 0x1A ) || 65536 ) * addr_multipler,
 			extension: extension,
-			extension_count: extension ? memory.getUint16( extension ) : 0,
+			extension_count: extension ? ram.getUint16( extension ) : 0,
 
 			// Routine and string multiplier
 			addr_multipler: addr_multipler,
@@ -573,7 +566,7 @@ module.exports = {
 		quetzal = new file.Quetzal( data ),
 		qmem = quetzal.memory,
 		qstacks = quetzal.stacks,
-		flags2 = this.m.getUint8( 0x11 ),
+		flags2 = ram.getUint8( 0x11 ),
 		temp,
 		i = 0, j = 0,
 		call_stack = [],
@@ -581,7 +574,8 @@ module.exports = {
 		newstack;
 		
 		// Memory chunk
-		ram.setUint8Array( 0, this.data.buffer.slice( 0, this.staticmem ) );
+		// Reset the RAM
+		ram.setUint8Array( 0, this.origram );
 		if ( quetzal.compressed )
 		{
 			while ( i < qmem.length )
@@ -594,7 +588,7 @@ module.exports = {
 				}
 				else
 				{
-					ram.setUint8( j, temp ^ this.data[j++] );
+					ram.setUint8( j, temp ^ this.origram[j++] );
 				}
 			}
 		}
@@ -718,7 +712,7 @@ module.exports = {
 		quetzal.compressed = 1;
 		for ( i = 0; i < this.staticmem; i++ )
 		{
-			abyte = memory.getUint8( i ) ^ this.data[i];
+			abyte = memory.getUint8( i ) ^ this.origram[i];
 			if ( abyte === 0 )
 			{
 				if ( ++zeroes === 256 )
