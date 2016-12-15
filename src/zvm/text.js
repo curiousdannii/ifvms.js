@@ -65,12 +65,12 @@ module.exports = {
 		}
 
 		// Check for custom alphabets
-		make_alphabet( alphabet_addr ? memory.getBuffer8( alphabet_addr, 78 )
+		make_alphabet( alphabet_addr ? memory.getUint8Array( alphabet_addr, 78 )
 			// Or use the standard alphabet
 			: this.text_to_zscii( 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \r0123456789.,!?_#\'"/\\-:()', 1 ) );
 
 		// Check for a custom unicode table
-		make_unicode( unicode_addr ? memory.getBuffer16( unicode_addr, unicode_len )
+		make_unicode( unicode_addr ? memory.getUint16Array( unicode_addr, unicode_len )
 			// Or use the default
 			: this.text_to_zscii( unescape( '%E4%F6%FC%C4%D6%DC%DF%BB%AB%EB%EF%FF%CB%CF%E1%E9%ED%F3%FA%FD%C1%C9%CD%D3%DA%DD%E0%E8%EC%F2%F9%C0%C8%CC%D2%D9%E2%EA%EE%F4%FB%C2%CA%CE%D4%DB%E5%C5%F8%D8%E3%F1%F5%C3%D1%D5%E6%C6%E7%C7%FE%F0%DE%D0%A3%u0153%u0152%A1%BF' ), 1 ) );
 
@@ -328,7 +328,7 @@ module.exports = {
 
 		// Support: IE, Safari, Firefox<38, Chrome<45, Opera<32, Node<4
 		// These browsers don't support Uint8Array.indexOf() so convert to a normal array
-		dict.separators = Array.prototype.slice.call( memory.getBuffer8( addr, seperators_len ) );
+		dict.separators = Array.prototype.slice.call( memory.getUint8Array( addr, seperators_len ) );
 
 		addr += seperators_len;
 
@@ -338,7 +338,7 @@ module.exports = {
 		addr += 2;
 		while ( addr < endaddr )
 		{
-			dict[ Array.prototype.toString.call( memory.getBuffer8( addr, this.version3 ? 4 : 6 ) ) ] = addr;
+			dict[ Array.prototype.toString.call( memory.getUint8Array( addr, this.version3 ? 4 : 6 ) ) ] = addr;
 			addr += entry_len;
 		}
 		this.dictionaries[addr_start] = dict;

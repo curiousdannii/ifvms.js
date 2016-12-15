@@ -171,7 +171,7 @@ module.exports = {
 			response.push( 0 );
 
 			// Store the response in the buffer
-			ram.setBuffer8( options.bufaddr + 1, response );
+			ram.setUint8Array( options.bufaddr + 1, response );
 		}
 		else
 		{
@@ -179,7 +179,7 @@ module.exports = {
 			ram.setUint8( options.bufaddr + 1, len );
 
 			// Store the response in the buffer
-			ram.setBuffer8( options.bufaddr + 2, response );
+			ram.setUint8Array( options.bufaddr + 2, response );
 
 			// Store the terminator
 			this.variable( options.storer, isNaN( terminator ) ? 13 : terminator );
@@ -285,7 +285,7 @@ module.exports = {
 		var i = 0;
 		while ( i++ < height )
 		{
-			this._print( this.zscii_to_text( this.m.getBuffer8( zscii, width ) ) + ( i < height ? '\r' : '' ) );
+			this._print( this.zscii_to_text( this.m.getUint8Array( zscii, width ) ) + ( i < height ? '\r' : '' ) );
 			zscii += width + skip;
 		}
 	},

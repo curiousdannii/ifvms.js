@@ -25,7 +25,7 @@ var utils = require( '../common/utils.js' ),
 extend = utils.extend,
 U2S = utils.U2S16,
 S2U = utils.S2U16,
-byte_to_word = utils.byte_to_word,
+byte_to_word = utils.Uint8toUint16Array,
 
 file = require( '../common/file.js' ),
 
@@ -117,13 +117,13 @@ module.exports = {
 		}
 		else
 		{
-			ram.setBuffer8( second, this.m.getBuffer8( first, size ) );
+			ram.setUint8Array( second, this.m.getUint8Array( first, size ) );
 		}
 	},
 
 	encode_text: function( zscii, length, from, target )
 	{
-		this.ram.setBuffer8( target, this.encode( this.m.getBuffer8( zscii + from, length ) ) );
+		this.ram.setUint8Array( target, this.encode( this.m.getUint8Array( zscii + from, length ) ) );
 	},
 
 	// Access the extension table
@@ -409,7 +409,7 @@ module.exports = {
 			var data = this.streams[2].shift(),
 			text = this.text_to_zscii( data[1] );
 			this.ram.setUint16( data[0], text.length );
-			this.ram.setBuffer8( data[0] + 2, text );
+			this.ram.setUint8Array( data[0] + 2, text );
 		}
 	},
 
@@ -581,7 +581,7 @@ module.exports = {
 		newstack;
 		
 		// Memory chunk
-		ram.setBuffer8( 0, this.data.buffer.slice( 0, this.staticmem ) );
+		ram.setUint8Array( 0, this.data.buffer.slice( 0, this.staticmem ) );
 		if ( quetzal.compressed )
 		{
 			while ( i < qmem.length )
@@ -600,7 +600,7 @@ module.exports = {
 		}
 		else
 		{
-			ram.setBuffer8( 0, qmem );
+			ram.setUint8Array( 0, qmem );
 		}
 		// Preserve flags 1
 		ram.setUint8( 0x11, flags2 );
@@ -658,7 +658,7 @@ module.exports = {
 		this.pc = state[0];
 		// Preserve flags 2
 		state[2][0x11] = this.m.getUint8( 0x11 );
-		this.ram.setBuffer8( 0, state[2] );
+		this.ram.setUint8Array( 0, state[2] );
 		this.l = state[3];
 		this.s = state[4];
 		this.call_stack = state[5];
@@ -710,7 +710,7 @@ module.exports = {
 
 		// IFhd chunk
 		quetzal.release = memory.getUint16( 0x02 );
-		quetzal.serial = memory.getBuffer8( 0x12, 6 );
+		quetzal.serial = memory.getUint8Array( 0x12, 6 );
 		quetzal.checksum = memory.getUint16( 0x1C );
 		quetzal.pc = pc;
 
@@ -843,7 +843,7 @@ module.exports = {
 		this.undo.push( [
 			pc,
 			variable,
-			this.m.getBuffer8( 0, this.staticmem ),
+			this.m.getUint8Array( 0, this.staticmem ),
 			this.l.slice(),
 			this.s.slice(),
 			this.call_stack.slice(),

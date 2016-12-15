@@ -48,7 +48,7 @@ IFF = utils.Class.subClass({
 				this.chunks.push({
 					type: view.getFourCC( i ),
 					offset: i,
-					data: view.getBuffer8( i + 8, chunk_length ),
+					data: view.getUint8Array( i + 8, chunk_length ),
 				});
 
 				i += 8 + chunk_length;
@@ -94,7 +94,7 @@ IFF = utils.Class.subClass({
 			chunk = this.chunks[i++];
 			out.setFourCC( index, chunk.type );
 			out.setUint32( index + 4, chunk.length );
-			out.setBuffer8( index + 8, chunk.data );
+			out.setUint8Array( index + 8, chunk.data );
 			index += 8 + chunk.length;
 			if ( index % 2 )
 			{
@@ -144,7 +144,7 @@ Quetzal = IFF.subClass({
 				{
 					view = utils.MemoryView( chunk_data.buffer );
 					this.release = view.getUint16( 0 );
-					this.serial = view.getBuffer8( 2, 6 );
+					this.serial = view.getUint8Array( 2, 6 );
 					// The checksum isn't used, but if we throw it away we can't round-trip
 					this.checksum = view.getUint16( 8 );
 					// The pc is only a Uint24, but there's no function for that, so grab an extra byte and then discard it
@@ -163,7 +163,7 @@ Quetzal = IFF.subClass({
 		// Format the IFhd chunk correctly
 		var ifhd = utils.MemoryView( 13 );
 		ifhd.setUint16( 0, this.release );
-		ifhd.setBuffer8( 2, this.serial );
+		ifhd.setUint8Array( 2, this.serial );
 		ifhd.setUint32( 9, this.pc );
 		ifhd.setUint16( 8, this.checksum );
 

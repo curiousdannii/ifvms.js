@@ -58,15 +58,16 @@ function MemoryView( buffer, byteOffset, byteLength )
 	}
 	
 	return extend( new DataView( buffer, byteOffset, byteLength ), {
-		getBuffer8: function( start, length )
+		getUint8Array: function( start, length )
 		{
 			return new Uint8Array( this.buffer.slice( start, start + length ) );
 		},
-		getBuffer16: function( start, length )
+		getUint16Array: function( start, length )
 		{
-			return new Uint16Array( this.buffer.slice( start, start + length * 2 ) );
+			// We cannot simply return a Uint16Array as most systems are little-endian
+			return Uint8toUint16Array( new Uint8Array( this.buffer, start, start + length * 2 ) );
 		},
-		setBuffer8: function( start, data )
+		setUint8Array: function( start, data )
 		{
 			if ( data instanceof ArrayBuffer )
 			{
@@ -74,7 +75,7 @@ function MemoryView( buffer, byteOffset, byteLength )
 			}
 			( new Uint8Array( this.buffer ) ).set( data, start );
 		},
-		//setBuffer16
+		//setBuffer16 NOTE: if we implement this we cannot simply set a Uint16Array as most systems are little-endian
 		
 		// For use with IFF files
 		getFourCC: function( index )
@@ -102,10 +103,10 @@ function S2U16 ( value )
 }
 
 // Utility to convert from byte arrays to word arrays
-function byte_to_word( array )
+function Uint8toUint16Array( array )
 {
 	var i = 0, l = array.length,
-	result = [];
+	result = new Uint16Array( l / 2 );
 	while ( i < l )
 	{
 		result[i / 2] = array[i++] << 8 | array[i++];
@@ -119,40 +120,5 @@ module.exports = {
 	MemoryView: MemoryView,
 	U2S16: U2S16,
 	S2U16: S2U16,
-	byte_to_word: byte_to_word,
+	Uint8toUint16Array: Uint8toUint16Array,
 };
-
-/*// Perform some micro optimisations
-function optimise( code )
-{
-	return code
-
-	// Sign conversions
-	.replace( /(e\.)?U2S\(([^(]+?)\)/g, '(($2)<<16>>16)' )
-	.replace( /(e\.)?S2U\(([^(]+?)\)/g, '(($2)&65535)' )
-
-	// Bytearray
-	.replace( /([\w.]+)\.getUint8\(([^(]+?)\)/g, '$1[$2]' )
-	.replace( /([\w.]+)\.getUint16\(([^(]+?)\)/g, '($1[$2]<<8|$1[$2+1])' );
-}
-// Optimise some functions of an obj, compiling several at once
-function optimise_obj( obj, funcnames )
-{
-	var funcname, funcparts, newfuncs = [];
-	for ( funcname in obj )
-	{
-		if ( funcnames.indexOf( funcname ) >= 0 )
-		{
-			funcparts = /function\s*\(([^(]*)\)\s*\{([\s\S]+)\}/.exec( '' + obj[funcname] );
-			if ( DEBUG )
-			{
-				newfuncs.push( funcname + ':function ' + funcname + '(' + funcparts[1] + '){' + optimise( funcparts[2] ) + '}' );
-			}
-			else
-			{
-				newfuncs.push( funcname + ':function(' + funcparts[1] + '){' + optimise( funcparts[2] ) + '}' );
-			}
-		}
-	}
-	extend( obj, eval( '({' + newfuncs.join() + '})' ) );
-}*/
