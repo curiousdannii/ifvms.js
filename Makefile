@@ -32,3 +32,4 @@ tests/regtest.py:
 test: dist/zvm.js tests/regtest.py
 	cd tests && python regtest.py praxix.regtest
 	cd tests && python regtest.py praxix-bundled.regtest
+	cd tests && python regtest.py curses.regtest

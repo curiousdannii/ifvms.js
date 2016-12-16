@@ -5,8 +5,6 @@
 
 Praxix: A Z-code interpreter unit test
 
-* all
-
 > all
 !FAIL
 All tests passed.
