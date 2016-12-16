@@ -4,25 +4,31 @@
 JOBS := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 MAKEFLAGS = "-j $(JOBS)"
 
-# Location of the project so we don't cross-wire relative paths.
-BASE := $(shell cd "$(shell dirname $(lastword $(MAKEFILE_LIST)))/" && pwd)
+# Add node bin scripts to path
+PATH := $(shell npm bin):$(PATH)
 
 CURL = curl -L -s -S
 
 # Mark which rules are not actually generating files
-.PHONY: all clean test
+.PHONY: all clean lint test
 
-all: test
+all: lint test
 
 clean:
+	rm dist/zvm.js
+	rm tests/regtest.py
 
-# Download Praxix and regtest
-tests/praxix.z5:
-	$(CURL) -o tests/praxix.z5 https://github.com/curiousdannii/if/raw/gh-pages/tests/praxix.z5
+dist/zvm.js: src/zvm.js src/common/* src/zvm/*
+	mkdir -p dist
+	browserify src/zvm.js --standalone ZVM > dist/zvm.js
+
+lint:
+	eslint --ignore-path .gitignore .
 
 tests/regtest.py:
 	$(CURL) -o tests/regtest.py https://raw.githubusercontent.com/erkyrath/plotex/master/regtest.py
 
 # Run the test suite
-test: tests/praxix.z5 tests/regtest.py
+test: dist/zvm.js tests/regtest.py
 	cd tests && python regtest.py praxix.regtest
+	cd tests && python regtest.py praxix-bundled.regtest

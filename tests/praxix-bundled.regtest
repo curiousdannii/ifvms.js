@@ -1,0 +1,12 @@
+** game: praxix.z5
+** interpreter: ../bin/zvm.js -b
+
+* praxix
+
+Praxix: A Z-code interpreter unit test
+
+* all
+
+> all
+!FAIL
+All tests passed.

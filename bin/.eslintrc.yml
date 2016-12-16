@@ -1,3 +1,8 @@
+parserOptions:
+  ecmaVersion: 6
+
 rules:
+  no-console:
+    - off
   one-var:
     - off

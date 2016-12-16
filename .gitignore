@@ -1,4 +1,4 @@
 node_modules
 npm-debug.log
-tests/praxix.z5
+dist
 tests/regtest.py
