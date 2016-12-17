@@ -27,6 +27,7 @@ Any other non-standard behaviour should be considered a bug
 'use strict';
 
 var utils = require( './common/utils.js' ),
+file = require( './common/file.js' ),
 MemoryView = utils.MemoryView,
 
 api = {
@@ -46,26 +47,38 @@ api = {
 		// If we are not given a glk option then we cannot continue
 		if ( !options.Glk )
 		{
-			throw new Error( 'a reference to Glk is required' );
+			throw new Error( 'A reference to Glk is required' );
 		}
 		this.glk = options.Glk;
-		
-		// Load the storyfile we are given into our MemoryView (an enhanced DataView)
-		this.m = MemoryView( new Uint8Array( storydata ) );
-		
-		// Make a seperate MemoryView for the ram, and store the original ram
-		this.staticmem = this.m.getUint16( 0x0E );
-		this.ram = MemoryView( this.m.buffer, 0, this.staticmem );
-		this.origram = this.m.getUint8Array( 0, this.staticmem );
-		
-		// TODO: check that we are given a valid storyfile
+		this.data = storydata;
 	},
 
 	start: function()
 	{
-		var Glk = this.glk;
+		var Glk = this.glk,
+		data;
 		try
 		{
+			// Identify the format and version number of the data file we were given
+			data = file.identify( this.data );
+			delete this.data;
+			if ( !data || data.format !== 'ZCOD' )
+			{
+				throw new Error( 'This is not a Z-Code file' );
+			}
+			if ( data.version !== 3 && data.version !== 5 && data.version !== 8 )
+			{
+				throw new Error( 'Unsupported Z-Machine version: ' + data.version );
+			}
+			
+			// Load the storyfile we are given into our MemoryView (an enhanced DataView)
+			this.m = MemoryView( data.data );
+			
+			// Make a seperate MemoryView for the ram, and store the original ram
+			this.staticmem = this.m.getUint16( 0x0E );
+			this.ram = MemoryView( this.m.buffer, 0, this.staticmem );
+			this.origram = this.m.getUint8Array( 0, this.staticmem );
+			
 			// Initiate the engine, run, and wait for our first Glk event
 			this.restart();
 			this.run();
@@ -78,7 +91,11 @@ api = {
 		}
 		catch ( e )
 		{
-			Glk.fatal_error( 'ZVM start: ' + e );
+			if ( e instanceof Error )
+			{
+				e.message = 'ZVM start: ' + e.message;
+			}
+			Glk.fatal_error( e );
 			throw e;
 		}
 	},
@@ -132,7 +149,11 @@ api = {
 		}
 		catch ( e )
 		{
-			Glk.fatal_error( 'ZVM: ' + e );
+			if ( e instanceof Error )
+			{
+				e.message = 'ZVM: ' + e.message;
+			}
+			Glk.fatal_error( e );
 			throw e;
 		}
 	},

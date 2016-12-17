@@ -504,12 +504,6 @@ module.exports = {
 		property_defaults = ram.getUint16( 0x0A ),
 		extension = ram.getUint16( 0x36 );
 
-		// Check if the version is supported
-		if ( version !== 3 && version !== 5 && version !== 8 )
-		{
-			throw new Error( 'Unsupported Z-Machine version: ' + version );
-		}
-
 		// Reset the RAM, but preserve flags 2
 		ram.setUint8Array( 0, this.origram );
 		ram.setUint8( 0x11, flags2 );

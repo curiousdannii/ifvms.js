@@ -70,7 +70,7 @@ function MemoryView( buffer, byteOffset, byteLength )
 		getUint16Array: function( start, length )
 		{
 			// We cannot simply return a Uint16Array as most systems are little-endian
-			return Uint8toUint16Array( new Uint8Array( this.buffer, start, start + length * 2 ) );
+			return Uint8toUint16Array( new Uint8Array( this.buffer, start, length * 2 ) );
 		},
 		setUint8Array: function( start, data )
 		{

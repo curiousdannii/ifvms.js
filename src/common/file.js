@@ -12,6 +12,7 @@ http://github.com/curiousdannii/ifvms.js
 'use strict';
 
 var utils = require( './utils.js' ),
+MemoryView = utils.MemoryView,
 
 // A basic IFF file, to be extended later
 // Currently supports buffer data
@@ -23,7 +24,7 @@ IFF = utils.Class.subClass({
 		
 		if ( data )
 		{
-			var view = utils.MemoryView( data ),
+			var view = MemoryView( data ),
 			i = 12, length, chunk_length;
 			
 			// Check that it is actually an IFF file
@@ -82,7 +83,7 @@ IFF = utils.Class.subClass({
 			}
 		}
 		
-		out = utils.MemoryView( buffer_len );
+		out = MemoryView( buffer_len );
 		out.setFourCC( 0, 'FORM' );
 		out.setUint32( 4, buffer_len - 8 );
 		out.setFourCC( 8, this.type );
@@ -103,6 +104,40 @@ IFF = utils.Class.subClass({
 		}
 
 		return out.buffer;
+	},
+}),
+
+Blorb = IFF.subClass({
+	init: function( data )
+	{
+		this.super.init.call( this, data );
+		if ( data )
+		{
+			if ( this.type !== 'IFRS' )
+			{
+				throw new Error( 'Not a Blorb file' );
+			}
+			
+			// Process the RIdx chunk to find the main exec chunk
+			if ( this.chunks[0].type !== 'RIdx' )
+			{
+				throw new Error( 'Malformed Blorb: chunk 1 is not RIdx' );
+			}
+			var view = MemoryView( this.chunks[0].data ),
+			i = 4;
+			while ( i < this.chunks[0].data.length )
+			{
+				if ( view.getFourCC( i ) === 'Exec' && view.getUint32( i + 4 ) === 0 )
+				{
+					this.exec = this.chunks.filter( function( chunk )
+					{
+						return chunk.offset === view.getUint32( i + 8 );
+					})[0];
+					return;
+				}
+				i += 12;
+			}
+		}
 	},
 }),
 
@@ -142,7 +177,7 @@ Quetzal = IFF.subClass({
 				// Story file data
 				else if ( type === 'IFhd' )
 				{
-					view = utils.MemoryView( chunk_data.buffer );
+					view = MemoryView( chunk_data.buffer );
 					this.release = view.getUint16( 0 );
 					this.serial = view.getUint8Array( 2, 6 );
 					// The checksum isn't used, but if we throw it away we can't round-trip
@@ -161,7 +196,7 @@ Quetzal = IFF.subClass({
 		this.type = 'IFZS';
 
 		// Format the IFhd chunk correctly
-		var ifhd = utils.MemoryView( 13 );
+		var ifhd = MemoryView( 13 );
 		ifhd.setUint16( 0, this.release );
 		ifhd.setUint8Array( 2, this.serial );
 		ifhd.setUint32( 9, this.pc );
@@ -179,7 +214,62 @@ Quetzal = IFF.subClass({
 	},
 });
 
+// Inspect a file and identify its format and version number
+function identify( buffer )
+{
+	var view = MemoryView( buffer ),
+	blorb,
+	format,
+	version;
+	
+	// Blorb
+	if ( view.getFourCC( 0 ) === 'FORM' && view.getFourCC( 8 ) === 'IFRS' )
+	{
+		blorb = new Blorb( buffer );
+		if ( blorb.exec )
+		{
+			format = blorb.exec.type;
+			buffer = blorb.exec.data;
+			if ( format === 'GLUL' )
+			{
+				view = MemoryView( buffer );
+				version = view.getUint32( 4 );
+			}
+			if ( format === 'ZCOD' )
+			{
+				version = buffer[0];
+			}
+		}
+	}
+	// Glulx
+	else if ( view.getFourCC( 0 ) === 'Glul' )
+	{
+		format = 'GLUL';
+		version = view.getUint32( 4 );
+	}
+	// Z-Code
+	else
+	{
+		version = view.getUint8( 0 );
+		if ( version > 0 && version < 9 )
+		{
+			format = 'ZCOD';
+		}
+	}
+	
+	if ( format && version )
+	{
+		return {
+			format: format,
+			version: version,
+			data: buffer,
+		};
+	}
+}
+
 module.exports = {
 	IFF: IFF,
+	Blorb: Blorb,
 	Quetzal: Quetzal,
+	identify: identify,
 };
