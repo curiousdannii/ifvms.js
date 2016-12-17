@@ -375,7 +375,7 @@ module.exports = {
 
 		if ( this.version3 )
 		{
-			len--;
+			len++;
 			this.v3_status();
 		}
 		else
