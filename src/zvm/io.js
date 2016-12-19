@@ -42,7 +42,7 @@ var ZSCII_keyCodes = (function()
 	i = 0;
 	while ( i < 12 )
 	{
-		codes[i] = 0xffffffef - i++; // function keys
+		codes[ 0xffffffef - i ] = 133 + i++; // function keys
 	}
 	return codes;
 })(),
