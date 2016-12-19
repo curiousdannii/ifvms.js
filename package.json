@@ -4,7 +4,7 @@
   "version": "0.2.1",
   "description": "The Interactive Fiction Virtual Machines Suite - in Javascript",
   "author": "Dannii Willis <curiousdannii@gmail.com>",
-  "license": "BSD-3-Clause",
+  "license": "MIT",
   "keywords": [
     "intfiction",
     "vm"
@@ -13,6 +13,11 @@
   "bin": {
     "zvm": "bin/zvm.js"
   },
+  "files": [
+    "CONTRIBUTORS",
+    "*.css",
+    "*.js"
+  ],
   "repository": "curiousdannii/ifvms.js",
   "homepage": "https://github.com/curiousdannii/ifvms.js",
   "bugs": "https://github.com/curiousdannii/ifvms.js/issues",
