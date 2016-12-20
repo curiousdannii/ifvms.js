@@ -353,7 +353,7 @@ module.exports = {
 	},
 
 	// Tokenise a text
-	tokenise: function( text, buffer, dictionary, flag )
+	tokenise: function( bufaddr, parseaddr, dictionary, flag )
 	{
 		// Use the default dictionary if one wasn't provided
 		dictionary = dictionary || this.dict;
@@ -376,13 +376,13 @@ module.exports = {
 		// In versions 5 and 8 we can get the actual buffer length
 		if ( !this.version3 )
 		{
-			bufferlength = memory.getUint8( text + i++ ) + 2;
+			bufferlength = memory.getUint8( bufaddr + i++ ) + 2;
 		}
 
 		// Find the words, separated by the separators, but as well as the separators themselves
 		while ( i < bufferlength )
 		{
-			letter = memory.getUint8( text + i );
+			letter = memory.getUint8( bufaddr + i );
 			if ( letter === 0 )
 			{
 				break;
@@ -408,7 +408,7 @@ module.exports = {
 		}
 
 		// Go through the text until we either have reached the max number of words, or we're out of words
-		max_words = Math.min( words.length, memory.getUint8( buffer ) );
+		max_words = Math.min( words.length, memory.getUint8( parseaddr ) );
 		while ( wordcount < max_words )
 		{
 			dictword = dictionary['' + this.encode( words[wordcount][0] )];
@@ -417,15 +417,15 @@ module.exports = {
 			if ( !flag || dictword )
 			{
 				// Fill out the buffer
-				ram.setUint16( buffer + 2 + wordcount * 4, dictword || 0 );
-				ram.setUint8( buffer + 4 + wordcount * 4, words[wordcount][0].length );
-				ram.setUint8( buffer + 5 + wordcount * 4, words[wordcount][1] );
+				ram.setUint16( parseaddr + 2 + wordcount * 4, dictword || 0 );
+				ram.setUint8( parseaddr + 4 + wordcount * 4, words[wordcount][0].length );
+				ram.setUint8( parseaddr + 5 + wordcount * 4, words[wordcount][1] );
 			}
 			wordcount++;
 		}
 
 		// Update the number of found words
-		ram.setUint8( buffer + 1, wordcount );
+		ram.setUint8( parseaddr + 1, wordcount );
 	},
 
 };

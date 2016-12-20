@@ -902,7 +902,7 @@ module.exports = {
 
 	test: function( bitmap, flag )
 	{
-		return bitmap & flag === flag;
+		return ( bitmap & flag ) === flag;
 	},
 
 	test_attr: function( object, attribute )

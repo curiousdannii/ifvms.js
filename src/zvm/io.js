@@ -99,7 +99,11 @@ module.exports = {
 		if ( !this.mainwin )
 		{
 			this.mainwin = this.glk.glk_window_open( 0, 0, 0, 3, 201 );
-			this.statuswin = this.glk.glk_window_open( this.mainwin, 0x12, 0, 4, 202 );
+			if ( this.version3 )
+			{
+				this.statuswin = this.glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 );
+			}
+			this.upperwin = this.glk.glk_window_open( this.mainwin, 0x12, 0, 4, 203 );
 		}
 		this.set_window( 0 );
 	},
@@ -124,9 +128,9 @@ module.exports = {
 		}
 		if ( window === 1 || window === -2 )
 		{
-			if ( this.statuswin )
+			if ( this.upperwin )
 			{
-				this.glk.glk_window_clear( this.statuswin );
+				this.glk.glk_window_clear( this.upperwin );
 				this.set_cursor( 0, 0 );
 			}
 		}
@@ -375,7 +379,7 @@ module.exports = {
 
 		if ( this.version3 )
 		{
-			len--;
+			len++;
 			this.v3_status();
 		}
 		else
@@ -432,9 +436,9 @@ module.exports = {
 	set_cursor: function( row, col )
 	{
 		var io = this.io;
-		if ( this.statuswin && row >= 0 && row < io.height && col >= 0 && col < io.width )
+		if ( this.upperwin && row >= 0 && row < io.height && col >= 0 && col < io.width )
 		{
-			this.glk.glk_window_move_cursor( this.statuswin, col, row );
+			this.glk.glk_window_move_cursor( this.upperwin, col, row );
 			io.row = row;
 			io.col = col;
 		}
@@ -526,7 +530,7 @@ module.exports = {
 
 	set_window: function( window )
 	{
-		this.glk.glk_set_window( this.statuswin && window ? this.statuswin : this.mainwin );
+		this.glk.glk_set_window( this.upperwin && window ? this.upperwin : this.mainwin );
 		this.io.currentwin = window;
 		this.format();
 		
@@ -539,9 +543,9 @@ module.exports = {
 
 	split_window: function( lines )
 	{
-		if ( this.statuswin )
+		if ( this.upperwin )
 		{
-			this.glk.glk_window_set_arrangement( this.glk.glk_window_get_parent( this.statuswin ), 0x12, lines, null );
+			this.glk.glk_window_set_arrangement( this.glk.glk_window_get_parent( this.upperwin ), 0x12, lines, null );
 			this.io.height = lines;
 			if ( this.io.row >= lines )
 			{
@@ -551,7 +555,7 @@ module.exports = {
 			// 8.6.1.1.2: In version three the upper window is always cleared
 			if ( this.version3 )
 			{
-				this.glk.glk_window_clear( this.statuswin );
+				this.glk.glk_window_clear( this.upperwin );
 			}
 		}
 	},
@@ -564,12 +568,18 @@ module.exports = {
 		// Reset the Xorshift seed
 		this.xorshift_seed = 0;
 
+		// Update the width - in version 3 does not actually set the header variables
+		this.update_width();
+
 		// For version 3 we only set Flags 1
 		if ( this.version3 )
 		{
-			// Flags 1: Set bits 5, 6
-			// TODO: Can we tell from env if the font is fixed pitch?
-			return ram.setUint8( 0x01, ram.getUint8( 0x01 ) | 0x60 );
+			return ram.setUint8( 0x01,
+				( ram.getUint8( 0x01 ) & 0x8F ) // Keep all except bits 4-6
+				| ( this.statuswin ? 0 : 0x10 ) // Status win not available
+				| ( this.upperwin ? 0x20 : 0 ) // Upper win is available
+				| 0x40 // Variable pitch font is default - Or can we tell from env if the font is fixed pitch?
+			);
 		}
 		
 		// Flags 1
@@ -585,7 +595,6 @@ module.exports = {
 		
 		// Screen settings
 		ram.setUint8( 0x20, 255 ); // Infinite height
-		this.update_width();
 		ram.setUint16( 0x24, 255 );
 		ram.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
 		
@@ -605,10 +614,13 @@ module.exports = {
 	update_width: function()
 	{
 		var width, box = new this.glk.RefBox();
-		this.glk.glk_window_get_size( this.statuswin || this.mainwin, box );
+		this.glk.glk_window_get_size( this.upperwin || this.mainwin, box );
 		this.io.width = width = box.get_value();
-		this.ram.setUint8( 0x21, width );
-		this.ram.setUint16( 0x22, width );
+		if ( !this.version3 )
+		{
+			this.ram.setUint8( 0x21, width );
+			this.ram.setUint16( 0x22, width );
+		}
 		if ( this.io.col >= width )
 		{
 			this.io.col = width - 1;
@@ -618,17 +630,22 @@ module.exports = {
 	// Output the version 3 status line
 	v3_status: function()
 	{
-		/*var width = this.io.width,
-		hours_score = engine.m.getUint16( engine.globals + 2 ),
-		mins_turns = engine.m.getUint16( engine.globals + 4 ),
+		if ( !this.statuswin )
+		{
+			return;
+		}
+
+		var Glk = this.glk,
+		io = this.io,
+		width = io.width,
+		hours_score = this.m.getUint16( this.globals + 2 ),
+		mins_turns = this.m.getUint16( this.globals + 4 ),
+		proptable = this.m.getUint16( this.objects + 9 * this.m.getUint16( this.globals ) + 7 ),
+		shortname = '' + this.decode( proptable + 1, this.m.getUint8( proptable ) * 2 ),
 		rhs;
-		this.set_window( 1 );
-		this.set_style( 1 );
-		engine._print( Array( width + 1 ).join( ' ' ) );
-		this.set_cursor( 0, 0 );
 
 		// Handle the turns/score or time
-		if ( this.time )
+		if ( io.time )
 		{
 			rhs = 'Time: ' + ( hours_score % 12 === 0 ? 12 : hours_score % 12 ) + ':' + ( mins_turns < 10 ? '0' : '' ) + mins_turns + ' ' + ( hours_score > 11 ? 'PM' : 'AM' );
 		}
@@ -637,14 +654,23 @@ module.exports = {
 			rhs = 'Score: ' + hours_score + '  Turns: ' + mins_turns;
 		}
 
-		engine.print( 3, engine.m.getUint16( engine.globals ) );
-		// this.buffer now has the room name, so ensure it is not too long
-		this.buffer = ' ' + this.buffer.slice( 0, width - rhs.length - 4 );
+		// Print a blank line in reverse
+		Glk.glk_set_window( this.statuswin );
+		Glk.glk_window_move_cursor( this.statuswin, 0, 0 );
+		Glk.glk_set_style( style_mappings[1][ 0x08 ] );
+		Glk.glk_put_jstring( Array( width + 1 ).join( ' ' ) );
 
-		this.set_cursor( 0, width - rhs.length );
-		engine._print( rhs );
-		this.set_style( 0 );
-		this.set_window( 0 );*/
+		// Trim the shortname if necessary
+		Glk.glk_window_move_cursor( this.statuswin, 0, 0 );
+		Glk.glk_put_jstring( ' ' + shortname.slice( 0, width - rhs.length - 4 ) );
+
+		// Print the right hand side
+		Glk.glk_window_move_cursor( this.statuswin, width - rhs.length - 1, 0 );
+		Glk.glk_put_jstring( rhs );
+
+		// Return to the former window
+		Glk.glk_set_style( 0 );
+		Glk.glk_set_window( this.upperwin && io.currentwin ? this.upperwin : this.mainwin );
 	},
 
 };
