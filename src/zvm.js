@@ -48,14 +48,14 @@ api = {
 		{
 			throw new Error( 'A reference to Glk is required' );
 		}
-		this.glk = options.Glk;
+		this.Glk = options.Glk;
 		this.data = storydata;
 		this.env = options;
 	},
 
 	start: function()
 	{
-		var Glk = this.glk,
+		var Glk = this.Glk,
 		data;
 		try
 		{
@@ -102,7 +102,7 @@ api = {
 
 	resume: function()
 	{
-		var Glk = this.glk,
+		var Glk = this.Glk,
 		glk_event = this.glk_event,
 		event_type,
 		run;

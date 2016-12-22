@@ -98,10 +98,10 @@ module.exports = {
 		// Construct the windows if they do not already exist
 		if ( !this.mainwin )
 		{
-			this.mainwin = this.glk.glk_window_open( 0, 0, 0, 3, 201 );
+			this.mainwin = this.Glk.glk_window_open( 0, 0, 0, 3, 201 );
 			if ( this.version3 )
 			{
-				this.statuswin = this.glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 );
+				this.statuswin = this.Glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 );
 			}
 		}
 		this.set_window( 0 );
@@ -123,13 +123,13 @@ module.exports = {
 	{
 		if ( window < 1 )
 		{
-			this.glk.glk_window_clear( this.mainwin );
+			this.Glk.glk_window_clear( this.mainwin );
 		}
 		if ( window === 1 || window === -2 )
 		{
 			if ( this.upperwin )
 			{
-				this.glk.glk_window_clear( this.upperwin );
+				this.Glk.glk_window_clear( this.upperwin );
 				this.set_cursor( 0, 0 );
 			}
 		}
@@ -141,7 +141,7 @@ module.exports = {
 
 	format: function()
 	{
-		this.glk.glk_set_style( style_mappings[ this.io.currentwin ][ !!this.io.mono | this.io.italic | this.io.bold | this.io.reverse ] );
+		this.Glk.glk_set_style( style_mappings[ this.io.currentwin ][ !!this.io.mono | this.io.italic | this.io.bold | this.io.reverse ] );
 	},
 
 	get_cursor: function( array )
@@ -227,7 +227,7 @@ module.exports = {
 				// If we confirm that games do need this then we can implement it later
 				while ( i < text.length && io.row < io.height )
 				{
-					this.glk.glk_put_jstring( text[i++] );
+					this.Glk.glk_put_jstring( text[i++] );
 					io.col++;
 					if ( io.col === io.width )
 					{
@@ -238,7 +238,7 @@ module.exports = {
 			}
 			else
 			{
-				this.glk.glk_put_jstring( text );
+				this.Glk.glk_put_jstring( text );
 			}
 		}
 	},
@@ -397,7 +397,7 @@ module.exports = {
 		};
 		
 		// TODO: pre-existing input
-		this.glk.glk_request_line_event_uni( this.mainwin, buffer, initiallen );
+		this.Glk.glk_request_line_event_uni( this.mainwin, buffer, initiallen );
 	},
 
 	// Request character input
@@ -408,7 +408,7 @@ module.exports = {
 			storer: storer,
 			time: time,
 		};
-		this.glk.glk_request_char_event_uni( this.mainwin );
+		this.Glk.glk_request_char_event_uni( this.mainwin );
 	},
 
 	set_colour: function( /*foreground, background*/ )
@@ -437,7 +437,7 @@ module.exports = {
 		var io = this.io;
 		if ( this.upperwin && row >= 0 && row < io.height && col >= 0 && col < io.width )
 		{
-			this.glk.glk_window_move_cursor( this.upperwin, col, row );
+			this.Glk.glk_window_move_cursor( this.upperwin, col, row );
 			io.row = row;
 			io.col = col;
 		}
@@ -529,7 +529,7 @@ module.exports = {
 
 	set_window: function( window )
 	{
-		this.glk.glk_set_window( this.upperwin && window ? this.upperwin : this.mainwin );
+		this.Glk.glk_set_window( this.upperwin && window ? this.upperwin : this.mainwin );
 		this.io.currentwin = window;
 		this.format();
 		
@@ -542,7 +542,7 @@ module.exports = {
 
 	split_window: function( lines )
 	{
-		var Glk = this.glk;
+		var Glk = this.Glk;
 		if ( lines === 0 && this.upperwin )
 		{
 			Glk.glk_window_close( this.upperwin );
@@ -621,7 +621,7 @@ module.exports = {
 
 	update_width: function()
 	{
-		var Glk = this.glk,
+		var Glk = this.Glk,
 		tempwin = Glk.glk_window_open( this.mainwin, 0x12, 0, 4, 204 ),
 		box = new Glk.RefBox(),
 		width;
@@ -650,7 +650,7 @@ module.exports = {
 			return;
 		}
 
-		var Glk = this.glk,
+		var Glk = this.Glk,
 		io = this.io,
 		width = io.width,
 		hours_score = this.m.getUint16( this.globals + 2 ),

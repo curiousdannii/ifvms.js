@@ -376,7 +376,7 @@ module.exports = {
 
 	log: function( message )
 	{
-		this.glk.log( message );
+		this.Glk.log( message );
 	},
 
 	log_shift: function( number, places )
@@ -547,7 +547,7 @@ module.exports = {
 	{
 		this.pc = pc;
 		this.save_mode = filemode_Read;
-		this.glk.glk_fileref_create_by_prompt( 0x01, filemode_Read, 0 );
+		this.Glk.glk_fileref_create_by_prompt( 0x01, filemode_Read, 0 );
 	},
 
 	restore_file: function( data )
@@ -674,7 +674,7 @@ module.exports = {
 	{
 		this.pc = pc;
 		this.save_mode = filemode_Write;
-		this.glk.glk_fileref_create_by_prompt( 0x01, filemode_Write, 0 );
+		this.Glk.glk_fileref_create_by_prompt( 0x01, filemode_Write, 0 );
 	},
 	
 	save_file: function( pc )
@@ -762,7 +762,7 @@ module.exports = {
 	save_restore_handler: function( fref )
 	{
 		var memory = this.m,
-		Glk = this.glk,
+		Glk = this.Glk,
 		str,
 		buffer,
 		result = 0,
