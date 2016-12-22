@@ -79,16 +79,16 @@ module.exports = {
 			reverse: 0,
 			bold: 0,
 			italic: 0,
-			fg: undefined,
-			bg: undefined,
-			
-			// Version 3 time header bit
-			time: this.m.getUint8( 0x01 ) & 0x02,
 			
 			// A variable for whether we are outputing in a monospaced font. If non-zero then we are
 			// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
 			mono: this.m.getUint8( 0x11 ) & 0x02,
-			
+
+			// A variable for checking whether the transcript bit has been changed
+			transcript: this.m.getUint8( 0x11 ) & 0x01,
+
+			streams: [ 1, 0, [], 0 ],
+
 			currentwin: 0,
 			
 			width: 0,
@@ -109,8 +109,6 @@ module.exports = {
 			}
 		}
 		this.set_window( 0 );
-		
-		this.streams = [ 1, 0, [], 0 ];
 	},
 
 	erase_line: function( value )
@@ -145,6 +143,12 @@ module.exports = {
 		}
 	},
 
+	fileref_create_by_prompt: function( data )
+	{
+		this.fileref_data = data;
+		this.Glk.glk_fileref_create_by_prompt( data.usage, data.mode, data.rock || 0 );
+	},
+
 	format: function()
 	{
 		this.Glk.glk_set_style( style_mappings[ this.io.currentwin ][ !!this.io.mono | this.io.italic | this.io.bold | this.io.reverse ] );
@@ -166,17 +170,28 @@ module.exports = {
 	handle_create_fileref: function( fref )
 	{
 		var Glk = this.Glk,
-		func = this.fileref_data.func,
+		data = this.fileref_data,
 		str;
 
 		if ( fref )
 		{
-			str = Glk.glk_stream_open_file( fref, this.fileref_data.mode, 0 );
+			if ( data.unicode )
+			{
+				str = Glk.glk_stream_open_file_uni( fref, data.mode, data.rock || 0 );
+			}
+			else
+			{
+				str = Glk.glk_stream_open_file( fref, data.mode, data.rock || 0 );
+			}
 			Glk.glk_fileref_destroy( fref );
 		}
-		if ( func === 'restore' || func === 'save' )
+		if ( data.func === 'restore' || data.func === 'save' )
 		{
 			this.save_restore_handler( str );
+		}
+		if ( data.func === 'output_stream' )
+		{
+			this.output_stream_handler( str );
 		}
 	},
 
@@ -186,10 +201,21 @@ module.exports = {
 		var ram = this.ram,
 		options = this.read_data,
 		
+		// Convert the response back to a string, cut to len, convert to lower case, and then to a ZSCII array
+		command = String.fromCharCode.apply( null, options.buffer ),
+		response = this.text_to_zscii( command.slice( 0, len ).toLowerCase() );
+		
 		// 7.1.1.1: The response must be echoed, Glk will handle this
 		
-		// Cut the response array to len, convert back to a string, convert to lower case, and then to a ZSCII array
-		response = this.text_to_zscii( String.fromCharCode.apply( null, options.buffer.slice( 0, len ) ).toLowerCase() );
+		// But we do have to echo to the transcript
+		if ( this.io.streams[1] )
+		{
+			this.Glk.glk_put_jstring_stream( this.io.streams[1], command + '\n' );
+		}
+		if ( this.io.streams[3] )
+		{
+			this.Glk.glk_put_jstring_stream( this.io.streams[3], command + '\n' );
+		}
 
 		// Store the response
 		if ( this.version3 )
@@ -220,46 +246,140 @@ module.exports = {
 	},
 
 	// Manage output streams
-	output_stream: function( stream, addr )
+	output_stream: function( stream, addr_text )
 	{
+		var ram = this.ram,
+		io = this.io,
+		data, text;
 		stream = U2S( stream );
+
 		if ( stream === 1 )
 		{
-			this.streams[0] = 1;
+			io.streams[0] = 1;
 		}
 		if ( stream === -1 )
 		{
-			this.streams[0] = 0;
+			io.streams[0] = 0;
+		}
+		if ( stream === 2 )
+		{
+			this.fileref_create_by_prompt({
+				func: 'output_stream',
+				mode: 0x05,
+				rock: 210,
+				str: 2,
+				text: addr_text,
+				unicode: 1,
+				usage: 0x102,
+			});
+			this.stop = 1;
+		}
+		if ( stream === -2 )
+		{
+			ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) );
+			if ( io.streams[1] )
+			{
+				this.Glk.glk_stream_close( io.streams[1] );
+			}
+			io.streams[1] = io.transcript = 0;
+			if ( addr_text )
+			{
+				this._print( addr_text );
+			}
 		}
 		if ( stream === 3 )
 		{
-			this.streams[2].unshift( [ addr, '' ] );
+			io.streams[2].unshift( [ addr_text, '' ] );
 		}
 		if ( stream === -3 )
 		{
-			var data = this.streams[2].shift(),
+			data = io.streams[2].shift();
 			text = this.text_to_zscii( data[1] );
-			this.ram.setUint16( data[0], text.length );
-			this.ram.setUint8Array( data[0] + 2, text );
+			ram.setUint16( data[0], text.length );
+			ram.setUint8Array( data[0] + 2, text );
+		}
+		if ( stream === 4 )
+		{
+			this.fileref_create_by_prompt({
+				func: 'output_stream',
+				mode: 0x05,
+				rock: 211,
+				str: 4,
+				unicode: 1,
+				usage: 0x103,
+			});
+			this.stop = 1;
+		}
+		if ( stream === -4 )
+		{
+			if ( io.streams[3] )
+			{
+				this.Glk.glk_stream_close( io.streams[3] );
+			}
+			io.streams[3] = 0;
+		}
+	},
+	
+	output_stream_handler: function( str )
+	{
+		var ram = this.ram,
+		io = this.io,
+		data = this.fileref_data;
+
+		if ( data.str === 2 )
+		{
+			ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) | ( str ? 1 : 0 ) );
+			if ( str )
+			{
+				io.streams[1] = str;
+				io.transcript = 1;
+			}
+			else
+			{
+				io.streams[1] = io.transcript = 0;
+			}
+			if ( data.text )
+			{
+				this._print( data.text );
+			}
+		}
+
+		if ( data.str === 4 )
+		{
+			if ( str )
+			{
+				io.streams[3] = str;
+			}
+			else
+			{
+				io.streams[3] = 0;
+			}
 		}
 	},
 
 	// Print text!
 	_print: function( text )
 	{
-		var io = this.io,
+		var Glk = this.Glk,
+		io = this.io,
 		i = 0;
 		
 		// Stream 3 gets the text first
-		if ( this.streams[2].length )
+		if ( io.streams[2].length )
 		{
-			this.streams[2][0][1] += text;
+			io.streams[2][0][1] += text;
 		}
-		// Don't print if stream 1 was switched off (why would you do that?!)
-		else if ( this.streams[0] )
+		else
 		{
 			// Convert CR into LF
 			text = text.replace( /\r/g, '\n' );
+			
+			// Check the transcript bit
+			// Because it might need to prompt for a file name, we return here, and will print again in the handler
+			if ( ( this.m.getUint8( 0x11 ) & 0x01 ) !== io.transcript )
+			{
+				return this.output_stream( io.transcript ? -2 : 2, text );
+			}
 			
 			// Check if the monospace font bit has changed
 			// Unfortunately, even now Inform changes this bit for the font statement, even though the 1.1 standard depreciated it :(
@@ -276,7 +396,7 @@ module.exports = {
 				// If we confirm that games do need this then we can implement it later
 				while ( i < text.length && io.row < io.height )
 				{
-					this.Glk.glk_put_jstring( text[i++] );
+					Glk.glk_put_jstring( text[i++] );
 					io.col++;
 					if ( io.col === io.width )
 					{
@@ -287,7 +407,15 @@ module.exports = {
 			}
 			else
 			{
-				this.Glk.glk_put_jstring( text );
+				if ( io.streams[0]  )
+				{
+					Glk.glk_put_jstring( text );
+				}
+				// Transcript
+				if ( io.streams[1]  )
+				{
+					Glk.glk_put_jstring_stream( io.streams[1], text );
+				}
 			}
 		}
 	},
@@ -700,16 +828,17 @@ module.exports = {
 		}
 
 		var Glk = this.Glk,
+		memory = this.m,
 		io = this.io,
 		width = io.width,
-		hours_score = this.m.getUint16( this.globals + 2 ),
-		mins_turns = this.m.getUint16( this.globals + 4 ),
-		proptable = this.m.getUint16( this.objects + 9 * this.m.getUint16( this.globals ) + 7 ),
-		shortname = '' + this.decode( proptable + 1, this.m.getUint8( proptable ) * 2 ),
+		hours_score = memory.getUint16( this.globals + 2 ),
+		mins_turns = memory.getUint16( this.globals + 4 ),
+		proptable = memory.getUint16( this.objects + 9 * memory.getUint16( this.globals ) + 7 ),
+		shortname = '' + this.decode( proptable + 1, memory.getUint8( proptable ) * 2 ),
 		rhs;
 
 		// Handle the turns/score or time
-		if ( io.time )
+		if ( memory.getUint8( 0x01 ) & 0x02 )
 		{
 			rhs = 'Time: ' + ( hours_score % 12 === 0 ? 12 : hours_score % 12 ) + ':' + ( mins_turns < 10 ? '0' : '' ) + mins_turns + ' ' + ( hours_score > 11 ? 'PM' : 'AM' );
 		}

@@ -194,7 +194,7 @@ return {
 /* get_cursor */ 240: opcode_builder( Opcode, function( addr ) { return 'e.get_cursor(' + addr + ')'; } ),
 /* set_text_style */ 241: opcode_builder( Opcode, function( stylebyte ) { return 'e.set_style(' + stylebyte + ')'; } ),
 /* buffer_mode */ 242: Opcode, // We don't support non-buffered output
-/* output_stream */ 243: opcode_builder( Opcode, function() { return 'e.output_stream(' + this.args() + ')'; } ),
+/* output_stream */ 243: opcode_builder( Stopper, function() { return 'e.output_stream(' + this.args() + ')'; } ),
 /* input_stream */ 244: Opcode, // We don't support changing the input stream
 /* sound_effect */ 245: Opcode, // We don't support sounds
 /* read_char */ 246: opcode_builder( Pauser, function() { return 'e.read_char(' + this.storer.v + ',' + ( this.args() || '1' ) + ');e.stop=1'; } ),

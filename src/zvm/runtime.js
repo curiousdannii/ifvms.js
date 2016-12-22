@@ -27,10 +27,7 @@ U2S = utils.U2S16,
 S2U = utils.S2U16,
 byte_to_word = utils.Uint8toUint16Array,
 
-file = require( '../common/file.js' ),
-
-filemode_Read = 0x02,
-filemode_Write = 0x01;
+file = require( '../common/file.js' );
 
 module.exports = {
 
@@ -521,11 +518,11 @@ module.exports = {
 	restore: function( pc )
 	{
 		this.pc = pc;
-		this.fileref_data = {
+		this.fileref_create_by_prompt({
 			func: 'restore',
-			mode: filemode_Read,
-		};
-		this.Glk.glk_fileref_create_by_prompt( 0x01, filemode_Read, 0 );
+			mode: 0x02,
+			usage: 0x01,
+		});
 	},
 
 	restore_file: function( data )
@@ -667,11 +664,11 @@ module.exports = {
 	save: function( pc )
 	{
 		this.pc = pc;
-		this.fileref_data = {
+		this.fileref_create_by_prompt({
 			func: 'save',
-			mode: filemode_Write,
-		};
-		this.Glk.glk_fileref_create_by_prompt( 0x01, filemode_Write, 0 );
+			mode: 0x01,
+			usage: 0x01,
+		});
 	},
 	
 	save_file: function( pc )
@@ -774,7 +771,7 @@ module.exports = {
 			// Restore
 			else
 			{
-				buffer = new Uint8Array( 128 * 1024 )
+				buffer = new Uint8Array( 128 * 1024 );
 				Glk.glk_get_buffer_stream( str, buffer );
 				result = this.restore_file( buffer.buffer );
 			}
