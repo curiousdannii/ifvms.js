@@ -376,37 +376,15 @@ module.exports = {
 
 	log: function( message )
 	{
-		this.Glk.log( message );
+		if ( this.env.GlkOte )
+		{
+			this.env.GlkOte.log( message );
+		}
 	},
 
 	log_shift: function( number, places )
 	{
 		return places > 0 ? number << places : number >>> -places;
-	},
-
-	// Manage output streams
-	output_stream: function( stream, addr )
-	{
-		stream = U2S( stream );
-		if ( stream === 1 )
-		{
-			this.streams[0] = 1;
-		}
-		if ( stream === -1 )
-		{
-			this.streams[0] = 0;
-		}
-		if ( stream === 3 )
-		{
-			this.streams[2].unshift( [ addr, '' ] );
-		}
-		if ( stream === -3 )
-		{
-			var data = this.streams[2].shift(),
-			text = this.text_to_zscii( data[1] );
-			this.ram.setUint16( data[0], text.length );
-			this.ram.setUint8Array( data[0] + 2, text );
-		}
 	},
 
 	put_prop: function( object, property, value )
@@ -512,9 +490,6 @@ module.exports = {
 			call_stack: [],
 			undo: [],
 
-			// IO stuff
-			streams: [ 1, 0, [], 0 ],
-
 			// Get some header variables
 			version: version,
 			version3: version3,
@@ -546,7 +521,10 @@ module.exports = {
 	restore: function( pc )
 	{
 		this.pc = pc;
-		this.save_mode = filemode_Read;
+		this.fileref_data = {
+			func: 'restore',
+			mode: filemode_Read,
+		};
 		this.Glk.glk_fileref_create_by_prompt( 0x01, filemode_Read, 0 );
 	},
 
@@ -563,6 +541,20 @@ module.exports = {
 		newlocals = [],
 		newstack;
 		
+		// Check this is a savefile for this story
+		if ( ram.getUint16( 0x02 ) !== quetzal.release || ram.getUint16( 0x1C ) !== quetzal.checksum )
+		{
+			return 0;
+		}
+		while ( i < 6 )
+		{
+			if ( ram.getUint8( 0x12 + i ) !== quetzal.serial[i++] )
+			{
+				return 0;
+			}
+		}
+		i = 0;
+
 		// Memory chunk
 		// Reset the RAM
 		ram.setUint8Array( 0, this.origram );
@@ -630,6 +622,8 @@ module.exports = {
 		{
 			this.split_window( 0 );
 		}
+
+		return 2;
 	},
 
 	restore_undo: function()
@@ -673,7 +667,10 @@ module.exports = {
 	save: function( pc )
 	{
 		this.pc = pc;
-		this.save_mode = filemode_Write;
+		this.fileref_data = {
+			func: 'save',
+			mode: filemode_Write,
+		};
 		this.Glk.glk_fileref_create_by_prompt( 0x01, filemode_Write, 0 );
 	},
 	
@@ -758,38 +755,30 @@ module.exports = {
 		return quetzal.write();
 	},
 	
-	// Handle the result of glk_fileref_create_by_prompt()
-	save_restore_handler: function( fref )
+	save_restore_handler: function( str )
 	{
 		var memory = this.m,
 		Glk = this.Glk,
-		str,
-		buffer,
 		result = 0,
+		buffer = [],
 		temp, iftrue, offset;
 		
-		if ( fref )
+		if ( str )
 		{
-			str = Glk.glk_stream_open_file( fref, this.save_mode, 0 );
-			Glk.glk_fileref_destroy( fref );
-			if ( str )
+			// Save
+			if ( this.fileref_data.func === 'save' )
 			{
-				// Save
-				if ( this.save_mode === filemode_Write )
-				{
-					Glk.glk_put_buffer_stream( str, new Uint8Array( this.save_file( this.pc ) ) );
-					result = 1;
-				}
-				// Restore
-				else
-				{
-					buffer = new Uint8Array( 128 * 1024 );
-					Glk.glk_get_buffer_stream( str, buffer );
-					this.restore_file( buffer.buffer );
-					result = 2;
-				}
-				Glk.glk_stream_close( str );
+				Glk.glk_put_buffer_stream( str, new Uint8Array( this.save_file( this.pc ) ) );
+				result = 1;
 			}
+			// Restore
+			else
+			{
+				buffer = new Uint8Array( 128 * 1024 )
+				Glk.glk_get_buffer_stream( str, buffer );
+				result = this.restore_file( buffer.buffer );
+			}
+			Glk.glk_stream_close( str );
 		}
 		
 		// Store the result / branch in z3

@@ -23,8 +23,12 @@ TODO:
 
 */
 
+var utils = require( '../common/utils.js' ),
+U2S = utils.U2S16,
+//S2U = utils.S2U16,
+
 // Glulx key codes accepted by the Z-Machine
-var ZSCII_keyCodes = (function()
+ZSCII_keyCodes = (function()
 {
 	var codes = {
 		0xfffffff9: 8, // delete/backspace
@@ -105,6 +109,8 @@ module.exports = {
 			}
 		}
 		this.set_window( 0 );
+		
+		this.streams = [ 1, 0, [], 0 ];
 	},
 
 	erase_line: function( value )
@@ -156,6 +162,24 @@ module.exports = {
 		this.variable( this.read_data.storer, ZSCII_keyCodes[ charcode ] || this.reverse_unicode_table[ charcode ] || 63 );
 	},
 
+	// Handle the result of glk_fileref_create_by_prompt()
+	handle_create_fileref: function( fref )
+	{
+		var Glk = this.Glk,
+		func = this.fileref_data.func,
+		str;
+
+		if ( fref )
+		{
+			str = Glk.glk_stream_open_file( fref, this.fileref_data.mode, 0 );
+			Glk.glk_fileref_destroy( fref );
+		}
+		if ( func === 'restore' || func === 'save' )
+		{
+			this.save_restore_handler( str );
+		}
+	},
+
 	// Handle line input
 	handle_line_input: function( len, terminator )
 	{
@@ -192,6 +216,31 @@ module.exports = {
 		{
 			// Tokenise the response
 			this.tokenise( options.bufaddr, options.parseaddr );
+		}
+	},
+
+	// Manage output streams
+	output_stream: function( stream, addr )
+	{
+		stream = U2S( stream );
+		if ( stream === 1 )
+		{
+			this.streams[0] = 1;
+		}
+		if ( stream === -1 )
+		{
+			this.streams[0] = 0;
+		}
+		if ( stream === 3 )
+		{
+			this.streams[2].unshift( [ addr, '' ] );
+		}
+		if ( stream === -3 )
+		{
+			var data = this.streams[2].shift(),
+			text = this.text_to_zscii( data[1] );
+			this.ram.setUint16( data[0], text.length );
+			this.ram.setUint8Array( data[0] + 2, text );
 		}
 	},
 

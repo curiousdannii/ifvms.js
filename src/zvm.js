@@ -130,7 +130,7 @@ api = {
 			// glk_fileref_create_by_prompt handler
 			if ( event_type === -1 )
 			{
-				this.save_restore_handler( glk_event.get_field( 1 ) );
+				this.handle_create_fileref( glk_event.get_field( 1 ) );
 				run = 1;
 			}
 			
