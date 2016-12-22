@@ -103,7 +103,6 @@ module.exports = {
 			{
 				this.statuswin = this.glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 );
 			}
-			this.upperwin = this.glk.glk_window_open( this.mainwin, 0x12, 0, 4, 203 );
 		}
 		this.set_window( 0 );
 	},
@@ -543,9 +542,18 @@ module.exports = {
 
 	split_window: function( lines )
 	{
-		if ( this.upperwin )
+		var Glk = this.glk;
+		if ( lines === 0 && this.upperwin )
 		{
-			this.glk.glk_window_set_arrangement( this.glk.glk_window_get_parent( this.upperwin ), 0x12, lines, null );
+			Glk.glk_window_close( this.upperwin );
+		}
+		else if ( !this.upperwin )
+		{
+			this.upperwin = Glk.glk_window_open( this.mainwin, 0x12, lines, 4, 203 );
+		}
+		if ( lines && this.upperwin )
+		{
+			Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, lines, null );
 			this.io.height = lines;
 			if ( this.io.row >= lines )
 			{
@@ -555,7 +563,7 @@ module.exports = {
 			// 8.6.1.1.2: In version three the upper window is always cleared
 			if ( this.version3 )
 			{
-				this.glk.glk_window_clear( this.upperwin );
+				Glk.glk_window_clear( this.upperwin );
 			}
 		}
 	},
@@ -577,7 +585,7 @@ module.exports = {
 			return ram.setUint8( 0x01,
 				( ram.getUint8( 0x01 ) & 0x8F ) // Keep all except bits 4-6
 				| ( this.statuswin ? 0 : 0x10 ) // Status win not available
-				| ( this.upperwin ? 0x20 : 0 ) // Upper win is available
+				| ( this.statuswin ? 0x20 : 0 ) // Upper win is available
 				| 0x40 // Variable pitch font is default - Or can we tell from env if the font is fixed pitch?
 			);
 		}
@@ -613,8 +621,15 @@ module.exports = {
 
 	update_width: function()
 	{
-		var width, box = new this.glk.RefBox();
-		this.glk.glk_window_get_size( this.upperwin || this.mainwin, box );
+		var Glk = this.glk,
+		tempwin = Glk.glk_window_open( this.mainwin, 0x12, 0, 4, 204 ),
+		box = new Glk.RefBox(),
+		width;
+		Glk.glk_window_get_size( tempwin || this.mainwin, box );
+		if ( tempwin )
+		{
+			Glk.glk_window_close( tempwin );
+		}
 		this.io.width = width = box.get_value();
 		if ( !this.version3 )
 		{
