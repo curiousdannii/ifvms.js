@@ -36,7 +36,6 @@ api = {
 	{
 		// Create this here so that it won't be cleared on restart
 		this.jit = {};
-		this.env = {};
 		
 		// The Quixe API expects the start function to be named init
 		this.init = this.start;
@@ -51,6 +50,7 @@ api = {
 		}
 		this.glk = options.Glk;
 		this.data = storydata;
+		this.env = options;
 	},
 
 	start: function()
@@ -205,7 +205,7 @@ api = {
 
 		if ( context.pc < this.staticmem )
 		{
-			this.warn( 'Caching a JIT function in dynamic memory: ' + context.pc );
+			this.log( 'Caching a JIT function in dynamic memory: ' + context.pc );
 		}
 	},
 

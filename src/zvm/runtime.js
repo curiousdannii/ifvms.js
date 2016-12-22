@@ -374,12 +374,9 @@ module.exports = {
 		return this.get_parent( child ) === parent;
 	},
 
-	log: function()
+	log: function( message )
 	{
-		if ( this.env.debug && typeof console !== 'undefined' && console.log )
-		{
-			console.log.apply( console, arguments );
-		}
+		this.glk.log( message );
 	},
 
 	log_shift: function( number, places )
@@ -397,7 +394,6 @@ module.exports = {
 		}
 		if ( stream === -1 )
 		{
-			this.log( 'Disabling stream one - it actually happened!' );
 			this.streams[0] = 0;
 		}
 		if ( stream === 3 )
@@ -597,7 +593,7 @@ module.exports = {
 		i = 6;
 		// Dummy call frame
 		temp = qstacks[i++] << 8 | qstacks[i++];
-		newstack = byte_to_word( qstacks.slice( i, temp ) );
+		newstack = Array.prototype.slice.apply( byte_to_word( qstacks.slice( i, temp ) ) );
 		// Regular frames
 		while ( i < qstacks.length )
 		{
@@ -619,7 +615,7 @@ module.exports = {
 				temp >>= 1;
 			}
 			temp = ( qstacks[i++] << 8 | qstacks[i++] ) * 2; // "eval" stack length
-			newlocals = byte_to_word( qstacks.slice( i, ( i += call_stack[0][2] * 2 ) ) ).concat( newlocals );
+			newlocals = Array.prototype.slice.apply( byte_to_word( qstacks.slice( i, ( i += call_stack[0][2] * 2 ) ) ) ).concat( newlocals );
 			newstack = newstack.concat( byte_to_word( qstacks.slice( i, ( i += temp ) ) ) );
 		}
 		this.call_stack = call_stack;
@@ -950,14 +946,6 @@ module.exports = {
 			}
 		}
 		return value;
-	},
-
-	warn: function()
-	{
-		if ( this.env.debug && typeof console !== 'undefined' && console.warn )
-		{
-			console.warn.apply( console, arguments );
-		}
 	},
 
 	// Utilities for signed arithmetic
