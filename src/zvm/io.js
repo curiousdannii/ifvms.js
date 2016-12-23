@@ -723,6 +723,7 @@ module.exports = {
 		if ( lines === 0 && this.upperwin )
 		{
 			Glk.glk_window_close( this.upperwin );
+			this.upperwin = null;
 		}
 		else if ( !this.upperwin )
 		{

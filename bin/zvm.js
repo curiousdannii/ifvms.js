@@ -42,6 +42,7 @@ var Glk = GlkOte.Glk;
 
 var options = {
 	vm: vm,
+	Dialog: new GlkOte.Dialog(),
 	Glk: Glk,
 	GlkOte: new GlkOte(),
 };

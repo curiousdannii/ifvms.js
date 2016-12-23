@@ -16,7 +16,6 @@ https://github.com/erkyrath/quixe/wiki/Quixe-Without-GlkOte#quixes-api
 
 ZVM willfully ignores the standard in these ways:
 	Non-buffered output is not supported
-	Output streams 2 and 4 and input stream 1 are not supported
 	Saving tables is not supported (yet?)
 	No interpreter number or version is set
 
