@@ -80,11 +80,17 @@ api = {
 			
 			// Initiate the engine, run, and wait for our first Glk event
 			this.restart();
+			this.glk_block_call = null;
 			this.run();
 			if ( !this.quit )
 			{
 				this.glk_event = new Glk.RefStruct();
-				Glk.glk_select( this.glk_event );
+				if (!this.glk_block_call) {
+					Glk.glk_select( this.glk_event );
+				}
+				else {
+					this.glk_event.push_field(this.glk_block_call);
+				}
 				Glk.update();
 			}
 		}
@@ -99,7 +105,7 @@ api = {
 		}
 	},
 
-	resume: function()
+	resume: function(resumearg)
 	{
 		var Glk = this.Glk,
 		glk_event = this.glk_event,
@@ -127,12 +133,13 @@ api = {
 				this.update_width();
 			}
 			// glk_fileref_create_by_prompt handler
-			if ( event_type === -1 )
+			if ( event_type === 'fileref_create_by_prompt' )
 			{
-				this.handle_create_fileref( glk_event.get_field( 1 ) );
+				this.handle_create_fileref( resumearg );
 				run = 1;
 			}
 			
+			this.glk_block_call = null;
 			if ( run )
 			{
 				this.run();
@@ -142,7 +149,12 @@ api = {
 			if ( !this.quit )
 			{
 				this.glk_event = new Glk.RefStruct();
-				Glk.glk_select( this.glk_event );
+				if (!this.glk_block_call) {
+					Glk.glk_select( this.glk_event );
+				}
+				else {
+					this.glk_event.push_field(this.glk_block_call);
+				}
 				Glk.update();
 			}
 		}
