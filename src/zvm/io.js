@@ -146,6 +146,7 @@ module.exports = {
 	fileref_create_by_prompt: function( data )
 	{
 		this.fileref_data = data;
+		this.glk_block_call = 'fileref_create_by_prompt';
 		this.Glk.glk_fileref_create_by_prompt( data.usage, data.mode, data.rock || 0 );
 	},
 
