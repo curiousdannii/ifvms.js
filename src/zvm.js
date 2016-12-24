@@ -85,10 +85,12 @@ api = {
 			if ( !this.quit )
 			{
 				this.glk_event = new Glk.RefStruct();
-				if (!this.glk_block_call) {
+				if ( !this.glk_block_call )
+				{
 					Glk.glk_select( this.glk_event );
 				}
-				else {
+				else
+				{
 					this.glk_event.push_field(this.glk_block_call);
 				}
 				Glk.update();
@@ -149,10 +151,12 @@ api = {
 			if ( !this.quit )
 			{
 				this.glk_event = new Glk.RefStruct();
-				if (!this.glk_block_call) {
+				if ( !this.glk_block_call )
+				{
 					Glk.glk_select( this.glk_event );
 				}
-				else {
+				else
+				{
 					this.glk_event.push_field(this.glk_block_call);
 				}
 				Glk.update();
