@@ -3,7 +3,7 @@
 Abstract syntax trees for IF VMs
 ================================
 
-Copyright (c) 2016 The ifvms.js team
+Copyright (c) 2017 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -168,11 +168,8 @@ Stopper = Opcode.subClass({
 
 // Pausing opcodes (ie, set the pc at the end of the context)
 Pauser = Stopper.subClass({
-	storer: 1,
-
 	post: function()
 	{
-		this.storer = this.operands.pop();
 		this.origfunc = this.func;
 		this.func = this.newfunc;
 	},
@@ -180,6 +177,17 @@ Pauser = Stopper.subClass({
 	newfunc: function()
 	{
 		return 'e.stop=1;e.pc=' + this.next + ';' + this.origfunc.apply( this, arguments );
+	},
+}),
+
+PauserStorer = Pauser.subClass({
+	storer: 1,
+
+	post: function()
+	{
+		this.storer = this.operands.pop();
+		this.origfunc = this.func;
+		this.func = this.newfunc;
 	},
 }),
 
@@ -451,6 +459,7 @@ module.exports = {
 	Opcode: Opcode,
 	Stopper: Stopper,
 	Pauser: Pauser,
+	PauserStorer: PauserStorer,
 	BrancherLogic: BrancherLogic,
 	Brancher: Brancher,
 	BrancherStorer: BrancherStorer,

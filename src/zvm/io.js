@@ -3,7 +3,7 @@
 Z-Machine IO
 ============
 
-Copyright (c) 2016 The ifvms.js team
+Copyright (c) 2017 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -87,6 +87,7 @@ module.exports = {
 			// A variable for checking whether the transcript bit has been changed
 			transcript: this.m.getUint8( 0x11 ) & 0x01,
 
+			// Index 0 is input stream 1, the output streams follow
 			streams: [ 0, 1, {}, [], {} ],
 
 			currentwin: 0,
@@ -194,6 +195,10 @@ module.exports = {
 		{
 			this.save_restore_handler( str );
 		}
+		if ( data.func === 'input_stream' )
+		{
+			this.io.streams[0] = str;
+		}
 		if ( data.func === 'output_stream' )
 		{
 			this.output_stream_handler( str );
@@ -208,30 +213,31 @@ module.exports = {
 	{
 		var ram = this.ram,
 		options = this.read_data,
+		streams = this.io.streams,
 		
-		// Convert the response back to a string, cut to len, convert to lower case, and then to a ZSCII array
-		command = String.fromCharCode.apply( null, options.buffer ) + '\n',
-		response = this.text_to_zscii( command.slice( 0, Math.min( len, command.length - 1 ) ).toLowerCase() );
+		// Cut the response to len, convert to a lower case string, and then to a ZSCII array
+		command = String.fromCharCode.apply( null, options.buffer.slice( 0, len ) ) + '\n',
+		response = this.text_to_zscii( command.slice( 0, -1 ).toLowerCase() );
 		
 		// 7.1.1.1: The response must be echoed, Glk will handle this
 		
 		// But we do have to echo to the transcripts
-		if ( this.io.streams[2].mode === 1 )
+		if ( streams[2].mode === 1 )
 		{
-			this.io.streams[2].cache += command;
+			streams[2].cache += command;
 		}
-		if ( this.io.streams[2].mode === 2 )
+		if ( streams[2].mode === 2 )
 		{
-			this.Glk.glk_put_jstring_stream( this.io.streams[2].str, command );
+			this.Glk.glk_put_jstring_stream( streams[2].str, command );
 		}
 		
-		if ( this.io.streams[4].mode === 1 )
+		if ( streams[4].mode === 1 )
 		{
-			this.io.streams[4].cache += command;
+			streams[4].cache += command;
 		}
-		if ( this.io.streams[4].mode === 2 )
+		if ( streams[4].mode === 2 )
 		{
-			this.Glk.glk_put_jstring_stream( this.io.streams[4].str, command );
+			this.Glk.glk_put_jstring_stream( streams[4].str, command );
 		}
 
 		// Store the response
@@ -262,26 +268,46 @@ module.exports = {
 		}
 	},
 
+	input_stream: function( stream )
+	{
+		var io = this.io;
+		if ( stream && !io.streams[0] )
+		{
+			this.fileref_create_by_prompt({
+				func: 'input_stream',
+				mode: 0x02,
+				rock: 212,
+				unicode: 1,
+				usage: 0x103,
+			});
+		}
+		if ( !stream && io.streams[0] )
+		{
+			this.Glk.glk_stream_close( io.streams[0] );
+			io.streams[0] = 0;
+		}
+	},
+
 	// Manage output streams
 	output_stream: function( stream, addr, called_from_print )
 	{
 		var ram = this.ram,
-		io = this.io,
+		streams = this.io.streams,
 		data, text;
 		stream = U2S( stream );
 
 		// The screen
 		if ( stream === 1 )
 		{
-			io.streams[1] = 1;
+			streams[1] = 1;
 		}
 		if ( stream === -1 )
 		{
-			io.streams[1] = 0;
+			streams[1] = 0;
 		}
 
 		// Transcript
-		if ( stream === 2 && !io.streams[2].mode )
+		if ( stream === 2 && !streams[2].mode )
 		{
 			this.fileref_create_by_prompt({
 				func: 'output_stream',
@@ -292,8 +318,8 @@ module.exports = {
 				unicode: 1,
 				usage: 0x102,
 			});
-			io.streams[2].cache = '';
-			io.streams[2].mode = 1;
+			streams[2].cache = '';
+			streams[2].mode = 1;
 			if ( !called_from_print )
 			{
 				this.stop = 1;
@@ -302,28 +328,28 @@ module.exports = {
 		if ( stream === -2 )
 		{
 			ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) );
-			if ( io.streams[2].mode === 2 )
+			if ( streams[2].mode === 2 )
 			{
-				this.Glk.glk_stream_close( io.streams[2].str );
+				this.Glk.glk_stream_close( streams[2].str );
 			}
-			io.streams[2].mode = io.transcript = 0;
+			streams[2].mode = this.io.transcript = 0;
 		}
 
 		// Memory
 		if ( stream === 3 )
 		{
-			io.streams[3].unshift( [ addr, '' ] );
+			streams[3].unshift( [ addr, '' ] );
 		}
 		if ( stream === -3 )
 		{
-			data = io.streams[3].shift();
+			data = streams[3].shift();
 			text = this.text_to_zscii( data[1] );
 			ram.setUint16( data[0], text.length );
 			ram.setUint8Array( data[0] + 2, text );
 		}
 
 		// Command list
-		if ( stream === 4 && !io.streams[4].mode )
+		if ( stream === 4 && !streams[4].mode )
 		{
 			this.fileref_create_by_prompt({
 				func: 'output_stream',
@@ -333,24 +359,24 @@ module.exports = {
 				unicode: 1,
 				usage: 0x103,
 			});
-			io.streams[4].cache = '';
-			io.streams[4].mode = 1;
+			streams[4].cache = '';
+			streams[4].mode = 1;
 			this.stop = 1;
 		}
 		if ( stream === -4 )
 		{
-			if ( io.streams[4].mode === 2 )
+			if ( streams[4].mode === 2 )
 			{
-				this.Glk.glk_stream_close( io.streams[4].str );
+				this.Glk.glk_stream_close( streams[4].str );
 			}
-			io.streams[4].mode = 0;
+			streams[4].mode = 0;
 		}
 	},
 	
 	output_stream_handler: function( str )
 	{
 		var ram = this.ram,
-		io = this.io,
+		streams = this.io.streams,
 		data = this.fileref_data;
 
 		if ( data.str === 2 )
@@ -358,17 +384,17 @@ module.exports = {
 			ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) | ( str ? 1 : 0 ) );
 			if ( str )
 			{
-				io.streams[2].mode = 2;
-				io.streams[2].str = str;
-				io.transcript = 1;
-				if ( io.streams[2].cache )
+				streams[2].mode = 2;
+				streams[2].str = str;
+				this.io.transcript = 1;
+				if ( streams[2].cache )
 				{
-					this.Glk.glk_put_jstring_stream( io.streams[2].str, io.streams[2].cache );
+					this.Glk.glk_put_jstring_stream( streams[2].str, streams[2].cache );
 				}
 			}
 			else
 			{
-				io.streams[2].mode = io.transcript = 0;
+				streams[2].mode = this.io.transcript = 0;
 			}
 		}
 
@@ -376,16 +402,16 @@ module.exports = {
 		{
 			if ( str )
 			{
-				io.streams[4].mode = 2;
-				io.streams[4].str = str;
-				if ( io.streams[4].cache )
+				streams[4].mode = 2;
+				streams[4].str = str;
+				if ( streams[4].cache )
 				{
-					this.Glk.glk_put_jstring_stream( io.streams[4].str, io.streams[4].cache );
+					this.Glk.glk_put_jstring_stream( streams[4].str, streams[4].cache );
 				}
 			}
 			else
 			{
-				io.streams[4].mode = 0;
+				streams[4].mode = 0;
 			}
 		}
 	},
@@ -588,7 +614,8 @@ module.exports = {
 	{
 		var len = this.m.getUint8( text ),
 		initiallen = 0,
-		buffer;
+		buffer,
+		input_stream1_len;
 
 		if ( this.version3 )
 		{
@@ -600,7 +627,7 @@ module.exports = {
 			//initiallen = this.m.getUint8( text + 1 );
 		}
 
-		buffer =  Array( len );
+		buffer = Array( len );
 		this.read_data = {
 			buffer: buffer,
 			bufaddr: text, // text-buffer
@@ -610,6 +637,28 @@ module.exports = {
 			time: time,
 		};
 		
+		// Input stream 1
+		if ( this.io.streams[0] )
+		{
+			input_stream1_len = this.Glk.glk_get_line_stream_uni( this.io.streams[0], buffer );
+
+			// Check for a newline character
+			if ( buffer[input_stream1_len - 1] === 0x0A )
+			{
+				input_stream1_len--;
+			}
+			if ( input_stream1_len )
+			{
+				this._print( String.fromCharCode.apply( null, buffer.slice( 0, input_stream1_len ) ) + '\n' );
+				this.handle_line_input( input_stream1_len );
+				return this.stop = 0;
+			}
+			else
+			{
+				this.input_stream( 0 );
+			}
+		}
+
 		// TODO: pre-existing input
 		this.Glk.glk_request_line_event_uni( this.mainwin, buffer, initiallen );
 	},
@@ -875,8 +924,7 @@ module.exports = {
 
 		var Glk = this.Glk,
 		memory = this.m,
-		io = this.io,
-		width = io.width,
+		width = this.io.width,
 		hours_score = memory.getUint16( this.globals + 2 ),
 		mins_turns = memory.getUint16( this.globals + 4 ),
 		proptable = memory.getUint16( this.objects + 9 * memory.getUint16( this.globals ) + 7 ),
@@ -909,7 +957,7 @@ module.exports = {
 
 		// Return to the former window
 		Glk.glk_set_style( 0 );
-		Glk.glk_set_window( this.upperwin && io.currentwin ? this.upperwin : this.mainwin );
+		Glk.glk_set_window( this.upperwin && this.io.currentwin ? this.upperwin : this.mainwin );
 	},
 
 };

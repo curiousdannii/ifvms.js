@@ -12,7 +12,9 @@ Playing stories with ifvms.js
 
 ifvms.js is used by [Parchment](https://github.com/curiousdannii/parchment). To play a story with Parchment go to [iplayif.com](https://iplayif.com).
 
-A minimalistic terminal interpreter is also available. If you install the npm package globally then the `zvm` script will be added to your path:
+ifvms.js is also included in the desktop interpreter [Lectrote](https://github.com/erkyrath/lectrote).
+
+A minimalistic terminal interpreter is also available. If you install the ifvms npm package globally then the `zvm` script will be added to your path:
 
 ```
 npm install -g ifvms

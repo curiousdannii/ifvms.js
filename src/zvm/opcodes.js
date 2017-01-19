@@ -3,7 +3,7 @@
 Z-Machine opcodes
 =================
 
-Copyright (c) 2016 The ifvms.js team
+Copyright (c) 2017 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 
@@ -24,6 +24,7 @@ Variable = AST.Variable,
 Opcode = AST.Opcode,
 Stopper = AST.Stopper,
 Pauser = AST.Pauser,
+PauserStorer = AST.PauserStorer,
 Brancher = AST.Brancher,
 BrancherStorer = AST.BrancherStorer,
 Storer = AST.Storer,
@@ -178,8 +179,8 @@ return {
 /* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'e.ram.setUint8(e.S2U(' + array + '+' + index.U2S() + '),' + value + ')'; } ),
 /* put_prop */ 227: opcode_builder( Opcode, function() { return 'e.put_prop(' + this.args() + ')'; } ),
 /* read */ 228: version3 ?
-	opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.read(0,' + this.args() + ');e.stop=1'; } ) :
-	opcode_builder( Pauser, function() { return 'e.read(' + this.storer.v + ',' + this.args() + ');e.stop=1'; } ),
+	opcode_builder( Pauser, function() { return 'e.read(0,' + this.args() + ')'; } ) :
+	opcode_builder( PauserStorer, function() { return 'e.read(' + this.storer.v + ',' + this.args() + ')'; } ),
 /* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(4,' + a + ')'; } ),
 /* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.print(0,' + a.U2S() + ')'; } ),
 /* random */ 231: opcode_builder( Storer, function( a ) { return 'e.random(' + a.U2S() + ')'; } ),
@@ -195,9 +196,9 @@ return {
 /* set_text_style */ 241: opcode_builder( Opcode, function( stylebyte ) { return 'e.set_style(' + stylebyte + ')'; } ),
 /* buffer_mode */ 242: Opcode, // We don't support non-buffered output
 /* output_stream */ 243: opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.output_stream(' + this.args() + ')'; } ),
-/* input_stream */ 244: Opcode, // We don't support changing the input stream
+/* input_stream */ 244: opcode_builder( Pauser, function() { return 'e.input_stream(' + this.args() + ')'; } ),
 /* sound_effect */ 245: Opcode, // We don't support sounds
-/* read_char */ 246: opcode_builder( Pauser, function() { return 'e.read_char(' + this.storer.v + ',' + ( this.args() || '1' ) + ');e.stop=1'; } ),
+/* read_char */ 246: opcode_builder( PauserStorer, function() { return 'e.read_char(' + this.storer.v + ',' + ( this.args() || '1' ) + ')'; } ),
 /* scan_table */ 247: opcode_builder( BrancherStorer, function() { return 'e.scan_table(' + this.args() + ')'; } ),
 /* not (v5/8) */ 248: not,
 /* call_vn */ 249: Caller,
@@ -207,8 +208,8 @@ return {
 /* copy_table */ 253: opcode_builder( Opcode, function() { return 'e.copy_table(' + this.args() + ')'; } ),
 /* print_table */ 254: opcode_builder( Opcode, function() { return 'e.print_table(' + this.args() + ')'; } ),
 /* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return arg + '<=e.call_stack[0][4]'; } ),
-/* save */ 1000: opcode_builder( Pauser, function() { return 'e.save(' + ( this.next - 1 ) + ')'; } ),
-/* restore */ 1001: opcode_builder( Pauser, function() { return 'e.restore(' + ( this.next - 1 ) + ')'; } ),
+/* save */ 1000: opcode_builder( PauserStorer, function() { return 'e.save(' + ( this.next - 1 ) + ')'; } ),
+/* restore */ 1001: opcode_builder( PauserStorer, function() { return 'e.restore(' + ( this.next - 1 ) + ')'; } ),
 /* log_shift */ 1002: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.log_shift(' + a + ',' + b.U2S() + '))'; } ),
 /* art_shift */ 1003: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.art_shift(' + a.U2S() + ',' + b.U2S() + '))'; } ),
 /* set_font */ 1004: opcode_builder( Storer, function( font ) { return 'e.set_font(' + font + ')'; } ),
