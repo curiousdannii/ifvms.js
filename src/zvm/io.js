@@ -146,7 +146,7 @@ module.exports = {
 	fileref_create_by_prompt: function( data )
 	{
 		this.fileref_data = data;
-		this.glk_block_call = 'fileref_create_by_prompt';
+		this.glk_blocking_call = 'fileref_create_by_prompt';
 		this.Glk.glk_fileref_create_by_prompt( data.usage, data.mode, data.rock || 0 );
 	},
 
@@ -377,6 +377,7 @@ module.exports = {
 			
 			// Check the transcript bit
 			// Because it might need to prompt for a file name, we return here, and will print again in the handler
+			// Wait no, this will probably cause the pc to be wrong
 			if ( ( this.m.getUint8( 0x11 ) & 0x01 ) !== io.transcript )
 			{
 				return this.output_stream( io.transcript ? -2 : 2, text );
@@ -408,12 +409,12 @@ module.exports = {
 			}
 			else
 			{
-				if ( io.streams[0]  )
+				if ( io.streams[0] )
 				{
 					Glk.glk_put_jstring( text );
 				}
 				// Transcript
-				if ( io.streams[1]  )
+				if ( io.streams[1] )
 				{
 					Glk.glk_put_jstring_stream( io.streams[1], text );
 				}
@@ -617,7 +618,7 @@ module.exports = {
 		{
 			// Moving the cursor to a row forces the upper window
 			// to open enough for that line to exist
-			this.split_window( row+1 );
+			this.split_window( row + 1 );
 		}
 		if ( this.upperwin && row >= 0 && col >= 0 && col < io.width )
 		{
@@ -772,8 +773,7 @@ module.exports = {
 		{
 			return ram.setUint8( 0x01,
 				( ram.getUint8( 0x01 ) & 0x8F ) // Keep all except bits 4-6
-				| ( this.statuswin ? 0 : 0x10 ) // Status win not available
-				| ( this.statuswin ? 0x20 : 0 ) // Upper win is available
+				| ( this.statuswin ? 0x20 : 0x10 ) // If status win is available then set 0x20 for the upper win also being available, otherwise 0x10 for the status win itself
 				| 0x40 // Variable pitch font is default - Or can we tell from env if the font is fixed pitch?
 			);
 		}

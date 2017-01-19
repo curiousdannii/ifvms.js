@@ -15,12 +15,15 @@ CURL = curl -L -s -S
 all: lint test
 
 clean:
-	rm dist/zvm.js
+	rm -rf dist
 	rm tests/regtest.py
 
 dist/zvm.js: src/zvm.js src/common/* src/zvm/*
 	mkdir -p dist
 	browserify src/zvm.js --standalone ZVM > dist/zvm.js
+
+dist/zvm.min.js: dist/zvm.js
+	uglifyjs dist/zvm.js -c warnings=false -m --preamble '/* ZVM v$(shell jq -r .version -- package.json) https://github.com/curiousdannii/ifvms.js */' > dist/zvm.min.js
 
 lint:
 	eslint --ignore-path .gitignore .

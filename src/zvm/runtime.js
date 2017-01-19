@@ -486,6 +486,8 @@ module.exports = {
 			l: [],
 			call_stack: [],
 			undo: [],
+			
+			glk_blocking_call: null,
 
 			// Get some header variables
 			version: version,
