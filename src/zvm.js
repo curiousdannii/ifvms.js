@@ -136,8 +136,7 @@ api = {
 			// glk_fileref_create_by_prompt handler
 			if ( event_type === 'fileref_create_by_prompt' )
 			{
-				this.handle_create_fileref( resumearg );
-				run = 1;
+				run = this.handle_create_fileref( resumearg );
 			}
 			
 			this.glk_blocking_call = null;

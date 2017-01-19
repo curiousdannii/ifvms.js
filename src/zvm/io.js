@@ -87,7 +87,7 @@ module.exports = {
 			// A variable for checking whether the transcript bit has been changed
 			transcript: this.m.getUint8( 0x11 ) & 0x01,
 
-			streams: [ 1, 0, [], 0 ],
+			streams: [ 0, 1, {}, [], {} ],
 
 			currentwin: 0,
 			
@@ -145,6 +145,10 @@ module.exports = {
 
 	fileref_create_by_prompt: function( data )
 	{
+		if ( typeof data.run === 'undefined' )
+		{
+			data.run = 1;
+		}
 		this.fileref_data = data;
 		this.glk_blocking_call = 'fileref_create_by_prompt';
 		this.Glk.glk_fileref_create_by_prompt( data.usage, data.mode, data.rock || 0 );
@@ -194,6 +198,9 @@ module.exports = {
 		{
 			this.output_stream_handler( str );
 		}
+
+		// Signal to resume() to call run() if required
+		return data.run;
 	},
 
 	// Handle line input
@@ -203,19 +210,28 @@ module.exports = {
 		options = this.read_data,
 		
 		// Convert the response back to a string, cut to len, convert to lower case, and then to a ZSCII array
-		command = String.fromCharCode.apply( null, options.buffer ),
-		response = this.text_to_zscii( command.slice( 0, len ).toLowerCase() );
+		command = String.fromCharCode.apply( null, options.buffer ) + '\n',
+		response = this.text_to_zscii( command.slice( 0, Math.min( len, command.length - 1 ) ).toLowerCase() );
 		
 		// 7.1.1.1: The response must be echoed, Glk will handle this
 		
-		// But we do have to echo to the transcript
-		if ( this.io.streams[1] )
+		// But we do have to echo to the transcripts
+		if ( this.io.streams[2].mode === 1 )
 		{
-			this.Glk.glk_put_jstring_stream( this.io.streams[1], command + '\n' );
+			this.io.streams[2].cache += command;
 		}
-		if ( this.io.streams[3] )
+		if ( this.io.streams[2].mode === 2 )
 		{
-			this.Glk.glk_put_jstring_stream( this.io.streams[3], command + '\n' );
+			this.Glk.glk_put_jstring_stream( this.io.streams[2].str, command );
+		}
+		
+		if ( this.io.streams[4].mode === 1 )
+		{
+			this.io.streams[4].cache += command;
+		}
+		if ( this.io.streams[4].mode === 2 )
+		{
+			this.Glk.glk_put_jstring_stream( this.io.streams[4].str, command );
 		}
 
 		// Store the response
@@ -247,59 +263,67 @@ module.exports = {
 	},
 
 	// Manage output streams
-	output_stream: function( stream, addr_text )
+	output_stream: function( stream, addr, called_from_print )
 	{
 		var ram = this.ram,
 		io = this.io,
 		data, text;
 		stream = U2S( stream );
 
+		// The screen
 		if ( stream === 1 )
 		{
-			io.streams[0] = 1;
+			io.streams[1] = 1;
 		}
 		if ( stream === -1 )
 		{
-			io.streams[0] = 0;
+			io.streams[1] = 0;
 		}
-		if ( stream === 2 )
+
+		// Transcript
+		if ( stream === 2 && !io.streams[2].mode )
 		{
 			this.fileref_create_by_prompt({
 				func: 'output_stream',
 				mode: 0x05,
 				rock: 210,
+				run: !called_from_print,
 				str: 2,
-				text: addr_text,
 				unicode: 1,
 				usage: 0x102,
 			});
-			this.stop = 1;
+			io.streams[2].cache = '';
+			io.streams[2].mode = 1;
+			if ( !called_from_print )
+			{
+				this.stop = 1;
+			}
 		}
 		if ( stream === -2 )
 		{
 			ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) );
-			if ( io.streams[1] )
+			if ( io.streams[2].mode === 2 )
 			{
-				this.Glk.glk_stream_close( io.streams[1] );
+				this.Glk.glk_stream_close( io.streams[2].str );
 			}
-			io.streams[1] = io.transcript = 0;
-			if ( addr_text )
-			{
-				this._print( addr_text );
-			}
+			io.streams[2].mode = io.transcript = 0;
 		}
+
+		// Memory
 		if ( stream === 3 )
 		{
-			io.streams[2].unshift( [ addr_text, '' ] );
+			io.streams[3].unshift( [ addr, '' ] );
 		}
 		if ( stream === -3 )
 		{
-			data = io.streams[2].shift();
+			data = io.streams[3].shift();
 			text = this.text_to_zscii( data[1] );
 			ram.setUint16( data[0], text.length );
 			ram.setUint8Array( data[0] + 2, text );
 		}
-		if ( stream === 4 )
+
+		// Command list
+		if ( stream === 4 && !io.streams[4].mode )
 		{
 			this.fileref_create_by_prompt({
 				func: 'output_stream',
@@ -309,15 +333,17 @@ module.exports = {
 				unicode: 1,
 				usage: 0x103,
 			});
+			io.streams[4].cache = '';
+			io.streams[4].mode = 1;
 			this.stop = 1;
 		}
 		if ( stream === -4 )
 		{
-			if ( io.streams[3] )
+			if ( io.streams[4].mode === 2 )
 			{
-				this.Glk.glk_stream_close( io.streams[3] );
+				this.Glk.glk_stream_close( io.streams[4].str );
 			}
-			io.streams[3] = 0;
+			io.streams[4].mode = 0;
 		}
 	},
 	
@@ -332,16 +358,17 @@ module.exports = {
 			ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) | ( str ? 1 : 0 ) );
 			if ( str )
 			{
-				io.streams[1] = str;
+				io.streams[2].mode = 2;
+				io.streams[2].str = str;
 				io.transcript = 1;
+				if ( io.streams[2].cache )
+				{
+					this.Glk.glk_put_jstring_stream( io.streams[2].str, io.streams[2].cache );
+				}
 			}
 			else
 			{
-				io.streams[1] = io.transcript = 0;
-			}
-			if ( data.text )
-			{
-				this._print( data.text );
+				io.streams[2].mode = io.transcript = 0;
 			}
 		}
 
@@ -349,11 +376,16 @@ module.exports = {
 		{
 			if ( str )
 			{
-				io.streams[3] = str;
+				io.streams[4].mode = 2;
+				io.streams[4].str = str;
+				if ( io.streams[4].cache )
+				{
+					this.Glk.glk_put_jstring_stream( io.streams[4].str, io.streams[4].cache );
+				}
 			}
 			else
 			{
-				io.streams[3] = 0;
+				io.streams[4].mode = 0;
 			}
 		}
 	},
@@ -366,9 +398,9 @@ module.exports = {
 		i = 0;
 		
 		// Stream 3 gets the text first
-		if ( io.streams[2].length )
+		if ( io.streams[3].length )
 		{
-			io.streams[2][0][1] += text;
+			io.streams[3][0][1] += text;
 		}
 		else
 		{
@@ -377,10 +409,9 @@ module.exports = {
 			
 			// Check the transcript bit
 			// Because it might need to prompt for a file name, we return here, and will print again in the handler
-			// Wait no, this will probably cause the pc to be wrong
 			if ( ( this.m.getUint8( 0x11 ) & 0x01 ) !== io.transcript )
 			{
-				return this.output_stream( io.transcript ? -2 : 2, text );
+				this.output_stream( io.transcript ? -2 : 2, 0, 1 );
 			}
 			
 			// Check if the monospace font bit has changed
@@ -409,14 +440,18 @@ module.exports = {
 			}
 			else
 			{
-				if ( io.streams[0] )
+				if ( io.streams[1] )
 				{
 					Glk.glk_put_jstring( text );
 				}
 				// Transcript
-				if ( io.streams[1] )
+				if ( io.streams[2].mode === 1 )
 				{
-					Glk.glk_put_jstring_stream( io.streams[1], text );
+					io.streams[2].cache += text;
+				}
+				if ( io.streams[2].mode === 2 )
+				{
+					Glk.glk_put_jstring_stream( io.streams[2].str, text );
 				}
 			}
 		}
