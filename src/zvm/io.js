@@ -169,7 +169,19 @@ module.exports = {
 	// Handle char input
 	handle_char_input: function( charcode )
 	{
-		this.variable( this.read_data.storer, ZSCII_keyCodes[ charcode ] || this.reverse_unicode_table[ charcode ] || 63 );
+		var stream4 = this.io.streams[4],
+		code = ZSCII_keyCodes[ charcode ] || this.reverse_unicode_table[ charcode ] || 63;
+		this.variable( this.read_data.storer, code );
+
+		// Echo to the commands log
+		if ( stream4.mode === 1 )
+		{
+			stream4.cache += code;
+		}
+		if ( stream4.mode === 2 )
+		{
+			this.Glk.glk_put_char_stream_uni( stream4.str, code );
+		}
 	},
 
 	// Handle the result of glk_fileref_create_by_prompt()
@@ -666,6 +678,22 @@ module.exports = {
 	// Request character input
 	read_char: function( storer, one, time, routine )
 	{
+		// Input stream 1
+		if ( this.io.streams[0] )
+		{
+			var code = this.Glk.glk_get_char_stream_uni( this.io.streams[0] );
+			// Check for EOF
+			if ( code === -1 )
+			{
+				this.input_stream( 0 );
+			}
+			else
+			{
+				this.variable( storer, code );
+				return this.stop = 0;
+			}
+		}
+
 		this.read_data = {
 			routine: routine,
 			storer: storer,

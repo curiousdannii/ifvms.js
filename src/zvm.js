@@ -3,7 +3,7 @@
 ZVM - the ifvms.js Z-Machine (versions 3, 5 and 8)
 ==================================================
 
-Copyright (c) 2016 The ifvms.js team
+Copyright (c) 2017 The ifvms.js team
 BSD licenced
 http://github.com/curiousdannii/ifvms.js
 

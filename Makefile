@@ -32,7 +32,7 @@ tests/regtest.py:
 	$(CURL) -o tests/regtest.py https://raw.githubusercontent.com/erkyrath/plotex/master/regtest.py
 
 # Run the test suite
-test: dist/zvm.js tests/regtest.py
+test: dist/zvm.min.js tests/regtest.py
 	cd tests && python regtest.py praxix.regtest
 	cd tests && python regtest.py praxix-bundled.regtest
 	cd tests && python regtest.py curses.regtest

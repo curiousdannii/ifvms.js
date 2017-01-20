@@ -34,8 +34,8 @@ if ( !fs.existsSync( storyfile ) )
 	return;
 }
 
-// Use the bundled VM if requested
-var ZVM = require( argv.b ? '../dist/zvm.js' : '../src/zvm.js' );
+// Use the bundled (and minified) VM if requested
+var ZVM = require( argv.b ? '../dist/zvm.min.js' : '../src/zvm.js' );
 
 var vm = new ZVM();
 var Glk = GlkOte.Glk;
