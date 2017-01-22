@@ -92,8 +92,13 @@ module.exports = {
 
 			currentwin: 0,
 			
+			// Use Zarf's algorithm for the upper window
+			// http://eblong.com/zarf/glk/quote-box.html
+			// Implemented in fix_upper_window() and split_window()
+			height: 0, // What the VM thinks the height is
+			maxheight: 0, // Height including quote boxes etc
+			seenheight: 0, // Last height the player saw
 			width: 0,
-			height: 0,
 			row: 0,
 			col: 0,
 		};
@@ -153,6 +158,33 @@ module.exports = {
 		this.fileref_data = data;
 		this.glk_blocking_call = 'fileref_create_by_prompt';
 		this.Glk.glk_fileref_create_by_prompt( data.usage, data.mode, data.rock || 0 );
+	},
+
+	// Fix the upper window height before an input event
+	fix_upper_window: function()
+	{
+		var Glk = this.Glk,
+		io = this.io;
+
+		// If we have seen the entire window, shrink it to what it should be
+		if ( io.seenheight === io.maxheight )
+		{
+			io.maxheight = io.height;
+		}
+		if ( this.upperwin )
+		{
+			if ( io.maxheight === 0 )
+			{
+				Glk.glk_window_close( this.upperwin );
+				this.upperwin = null;
+			}
+			else
+			{
+				Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, io.maxheight, null );
+			}
+		}
+		io.seenheight = io.maxheight;
+		io.maxheight = io.height;
 	},
 
 	format: function()
@@ -673,6 +705,7 @@ module.exports = {
 
 		// TODO: pre-existing input
 		this.Glk.glk_request_line_event_uni( this.mainwin, buffer, initiallen );
+		this.fix_upper_window();
 	},
 
 	// Request character input
@@ -700,6 +733,7 @@ module.exports = {
 			time: time,
 		};
 		this.Glk.glk_request_char_event_uni( this.mainwin );
+		this.fix_upper_window();
 	},
 
 	set_colour: function( /*foreground, background*/ )
@@ -841,26 +875,49 @@ module.exports = {
 
 	split_window: function( lines )
 	{
-		var Glk = this.Glk;
-		if ( lines === 0 && this.upperwin )
+		var Glk = this.Glk,
+		io = this.io,
+		row = io.row, col = io.col,
+		oldheight = io.height,
+		str;
+		io.height = lines;
+
+		// Erase existing lines if we are expanding into existing rows
+		if ( this.upperwin && lines > oldheight )
 		{
-			Glk.glk_window_close( this.upperwin );
-			this.upperwin = null;
-			this.io.height = 0;
+			str = Glk.glk_window_get_stream( this.upperwin );
+			while ( oldheight < lines )
+			{
+				Glk.glk_window_move_cursor( this.upperwin, 0, oldheight++ );
+				Glk.glk_put_jstring_stream( str, Array( io.width + 1 ).join( ' ' ) );
+			}
+			Glk.glk_window_move_cursor( this.upperwin, col, row );
 		}
-		else if ( !this.upperwin )
+
+		// Don't decrease the height of the window yet, only increase
+		if ( lines > io.maxheight )
 		{
-			this.upperwin = Glk.glk_window_open( this.mainwin, 0x12, lines, 4, 203 );
+			io.maxheight = lines;
+
+			// Set the height of the window
+			// Create the window if it doesn't exist
+			if ( !this.upperwin )
+			{
+				this.upperwin = Glk.glk_window_open( this.mainwin, 0x12, io.maxheight, 4, 203 );
+			}
+			else
+			{
+				Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, io.maxheight, null );
+			}
 		}
-		if ( lines && this.upperwin )
+
+		if ( lines )
 		{
-			Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, lines, null );
-			this.io.height = lines;
-			if ( this.io.row >= lines )
+			// Reset the cursor if it is now outside the window
+			if ( io.row >= lines )
 			{
 				this.set_cursor( 0, 0 );
 			}
-
 			// 8.6.1.1.2: In version three the upper window is always cleared
 			if ( this.version3 )
 			{
