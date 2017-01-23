@@ -75,6 +75,8 @@ module.exports = {
 
 	init_io: function()
 	{
+		var Glk = this.Glk;
+
 		this.io = {
 			reverse: 0,
 			bold: 0,
@@ -108,10 +110,14 @@ module.exports = {
 		// Construct the windows if they do not already exist
 		if ( !this.mainwin )
 		{
-			this.mainwin = this.Glk.glk_window_open( 0, 0, 0, 3, 201 );
+			this.mainwin = Glk.glk_window_open( 0, 0, 0, 3, 201 );
 			if ( this.version3 )
 			{
-				this.statuswin = this.Glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 );
+				this.statuswin = Glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 );
+				if ( this.statuswin )
+				{
+					Glk.glk_set_style_stream( Glk.glk_window_get_stream( this.statuswin ), style_mappings[1][ 0x08 ] );
+				}
 			}
 		}
 		this.set_window( 0 );
@@ -1008,6 +1014,7 @@ module.exports = {
 		}
 
 		var Glk = this.Glk,
+		str = Glk.glk_window_get_stream( this.statuswin ),
 		memory = this.m,
 		width = this.io.width,
 		hours_score = memory.getUint16( this.globals + 2 ),
@@ -1027,22 +1034,16 @@ module.exports = {
 		}
 
 		// Print a blank line in reverse
-		Glk.glk_set_window( this.statuswin );
 		Glk.glk_window_move_cursor( this.statuswin, 0, 0 );
-		Glk.glk_set_style( style_mappings[1][ 0x08 ] );
-		Glk.glk_put_jstring( Array( width + 1 ).join( ' ' ) );
+		Glk.glk_put_jstring_stream( str, Array( width + 1 ).join( ' ' ) );
 
 		// Trim the shortname if necessary
 		Glk.glk_window_move_cursor( this.statuswin, 0, 0 );
-		Glk.glk_put_jstring( ' ' + shortname.slice( 0, width - rhs.length - 4 ) );
+		Glk.glk_put_jstring_stream( str, ' ' + shortname.slice( 0, width - rhs.length - 4 ) );
 
 		// Print the right hand side
 		Glk.glk_window_move_cursor( this.statuswin, width - rhs.length - 1, 0 );
-		Glk.glk_put_jstring( rhs );
-
-		// Return to the former window
-		Glk.glk_set_style( 0 );
-		Glk.glk_set_window( this.upperwin && this.io.currentwin ? this.upperwin : this.mainwin );
+		Glk.glk_put_jstring_stream( str, rhs );
 	},
 
 };
