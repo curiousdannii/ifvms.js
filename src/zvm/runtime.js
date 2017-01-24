@@ -24,7 +24,15 @@ utils = require( '../common/utils.js' ),
 extend = utils.extend,
 U2S = utils.U2S16,
 S2U = utils.S2U16,
-byte_to_word = utils.Uint8toUint16Array;
+
+// Test whether we are running on a littleEndian system
+littleEndian = (function()
+{
+	var testUint8Array = new Uint8Array( 2 ),
+	testUint16Array = new Uint16Array( testUint8Array.buffer );
+	testUint16Array[0] = 1;
+	return testUint8Array[0] === 1;
+})();
 
 module.exports = {
 
@@ -539,13 +547,11 @@ module.exports = {
 		var ram = this.ram,
 		quetzal = new file.Quetzal( data ),
 		qmem = quetzal.memory,
-		qstacks = quetzal.stacks,
+		stack = this.stack,
 		flags2 = ram.getUint8( 0x11 ),
 		temp,
-		i = 0, j = 0,
-		call_stack = [],
-		newlocals = [],
-		newstack;
+		locals_count,
+		i = 0, j = 0, l;
 		
 		// Check this is a savefile for this story
 		if ( ram.getUint16( 0x02 ) !== quetzal.release || ram.getUint16( 0x1C ) !== quetzal.checksum )
@@ -587,40 +593,42 @@ module.exports = {
 		// Preserve flags 1
 		ram.setUint8( 0x11, flags2 );
 
-		// Stacks chunk
-		i = 6;
-		// Dummy call frame
-		temp = qstacks[i++] << 8 | qstacks[i++];
-		newstack = Array.prototype.slice.apply( byte_to_word( qstacks.slice( i, temp ) ) );
-		// Regular frames
-		while ( i < qstacks.length )
+		// Stacks
+		stack.setUint8Array( 0, quetzal.stacks );
+		this.frames = [];
+		i = 0;
+		while ( i < quetzal.stacks.byteLength )
 		{
-			call_stack.unshift( [
-				qstacks[i++] << 16 | qstacks[i++] << 8 | qstacks[i++], // pc
-				0,
-				0,
-				newstack.length,
-				0,
-				newlocals.length,
-			] );
-			call_stack[0][1] = qstacks[i] & 0x10 ? -1 : qstacks[i + 1]; // storer
-			call_stack[0][2] = qstacks[i] & 0x0F; // local count
-			i += 2;
-			temp = qstacks[i++];
-			while ( temp )
+			this.frameptr = i;
+			this.frames.push( i );
+			locals_count = stack.getUint8( i + 3 ) & 0x0F;
+			// Swap the bytes of the locals and stacks
+			if ( littleEndian )
 			{
-				call_stack[0][4]++; // provided_args - this is a stupid way to store it
-				temp >>= 1;
+				// Locals
+				j = i + 8;
+				l = j + locals_count * 2;
+				while ( j < l )
+				{
+					stack.setUint16( j, stack.getUint16( j, 1 ) );
+					j += 2;
+				}
+				// Stack
+				l = j + stack.getUint16( i + 6 ) * 2;
+				while ( j < l )
+				{
+					stack.setUint16( j, stack.getUint16( j, 1 ) );
+					j += 2;
+				}
 			}
-			temp = ( qstacks[i++] << 8 | qstacks[i++] ) * 2; // "eval" stack length
-			newlocals = Array.prototype.slice.apply( byte_to_word( qstacks.slice( i, ( i += call_stack[0][2] * 2 ) ) ) ).concat( newlocals );
-			newstack = newstack.concat( byte_to_word( qstacks.slice( i, ( i += temp ) ) ) );
+			i += 8 + locals_count * 2 + stack.getUint16( i + 6 ) * 2;
 		}
-		this.call_stack = call_stack;
-		this.l = newlocals;
-		this.s = newstack;
-		this.pc = quetzal.pc;
+		this.frames.pop();
+		this.sp = stack.getUint16( this.frameptr + 6 );
+		this.l = new Uint16Array( stack.buffer, this.frameptr + 8, locals_count );
+		this.s = new Uint16Array( stack.buffer, this.frameptr + 8 + locals_count * 2 );
 
+		this.pc = quetzal.pc;
 		this.update_header();
 
 		// Collapse the upper window (8.6.1.3)
@@ -700,17 +708,14 @@ module.exports = {
 	save_file: function( pc )
 	{
 		var memory = this.m,
-		stack = this.s,
-		locals = this.l,
 		quetzal = new file.Quetzal(),
 		compressed_mem = [],
-		i, j,
-		abyte,
+		stack = utils.MemoryView( this.stack.buffer.slice() ),
+		frames = this.frames.slice(),
 		zeroes = 0,
-		call_stack = this.call_stack.reverse(),
-		frame,
-		stack_len,
-		stacks = [ 0, 0, 0, 0, 0, 0 ]; // Dummy call frame
+		i, j, l,
+		frameptr,
+		abyte;
 
 		// IFhd chunk
 		quetzal.release = memory.getUint16( 0x02 );
@@ -744,36 +749,34 @@ module.exports = {
 		quetzal.memory = compressed_mem;
 
 		// Stacks
-		// Finish the dummy call frame
-		stacks.push( call_stack[0][3] >> 8, call_stack[0][3] & 0xFF );
-		for ( j = 0; j < call_stack[0][3]; j++ )
+		// Set the current sp
+		stack.setUint16( frameptr + 6, this.sp );
+		frames.push( this.frameptr );
+
+		// Swap the bytes of the locals and stacks
+		if ( littleEndian )
 		{
-			stacks.push( stack[j] >> 8, stack[j] & 0xFF );
-		}
-		for ( i = 0; i < call_stack.length; i++ )
-		{
-			frame = call_stack[i];
-			stack_len = ( call_stack[i + 1] ? call_stack[i + 1][3] : stack.length ) - frame[3];
-			stacks.push(
-				frame[0] >> 16, frame[0] >> 8 & 0xFF, frame[0] & 0xFF, // pc
-				frame[2] | ( frame[1] < 0 ? 0x10 : 0 ), // locals count and flag for no storer
-				frame[1] < 0 ? 0 : frame[1], // storer
-				( 1 << frame[4] ) - 1, // provided args
-				stack_len >> 8, stack_len & 0xFF // this frame's stack length
-			);
-			// Locals
-			for ( j = locals.length - frame[5] - frame[2]; j < locals.length - frame[5]; j++ )
+			for ( i = 0; i < frames.length; i++ )
 			{
-				stacks.push( locals[j] >> 8, locals[j] & 0xFF );
-			}
-			// The stack
-			for ( j = frame[3]; j < frame[3] + stack_len; j++ )
-			{
-				stacks.push( stack[j] >> 8, stack[j] & 0xFF );
+				frameptr = frames[i];
+				// Locals
+				j = frameptr + 8;
+				l = j + ( stack.getUint8( frameptr + 3 ) & 0x0F ) * 2;
+				while ( j < l )
+				{
+					stack.setUint16( j, stack.getUint16( j ), 1 );
+					j += 2;
+				}
+				// Stack
+				l = j + stack.getUint16( frameptr + 6 ) * 2;
+				while ( j < l )
+				{
+					stack.setUint16( j, stack.getUint16( j ), 1 );
+					j += 2;
+				}
 			}
 		}
-		call_stack.reverse();
-		quetzal.stacks = stacks;
+		quetzal.stacks = stack.getUint8Array( 0, this.frameptr + 8 + ( stack.getUint8( frameptr + 3 ) & 0x0F ) * 2 + this.sp * 2 );
 
 		return quetzal.write();
 	},
