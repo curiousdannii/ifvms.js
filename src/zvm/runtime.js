@@ -19,13 +19,12 @@ TODO:
 
 */
 
-var utils = require( '../common/utils.js' ),
+var file = require( '../common/file.js' ),
+utils = require( '../common/utils.js' ),
 extend = utils.extend,
 U2S = utils.U2S16,
 S2U = utils.S2U16,
-byte_to_word = utils.Uint8toUint16Array,
-
-file = require( '../common/file.js' );
+byte_to_word = utils.Uint8toUint16Array;
 
 module.exports = {
 
@@ -60,7 +59,7 @@ module.exports = {
 		this.frames.push( frameptr );
 
 		// Create a new frame
-		frameptr = this.frameptr = frameptr + 8 + ( stack.getUint8( frameptr + 3 ) & 0x0F ) * 2 + this.sp * 2;
+		frameptr = this.frameptr = this.s.byteOffset + this.sp * 2;
 		// Return address
 		stack.setUint32( frameptr, next << 8 );
 		// Flags
@@ -639,15 +638,26 @@ module.exports = {
 		{
 			return 0;
 		}
-		var state = this.undo.pop();
-		this.pc = state[0];
-		// Preserve flags 2
-		state[2][0x11] = this.m.getUint8( 0x11 );
-		this.ram.setUint8Array( 0, state[2] );
-		this.l = state[3];
-		this.s = state[4];
-		this.call_stack = state[5];
-		this.variable( state[1], 2 );
+
+		var state = this.undo.pop(),
+		stack = this.stack,
+		frameptr = this.frameptr = state.frameptr,
+		locals_count;
+		this.pc = state.pc;
+
+		// Replace the ram, preserving flags 2
+		state.ram[0x11] = this.m.getUint8( 0x11 );
+		this.ram.setUint8Array( 0, state.ram );
+
+		// Fix up the stack
+		this.frames = state.frames;
+		this.sp = state.sp;
+		stack.setUint8Array( 0, state.stack );
+		locals_count = stack.getUint8( frameptr + 3 ) & 0x0F;
+		this.l = new Uint16Array( stack.buffer, frameptr + 8, locals_count );
+		this.s = new Uint16Array( stack.buffer, frameptr + 8 + locals_count * 2 );
+
+		this.variable( state.var, 2 );
 		return 1;
 	},
 
@@ -826,14 +836,15 @@ module.exports = {
 
 	save_undo: function( pc, variable )
 	{
-		this.undo.push( [
-			pc,
-			variable,
-			this.m.getUint8Array( 0, this.staticmem ),
-			this.l.slice(),
-			this.s.slice(),
-			this.call_stack.slice(),
-		] );
+		this.undo.push({
+			frameptr: this.frameptr,
+			frames: this.frames.slice(),
+			pc: pc,
+			ram: this.m.getUint8Array( 0, this.staticmem ),
+			sp: this.sp,
+			stack: this.stack.getUint8Array( 0, this.s.byteOffset + this.sp * 2 ),
+			var: variable,
+		});
 		return 1;
 	},
 
