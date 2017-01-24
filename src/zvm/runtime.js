@@ -19,8 +19,6 @@ TODO:
 
 */
 
-/*eslint no-console: "off" */
-
 var utils = require( '../common/utils.js' ),
 extend = utils.extend,
 U2S = utils.U2S16,
@@ -49,36 +47,44 @@ module.exports = {
 			return this.pc = next;
 		}
 
-		var i,
-		locals_count,
-		old_locals_count = this.l.length,
-
-		// Keep the number of provided args for @check_arg_count
-		provided_args = args.length;
-
 		// Get the number of locals and advance the pc
 		this.pc = addr * this.addr_multipler;
-		locals_count = this.m.getUint8( this.pc++ );
+		var locals_count = this.m.getUint8( this.pc++ ),
 
-		// Add the locals
-		// Trim args to the count if needed
-		args = args.slice( 0, locals_count );
-		// Add any extras
-		for ( i = args.length; i < locals_count; i++ )
+		stack = this.stack,
+		i = 0,
+
+		// Write the current stack use
+		frameptr = this.frameptr;
+		stack.setUint16( frameptr + 6, this.sp );
+		this.frames.push( frameptr );
+
+		// Create a new frame
+		frameptr = this.frameptr = frameptr + 8 + ( stack.getUint8( frameptr + 3 ) & 0x0F ) * 2 + this.sp * 2;
+		// Return address
+		stack.setUint32( frameptr, next << 8 );
+		// Flags
+		stack.setUint8( frameptr + 3, ( storer >= 0 ? 0 : 0x10 ) | locals_count );
+		// Storer
+		stack.setUint8( frameptr + 4, storer >= 0 ? storer : 0 );
+		// Supplied arguments
+		stack.setUint8( frameptr + 5, ( 1 << args.length ) - 1 );
+
+		// Create the locals
+		this.l = new Uint16Array( stack.buffer, frameptr + 8, locals_count );
+		while ( i < locals_count )
 		{
-			// Use provided arguments in version 3, or 0 in later versions
-			args.push( this.version3 ? this.m.getUint16( this.pc + i * 2 ) : 0 );
+			this.l[i] = i < args.length ? args[i] : ( this.version3 ? this.m.getUint16( this.pc + i * 2 ) : 0 );
+			i++;
 		}
 		if ( this.version3 )
 		{
 			this.pc += locals_count * 2;
 		}
 
-		// Prepend to the locals array
-		this.l = args.concat( this.l );
-
-		// Push the call stack (well unshift really)
-		this.call_stack.unshift( [ next, storer, locals_count, this.s.length, provided_args, old_locals_count ] );
+		// Create the stack
+		this.s = new Uint16Array( stack.buffer, frameptr + 8 + locals_count * 2 );
+		this.sp = 0;
 	},
 
 	clear_attr: function( object, attribute )
@@ -306,23 +312,21 @@ module.exports = {
 	// Quick hack for @inc/@dec/@inc_chk/@dec_chk
 	incdec: function( varnum, change )
 	{
-		var result, offset;
 		if ( varnum === 0 )
 		{
-			result = S2U( this.s.pop() + change );
-			this.s.push( result );
-			return result;
+			this.s[this.sp - 1] += change;
+			return this.s[this.sp - 1];
 		}
 		if ( --varnum < 15 )
 		{
-			return this.l[varnum] = S2U( this.l[varnum] + change );
+			this.l[varnum] += change;
+			return this.l[varnum];
 		}
 		else
 		{
-			offset = this.globals + ( varnum - 15 ) * 2;
-			result = this.m.getUint16( offset ) + change;
-			this.ram.setUint16( offset, result );
-			return result;
+			var offset = this.globals + ( varnum - 15 ) * 2;
+			this.ram.setUint16( offset, this.m.getUint16( offset ) + change );
+			return this.ram.getUint16( offset );
 		}
 	},
 
@@ -333,11 +337,11 @@ module.exports = {
 		{
 			if ( arguments.length > 1 )
 			{
-				return this.s[this.s.length - 1] = value;
+				return this.s[this.sp - 1] = value;
 			}
 			else
 			{
-				return this.s[this.s.length - 1];
+				return this.s[this.sp - 1];
 			}
 		}
 		return this.variable( variable, value );
@@ -373,9 +377,9 @@ module.exports = {
 
 	log: function( message )
 	{
-		if ( this.env.GlkOte )
+		if ( this.options.GlkOte )
 		{
-			this.env.GlkOte.log( message );
+			this.options.GlkOte.log( message );
 		}
 	},
 
@@ -473,7 +477,8 @@ module.exports = {
 		addr_multipler = version3 ? 2 : ( version === 5 ? 4 : 8 ),
 		flags2 = ram.getUint8( 0x11 ),
 		property_defaults = ram.getUint16( 0x0A ),
-		extension = ram.getUint16( 0x36 );
+		extension = ram.getUint16( 0x36 ),
+		stack = utils.MemoryView( this.options.stack_len );
 
 		// Reset the RAM, but preserve flags 2
 		ram.setUint8Array( 0, this.origram );
@@ -482,9 +487,12 @@ module.exports = {
 		extend( this, {
 
 			// Locals and stacks of various kinds
-			s: [],
+			stack: stack,
+			frameptr: 0,
+			frames: [],
+			s: new Uint16Array( stack.buffer, 8 ),
+			sp: 0,
 			l: [],
-			call_stack: [],
 			undo: [],
 			
 			glk_blocking_call: null,
@@ -646,19 +654,25 @@ module.exports = {
 	// Return from a routine
 	ret: function( result )
 	{
-		var call_stack = this.call_stack.shift(),
-		storer = call_stack[1];
+		var stack = this.stack,
+		locals_count,
 
-		// Correct everything again
-		this.pc = call_stack[0];
-		// With @throw we can now be skipping some call stack frames, so use the old locals length rather than this function's local count
-		this.l = this.l.slice( this.l.length - call_stack[5] );
-		this.s.length = call_stack[3];
+		// Get the storer and return pc from this frame
+		frameptr = this.frameptr,
+		storer = stack.getUint8( frameptr + 3 ) & 0x10 ? -1 : stack.getUint8( frameptr + 4 );
+		this.pc = stack.getUint32( frameptr ) >> 8;
+
+		// Recreate the locals and stacks from the previous frame
+		frameptr = this.frameptr = this.frames.pop();
+		locals_count = stack.getUint8( frameptr + 3 ) & 0x0F;
+		this.l = new Uint16Array( stack.buffer, frameptr + 8, locals_count );
+		this.s = new Uint16Array( stack.buffer, frameptr + 8 + locals_count * 2 );
+		this.sp = stack.getUint16( frameptr + 6 );
 
 		// Store the result if there is one
 		if ( storer >= 0 )
 		{
-			this.variable( storer, result | 0 );
+			this.variable( storer, result || 0 );
 		}
 	},
 
@@ -903,11 +917,11 @@ module.exports = {
 		{
 			if ( havevalue )
 			{
-				this.s.push( value );
+				this.s[this.sp++] = value;
 			}
 			else
 			{
-				return this.s.pop();
+				return this.s[--this.sp];
 			}
 		}
 		else if ( --variable < 15 )

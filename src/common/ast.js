@@ -72,7 +72,7 @@ Variable = Operand.subClass({
 		if ( variable === 0 )
 		{
 			// If we've been passed a value we're setting a variable
-			return 's.pop()';
+			return 's[--e.sp]';
 		}
 		// Locals
 		if ( --variable < 15 )
@@ -104,7 +104,7 @@ Variable = Operand.subClass({
 		if ( variable === 0 )
 		{
 			// If we've been passed a value we're setting a variable
-			return 's.push(' + value + ')';
+			return 't=' + value + ';s[e.sp++]=t';
 		}
 		// Locals
 		if ( --variable < 15 )
@@ -255,7 +255,7 @@ Brancher = Opcode.subClass({
 		this.cond = new BrancherLogic( [this] );
 
 		// TODO: re-enable
-		/*if ( this.e.env.debug )
+		/*if ( this.e.options.debug )
 		{
 			// Stop if we must
 			if ( debugflags.noidioms )
@@ -292,7 +292,7 @@ Brancher = Opcode.subClass({
 		if ( result instanceof Context )
 		{
 			// Update the context to be a child of this context
-			if ( this.e.env.debug )
+			if ( this.e.options.debug )
 			{
 				result.context = this.context;
 			}
@@ -303,7 +303,7 @@ Brancher = Opcode.subClass({
 			if ( this.result.ops.length > 1 )
 			{
 				result = '\n' + result + '\n';
-				if ( this.e.env.debug )
+				if ( this.e.options.debug )
 				{
 					result += this.context.spacer;
 				}
@@ -394,7 +394,7 @@ Context = Class.subClass({
 		this.ops = [];
 		this.post = [];
 		this.targets = []; // Branch targets
-		if ( engine.env.debug )
+		if ( engine.options.debug )
 		{
 			this.spacer = '';
 		}
@@ -402,7 +402,7 @@ Context = Class.subClass({
 
 	toString: function()
 	{
-		if ( this.e.env.debug )
+		if ( this.e.options.debug )
 		{
 			// Indent the spacer further if needed
 			if ( this.context )
@@ -428,7 +428,7 @@ RoutineContext = Context.subClass({
 		// TODO: Debug: If we have routine names, find this one's name
 
 		// Add in some extra vars and return
-		this.pre.unshift( 'var l=e.l,s=e.s;\n' );
+		this.pre.unshift( 'var l=e.l,s=e.s,t=0;\n' );
 		return RoutineContext.super.toString.call( this );
 	},
 });

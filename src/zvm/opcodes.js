@@ -85,7 +85,7 @@ Incdec = Opcode.subClass({
 			return 'e.incdec(' + variable + ',' + operator + ')';
 		}
 
-		return ( varnum < 0 ? 'e.s[e.s.length-1]=e.S2U(e.s[e.s.length-1]+' : ( 'e.l[' + varnum + ']=e.S2U(e.l[' + varnum + ']+' ) ) + operator + ')';
+		return ( varnum < 0 ? 'e.s[e.sp-1]' : 'e.l[' + varnum + ']' ) + ( operator === 1 ? '++' : '--' );
 	},
 }),
 
@@ -135,7 +135,7 @@ return {
 /* call_2s */ 25: CallerStorer,
 /* call_2n */ 26: Caller,
 /* set_colour */ 27: opcode_builder( Opcode, function() { return 'e.set_colour(' + this.args() + ')'; } ),
-/* throw */ 28: opcode_builder( Stopper, function( value, cookie ) { return 'while(e.call_stack.length>' + cookie + '){e.call_stack.shift()}return ' + value; } ),
+/* throw */ 28: opcode_builder( Stopper, function( value, cookie ) { return 'while(e.frames.length+1>' + cookie + '){e.frameptr=e.frames.pop()}return ' + value; } ),
 /* jz */ 128: opcode_builder( Brancher, function( a ) { return a + '===0'; } ),
 /* get_sibling */ 129: opcode_builder( BrancherStorer, function( obj ) { return 'e.get_sibling(' + obj + ')'; } ),
 /* get_child */ 130: opcode_builder( BrancherStorer, function( obj ) { return 'e.get_child(' + obj + ')'; } ),
@@ -165,8 +165,8 @@ return {
 /* restart */ 183: opcode_builder( Stopper, function() { return 'e.erase_window(-1);e.restart()'; } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( stack_var ); } } ),
 185: version3 ?
-	/* pop (v3) */ opcode_builder( Opcode, function() { return 's.pop()'; } ) :
-	/* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.call_stack.length'; } ),
+	/* pop (v3) */ opcode_builder( Opcode, function() { return 's[--e.sp]'; } ) :
+	/* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.frames.length+1'; } ),
 /* quit */ 186: opcode_builder( Pauser, function() { return 'e.quit=1;e.Glk.glk_exit()'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
 188: version3 ?
@@ -207,7 +207,7 @@ return {
 /* encode_text */ 252: opcode_builder( Opcode, function() { return 'e.encode_text(' + this.args() + ')'; } ),
 /* copy_table */ 253: opcode_builder( Opcode, function() { return 'e.copy_table(' + this.args() + ')'; } ),
 /* print_table */ 254: opcode_builder( Opcode, function() { return 'e.print_table(' + this.args() + ')'; } ),
-/* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return arg + '<=e.call_stack[0][4]'; } ),
+/* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return 'e.stack.getUint8(e.frameptr+5)&(1<<(' + arg + '-1))'; } ),
 /* save */ 1000: opcode_builder( PauserStorer, function() { return 'e.save(' + ( this.next - 1 ) + ')'; } ),
 /* restore */ 1001: opcode_builder( PauserStorer, function() { return 'e.restore(' + ( this.next - 1 ) + ')'; } ),
 /* log_shift */ 1002: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.log_shift(' + a + ',' + b.U2S() + '))'; } ),

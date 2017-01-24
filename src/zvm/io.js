@@ -632,8 +632,8 @@ module.exports = {
 		],
 
 		// Start with CSS colours provided by the runner
-		fg_css = this.e.env.fgcolour,
-		bg_css = this.e.env.bgcolour,
+		fg_css = this.options.fgcolour,
+		bg_css = this.options.bgcolour,
 		// Convert to true colour for storing in the header
 		fg_true = fg_css ? convert_RGB( fg_css ) : 0xFFFF,
 		bg_true = bg_css ? convert_RGB( bg_css ) : 0xFFFF,
@@ -651,12 +651,12 @@ module.exports = {
 			bg = bg_css || 9;
 		}
 
-		this.env = {
+		utils.extend( this.options, {
 			fg: fg,
 			bg: bg,
 			fg_true: fg_true,
 			bg_true: bg_true,
-		};*/
+		});*/
 	},
 
 	// Request line input
@@ -949,7 +949,7 @@ module.exports = {
 			return ram.setUint8( 0x01,
 				( ram.getUint8( 0x01 ) & 0x8F ) // Keep all except bits 4-6
 				| ( this.statuswin ? 0x20 : 0x10 ) // If status win is available then set 0x20 for the upper win also being available, otherwise 0x10 for the status win itself
-				| 0x40 // Variable pitch font is default - Or can we tell from env if the font is fixed pitch?
+				| 0x40 // Variable pitch font is default - Or can we tell from options if the font is fixed pitch?
 			);
 		}
 		
@@ -970,10 +970,10 @@ module.exports = {
 		ram.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
 		
 		// Colours
-		//ram.setUint8( 0x2C, isNaN( this.env.bg ) ? 1 : this.env.bg );
-		//ram.setUint8( 0x2D, isNaN( this.env.fg ) ? 1 : this.env.fg );
-		//this.extension_table( 5, this.env.fg_true );
-		//this.extension_table( 6, this.env.bg_true );
+		//ram.setUint8( 0x2C, isNaN( this.options.bg ) ? 1 : this.options.bg );
+		//ram.setUint8( 0x2D, isNaN( this.options.fg ) ? 1 : this.options.fg );
+		//this.extension_table( 5, this.options.fg_true );
+		//this.extension_table( 6, this.options.bg_true );
 		
 		// Z Machine Spec revision
 		ram.setUint16( 0x32, 0x0102 );

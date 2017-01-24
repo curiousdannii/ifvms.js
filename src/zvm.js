@@ -27,7 +27,10 @@ Any other non-standard behaviour should be considered a bug
 
 var utils = require( './common/utils.js' ),
 file = require( './common/file.js' ),
-MemoryView = utils.MemoryView,
+
+default_options = {
+	stack_len: 64 * 1024,
+},
 
 api = {
 
@@ -49,7 +52,7 @@ api = {
 		}
 		this.Glk = options.Glk;
 		this.data = storydata;
-		this.env = options;
+		this.options = utils.extend( {}, default_options, options );
 	},
 
 	start: function()
@@ -71,13 +74,13 @@ api = {
 			}
 			
 			// Load the storyfile we are given into our MemoryView (an enhanced DataView)
-			this.m = MemoryView( data.data );
+			this.m = utils.MemoryView( data.data );
 			
 			// Make a seperate MemoryView for the ram, and store the original ram
 			this.staticmem = this.m.getUint16( 0x0E );
-			this.ram = MemoryView( this.m.buffer, 0, this.staticmem );
+			this.ram = utils.MemoryView( this.m.buffer, 0, this.staticmem );
 			this.origram = this.m.getUint8Array( 0, this.staticmem );
-			
+
 			// Initiate the engine, run, and wait for our first Glk event
 			this.restart();
 			this.run();
