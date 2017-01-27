@@ -4,8 +4,8 @@ Z-Machine IO
 ============
 
 Copyright (c) 2017 The ifvms.js team
-BSD licenced
-http://github.com/curiousdannii/ifvms.js
+MIT licenced
+https://github.com/curiousdannii/ifvms.js
 
 */
 
@@ -19,7 +19,6 @@ TODO:
  - pre-existing line input
  - timed input
  - mouse input
- - text grid quote boxes
 
 */
 
@@ -499,7 +498,7 @@ module.exports = {
 			}
 			
 			// For the upper window we print each character individually so that we can track the cursor position
-			if ( io.currentwin )
+			if ( io.currentwin && this.upperwin )
 			{
 				// Don't automatically increase the size of the window
 				// If we confirm that games do need this then we can implement it later
@@ -514,7 +513,7 @@ module.exports = {
 					}
 				}
 			}
-			else
+			else if ( !io.currentwin )
 			{
 				if ( io.streams[1] )
 				{
