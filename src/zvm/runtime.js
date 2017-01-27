@@ -3,9 +3,9 @@
 Z-Machine runtime functions
 ===========================
 
-Copyright (c) 2016 The ifvms.js team
-BSD licenced
-http://github.com/curiousdannii/ifvms.js
+Copyright (c) 2017 The ifvms.js team
+MIT licenced
+https://github.com/curiousdannii/ifvms.js
 
 */
 
@@ -33,6 +33,18 @@ littleEndian = (function()
 	testUint16Array[0] = 1;
 	return testUint8Array[0] === 1;
 })();
+
+function fix_stack_endianness( view, start, end )
+{
+	if ( littleEndian )
+	{
+		while ( start < end )
+		{
+			view.setUint16( start, view.getUint16( start, 1 ) );
+			start += 2;
+		}
+	}
+}
 
 module.exports = {
 
@@ -77,8 +89,9 @@ module.exports = {
 		// Supplied arguments
 		stack.setUint8( frameptr + 5, ( 1 << args.length ) - 1 );
 
-		// Create the locals
-		this.l = new Uint16Array( stack.buffer, frameptr + 8, locals_count );
+		// Create the locals and stack
+		this.make_stacks();
+		this.sp = 0;
 		while ( i < locals_count )
 		{
 			this.l[i] = i < args.length ? args[i] : ( this.version3 ? this.m.getUint16( this.pc + i * 2 ) : 0 );
@@ -88,10 +101,6 @@ module.exports = {
 		{
 			this.pc += locals_count * 2;
 		}
-
-		// Create the stack
-		this.s = new Uint16Array( stack.buffer, frameptr + 8 + locals_count * 2 );
-		this.sp = 0;
 	},
 
 	clear_attr: function( object, attribute )
@@ -395,6 +404,13 @@ module.exports = {
 		return places > 0 ? number << places : number >>> -places;
 	},
 
+	make_stacks: function()
+	{
+		var locals_count = this.stack.getUint8( this.frameptr + 3 ) & 0x0F;
+		this.l = new Uint16Array( this.stack.buffer, this.frameptr + 8, locals_count );
+		this.s = new Uint16Array( this.stack.buffer, this.frameptr + 8 + locals_count * 2 );
+	},
+
 	put_prop: function( object, property, value )
 	{
 		// Try to find the property
@@ -550,8 +566,7 @@ module.exports = {
 		stack = this.stack,
 		flags2 = ram.getUint8( 0x11 ),
 		temp,
-		locals_count,
-		i = 0, j = 0, l;
+		i = 0, j = 0;
 		
 		// Check this is a savefile for this story
 		if ( ram.getUint16( 0x02 ) !== quetzal.release || ram.getUint16( 0x1C ) !== quetzal.checksum )
@@ -601,32 +616,14 @@ module.exports = {
 		{
 			this.frameptr = i;
 			this.frames.push( i );
-			locals_count = stack.getUint8( i + 3 ) & 0x0F;
 			// Swap the bytes of the locals and stacks
-			if ( littleEndian )
-			{
-				// Locals
-				j = i + 8;
-				l = j + locals_count * 2;
-				while ( j < l )
-				{
-					stack.setUint16( j, stack.getUint16( j, 1 ) );
-					j += 2;
-				}
-				// Stack
-				l = j + stack.getUint16( i + 6 ) * 2;
-				while ( j < l )
-				{
-					stack.setUint16( j, stack.getUint16( j, 1 ) );
-					j += 2;
-				}
-			}
-			i += 8 + locals_count * 2 + stack.getUint16( i + 6 ) * 2;
+			fix_stack_endianness( stack, j = i + 8, j += ( stack.getUint8( i + 3 ) & 0x0F ) * 2 );
+			fix_stack_endianness( stack, j, j += stack.getUint16( i + 6 ) * 2 );
+			i = j;
 		}
 		this.frames.pop();
 		this.sp = stack.getUint16( this.frameptr + 6 );
-		this.l = new Uint16Array( stack.buffer, this.frameptr + 8, locals_count );
-		this.s = new Uint16Array( stack.buffer, this.frameptr + 8 + locals_count * 2 );
+		this.make_stacks();
 
 		this.pc = quetzal.pc;
 		this.update_header();
@@ -647,10 +644,8 @@ module.exports = {
 			return 0;
 		}
 
-		var state = this.undo.pop(),
-		stack = this.stack,
-		frameptr = this.frameptr = state.frameptr,
-		locals_count;
+		var state = this.undo.pop();
+		this.frameptr = state.frameptr;
 		this.pc = state.pc;
 
 		// Replace the ram, preserving flags 2
@@ -660,10 +655,8 @@ module.exports = {
 		// Fix up the stack
 		this.frames = state.frames;
 		this.sp = state.sp;
-		stack.setUint8Array( 0, state.stack );
-		locals_count = stack.getUint8( frameptr + 3 ) & 0x0F;
-		this.l = new Uint16Array( stack.buffer, frameptr + 8, locals_count );
-		this.s = new Uint16Array( stack.buffer, frameptr + 8 + locals_count * 2 );
+		this.stack.setUint8Array( 0, state.stack );
+		this.make_stacks();
 
 		this.variable( state.var, 2 );
 		return 1;
@@ -673,7 +666,6 @@ module.exports = {
 	ret: function( result )
 	{
 		var stack = this.stack,
-		locals_count,
 
 		// Get the storer and return pc from this frame
 		frameptr = this.frameptr,
@@ -682,9 +674,7 @@ module.exports = {
 
 		// Recreate the locals and stacks from the previous frame
 		frameptr = this.frameptr = this.frames.pop();
-		locals_count = stack.getUint8( frameptr + 3 ) & 0x0F;
-		this.l = new Uint16Array( stack.buffer, frameptr + 8, locals_count );
-		this.s = new Uint16Array( stack.buffer, frameptr + 8 + locals_count * 2 );
+		this.make_stacks();
 		this.sp = stack.getUint16( frameptr + 6 );
 
 		// Store the result if there is one
@@ -713,7 +703,7 @@ module.exports = {
 		stack = utils.MemoryView( this.stack.buffer.slice() ),
 		frames = this.frames.slice(),
 		zeroes = 0,
-		i, j, l,
+		i, j,
 		frameptr,
 		abyte;
 
@@ -759,21 +749,8 @@ module.exports = {
 			for ( i = 0; i < frames.length; i++ )
 			{
 				frameptr = frames[i];
-				// Locals
-				j = frameptr + 8;
-				l = j + ( stack.getUint8( frameptr + 3 ) & 0x0F ) * 2;
-				while ( j < l )
-				{
-					stack.setUint16( j, stack.getUint16( j ), 1 );
-					j += 2;
-				}
-				// Stack
-				l = j + stack.getUint16( frameptr + 6 ) * 2;
-				while ( j < l )
-				{
-					stack.setUint16( j, stack.getUint16( j ), 1 );
-					j += 2;
-				}
+				fix_stack_endianness( stack, j = frameptr + 8, j += ( stack.getUint8( frameptr + 3 ) & 0x0F ) * 2 );
+				fix_stack_endianness( stack, j, j += stack.getUint16( frameptr + 6 ) * 2 );
 			}
 		}
 		quetzal.stacks = stack.getUint8Array( 0, this.frameptr + 8 + ( stack.getUint8( frameptr + 3 ) & 0x0F ) * 2 + this.sp * 2 );
