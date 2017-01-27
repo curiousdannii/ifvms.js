@@ -6,9 +6,13 @@
   "author": "Dannii Willis <curiousdannii@gmail.com>",
   "license": "MIT",
   "keywords": [
-    "intfiction",
-    "vm"
+    "emulator",
+    "interactive fiction",
+    "interactive-fiction"
   ],
+  "engines": {
+    "node": ">=6.0.0"
+  },
   "main": "src/index.js",
   "bin": {
     "zvm": "bin/zvm.js"

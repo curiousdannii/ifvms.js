@@ -606,7 +606,7 @@ module.exports = {
 		{
 			ram.setUint8Array( 0, qmem );
 		}
-		// Preserve flags 1
+		// Preserve flags 2
 		ram.setUint8( 0x11, flags2 );
 
 		// Stacks
@@ -648,6 +648,7 @@ module.exports = {
 		var state = this.undo.pop();
 		this.frameptr = state.frameptr;
 		this.pc = state.pc;
+		this.undo_len -= ( state.ram.byteLength + state.stack.byteLength );
 
 		// Replace the ram, preserving flags 2
 		state.ram[0x11] = this.m.getUint8( 0x11 );
