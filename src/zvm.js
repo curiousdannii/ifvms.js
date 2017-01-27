@@ -4,8 +4,8 @@ ZVM - the ifvms.js Z-Machine (versions 3, 5 and 8)
 ==================================================
 
 Copyright (c) 2017 The ifvms.js team
-BSD licenced
-http://github.com/curiousdannii/ifvms.js
+MIT licenced
+https://github.com/curiousdannii/ifvms.js
 
 */
 
@@ -29,7 +29,8 @@ var utils = require( './common/utils.js' ),
 file = require( './common/file.js' ),
 
 default_options = {
-	stack_len: 64 * 1024,
+	stack_len: 100 * 1000,
+	undo_len: 1000 * 1000,
 },
 
 api = {

@@ -517,6 +517,7 @@ module.exports = {
 			sp: 0,
 			l: [],
 			undo: [],
+			undo_len: 0,
 			
 			glk_blocking_call: null,
 
@@ -816,6 +817,12 @@ module.exports = {
 
 	save_undo: function( pc, variable )
 	{
+		// Drop an old undo state if we've reached the limit, but always save at least one state
+		if ( this.undo_len > this.options.undo_len )
+		{
+			this.undo.shift();
+		}
+		this.undo_len += this.staticmem + this.s.byteOffset + this.sp * 2;
 		this.undo.push({
 			frameptr: this.frameptr,
 			frames: this.frames.slice(),
