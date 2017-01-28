@@ -3,9 +3,9 @@
 Z-Machine text functions
 ========================
 
-Copyright (c) 2016 The ifvms.js team
-BSD licenced
-http://github.com/curiousdannii/ifvms.js
+Copyright (c) 2017 The ifvms.js team
+MIT licenced
+https://github.com/curiousdannii/ifvms.js
 
 */
 
@@ -23,7 +23,7 @@ module.exports = {
 		var self = this,
 		memory = this.m,
 
-		alphabet_addr = !this.version3 && memory.getUint16( 0x34 ),
+		alphabet_addr = ( this.version > 4 ) && memory.getUint16( 0x34 ),
 		unicode_addr = this.extension_table( 3 ),
 		unicode_len = unicode_addr && memory.getUint8( unicode_addr++ );
 
@@ -374,7 +374,7 @@ module.exports = {
 		wordcount = 0;
 
 		// In versions 5 and 8 we can get the actual buffer length
-		if ( !this.version3 )
+		if ( this.version > 4 )
 		{
 			bufferlength = memory.getUint8( bufaddr + i++ ) + 2;
 		}

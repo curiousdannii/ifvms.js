@@ -4,8 +4,8 @@ Z-Machine opcodes
 =================
 
 Copyright (c) 2017 The ifvms.js team
-BSD licenced
-http://github.com/curiousdannii/ifvms.js
+MIT licenced
+https://github.com/curiousdannii/ifvms.js
 
 */
 
@@ -97,12 +97,15 @@ V3SaveRestore = Stopper.subClass({
 	{
 		return 'e.' + ( this.code === 181 ? 'save' : 'restore' ) + '(' + ( this.pc + 1 ) + ')';
 	},
-});
+}),
+
+V45Restore = opcode_builder( PauserStorer, function() { return 'e.restore(' + ( this.next - 1 ) + ')'; } ),
+V45Save = opcode_builder( PauserStorer, function() { return 'e.save(' + ( this.next - 1 ) + ')'; } );
 
 /*eslint brace-style: "off" */
 /*eslint indent: "off" */
 
-module.exports = function( version3 )
+module.exports = function( version )
 {
 
 return {
@@ -151,8 +154,8 @@ return {
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + ( this.next - 2 ); } ),
 /* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(2,' + addr + '*' + this.e.addr_multipler + ')'; } ),
 /* load */ 142: Indirect.subClass( { storer: 1 } ),
-143: version3 ?
-	/* not (v3) */ not :
+143: version < 5 ?
+	/* not (v3/4) */ not :
 	/* call_1n (v5/8) */ Caller,
 /* rtrue */ 176: opcode_builder( Stopper, function() { return 'return 1'; } ),
 /* rfalse */ 177: opcode_builder( Stopper, function() { return 'return 0'; } ),
@@ -160,16 +163,20 @@ return {
 /* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print(2,' + text + ')'; }, { printer: 1 } ),
 /* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print(2,' + text + ');e.print(1,13);return 1'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
-/* save (v3) */ 181: V3SaveRestore,
-/* restore (v3) */ 182: V3SaveRestore,
+/* save (v3/4) */ 181: version < 4 ?
+	V3SaveRestore :
+	V45Save,
+/* restore(v3/4) */ 182: version < 4 ?
+	V3SaveRestore :
+	V45Restore,
 /* restart */ 183: opcode_builder( Stopper, function() { return 'e.erase_window(-1);e.restart()'; } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( stack_var ); } } ),
-185: version3 ?
-	/* pop (v3) */ opcode_builder( Opcode, function() { return 's[--e.sp]'; } ) :
+185: version < 5 ?
+	/* pop (v3/4) */ opcode_builder( Opcode, function() { return 's[--e.sp]'; } ) :
 	/* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.frames.length+1'; } ),
 /* quit */ 186: opcode_builder( Pauser, function() { return 'e.quit=1;e.Glk.glk_exit()'; } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
-188: version3 ?
+188: version < 4 ?
 	/* show_status (v3) */ opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.v3_status()'; } ) :
 	/* act as a nop in later versions */ Opcode,
 /* verify */ 189: alwaysbranch, // Actually check??
@@ -178,7 +185,7 @@ return {
 /* storew */ 225: opcode_builder( Opcode, function( array, index, value ) { return 'e.ram.setUint16(e.S2U(' + array + '+2*' + index.U2S() + '),' + value + ')'; } ),
 /* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'e.ram.setUint8(e.S2U(' + array + '+' + index.U2S() + '),' + value + ')'; } ),
 /* put_prop */ 227: opcode_builder( Opcode, function() { return 'e.put_prop(' + this.args() + ')'; } ),
-/* read */ 228: version3 ?
+/* read */ 228: version < 5 ?
 	opcode_builder( Pauser, function() { return 'e.read(0,' + this.args() + ')'; } ) :
 	opcode_builder( PauserStorer, function() { return 'e.read(' + this.storer.v + ',' + this.args() + ')'; } ),
 /* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(4,' + a + ')'; } ),
@@ -208,8 +215,8 @@ return {
 /* copy_table */ 253: opcode_builder( Opcode, function() { return 'e.copy_table(' + this.args() + ')'; } ),
 /* print_table */ 254: opcode_builder( Opcode, function() { return 'e.print_table(' + this.args() + ')'; } ),
 /* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return 'e.stack.getUint8(e.frameptr+5)&(1<<(' + arg + '-1))'; } ),
-/* save */ 1000: opcode_builder( PauserStorer, function() { return 'e.save(' + ( this.next - 1 ) + ')'; } ),
-/* restore */ 1001: opcode_builder( PauserStorer, function() { return 'e.restore(' + ( this.next - 1 ) + ')'; } ),
+/* save */ 1000: V45Save,
+/* restore */ 1001: V45Restore,
 /* log_shift */ 1002: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.log_shift(' + a + ',' + b.U2S() + '))'; } ),
 /* art_shift */ 1003: opcode_builder( Storer, function( a, b ) { return 'e.S2U(e.art_shift(' + a.U2S() + ',' + b.U2S() + '))'; } ),
 /* set_font */ 1004: opcode_builder( Storer, function( font ) { return 'e.set_font(' + font + ')'; } ),

@@ -1,7 +1,7 @@
 /*
 
-ZVM - the ifvms.js Z-Machine (versions 3, 5 and 8)
-==================================================
+ZVM - the ifvms.js Z-Machine (versions 3-5, 8)
+==============================================
 
 Copyright (c) 2017 The ifvms.js team
 MIT licenced
@@ -69,7 +69,7 @@ api = {
 			{
 				throw new Error( 'This is not a Z-Code file' );
 			}
-			if ( data.version !== 3 && data.version !== 5 && data.version !== 8 )
+			if ( [ 3, 4, 5, 8 ].indexOf( data.version ) < 0 )
 			{
 				throw new Error( 'Unsupported Z-Machine version: ' + data.version );
 			}

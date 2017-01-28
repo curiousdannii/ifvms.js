@@ -94,10 +94,10 @@ module.exports = {
 		this.sp = 0;
 		while ( i < locals_count )
 		{
-			this.l[i] = i < args.length ? args[i] : ( this.version3 ? this.m.getUint16( this.pc + i * 2 ) : 0 );
+			this.l[i] = i < args.length ? args[i] : ( this.version < 5 ? this.m.getUint16( this.pc + i * 2 ) : 0 );
 			i++;
 		}
-		if ( this.version3 )
+		if ( this.version < 5 )
 		{
 			this.pc += locals_count * 2;
 		}
@@ -497,10 +497,10 @@ module.exports = {
 		var ram = this.ram,
 		version = ram.getUint8( 0x00 ),
 		version3 = version === 3,
-		addr_multipler = version3 ? 2 : ( version === 5 ? 4 : 8 ),
+		addr_multipler = version3 ? 2 : ( version === 8 ? 8 : 4 ),
 		flags2 = ram.getUint8( 0x11 ),
 		property_defaults = ram.getUint16( 0x0A ),
-		extension = ram.getUint16( 0x36 ),
+		extension = ( version > 4 ) ? ram.getUint16( 0x36 ) : 0,
 		stack = utils.MemoryView( this.options.stack_len );
 
 		// Reset the RAM, but preserve flags 2
@@ -537,7 +537,7 @@ module.exports = {
 			addr_multipler: addr_multipler,
 
 			// Opcodes for this version of the Z-Machine
-			opcodes: require( './opcodes.js' )( version3 ),
+			opcodes: require( './opcodes.js' )( version ),
 
 		});
 

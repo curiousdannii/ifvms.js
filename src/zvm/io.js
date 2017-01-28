@@ -290,7 +290,7 @@ module.exports = {
 		}
 
 		// Store the response
-		if ( this.version3 )
+		if ( this.version < 5 )
 		{
 			// Append zero terminator
 			response.push( 0 );
@@ -965,8 +965,11 @@ module.exports = {
 		
 		// Screen settings
 		ram.setUint8( 0x20, 255 ); // Infinite height
-		ram.setUint16( 0x24, 255 );
-		ram.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
+		if ( this.version > 4 )
+		{
+			ram.setUint16( 0x24, 255 );
+			ram.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
+		}
 		
 		// Colours
 		//ram.setUint8( 0x2C, isNaN( this.options.bg ) ? 1 : this.options.bg );
@@ -992,10 +995,14 @@ module.exports = {
 		{
 			Glk.glk_window_close( tempwin );
 		}
-		this.io.width = width = box.get_value();
-		if ( !this.version3 )
+		// Get the width but limit to a max of 255
+		this.io.width = width = Math.min( box.get_value(), 255 );
+		if ( this.version > 3 )
 		{
 			this.ram.setUint8( 0x21, width );
+		}
+		if ( this.version > 4 )
+		{
 			this.ram.setUint16( 0x22, width );
 		}
 		if ( this.io.col >= width )
