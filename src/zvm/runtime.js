@@ -140,6 +140,30 @@ module.exports = {
 		}
 	},
 
+	do_autosave: function()
+	{
+		if ( !this.options.Dialog )
+		{
+			throw new Error( 'A reference to Dialog is required' );
+		}
+
+		var snapshot = {
+			glk: this.Glk.save_allstate(),
+			io: this.io,
+			ram: this.save_file( this.pc ),
+			read_data: this.read_data,
+			xorshift_seed: this.xorshift_seed,
+		};
+		snapshot.io.streams[2] = {};
+		snapshot.io.streams[4] = {};
+		if ( snapshot.read_data.buffer )
+		{
+			snapshot.read_data.buffer = snapshot.read_data.buffer.length;
+		}
+
+		this.options.Dialog.autosave_write( this.get_signature(), snapshot );
+	},
+
 	encode_text: function( zscii, length, from, target )
 	{
 		this.ram.setUint8Array( target, this.encode( this.m.getUint8Array( zscii + from, length ) ) );

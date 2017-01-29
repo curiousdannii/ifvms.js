@@ -3,11 +3,14 @@ root: true
 extends: 'eslint:recommended'
 
 parserOptions:
-  ecmaVersion: 5
+  ecmaVersion: 6
 
 env:
   es6: true
   node: true
+  
+globals:
+  window: true
 
 rules:
   brace-style:
@@ -20,6 +23,9 @@ rules:
     - error
   eqeqeq:
     - error
+    - always
+    -
+      null: ignore
   indent:
     - error
     - tab
@@ -36,6 +42,6 @@ rules:
   quotes:
     - error
     - single
-  semi:
-    - error
-    - always
+#  semi:
+#    - error
+#    - always
