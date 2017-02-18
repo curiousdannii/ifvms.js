@@ -19,20 +19,21 @@ TODO:
 
 */
 
-var file = require( '../common/file.js' ),
-utils = require( '../common/utils.js' ),
-extend = utils.extend,
-U2S = utils.U2S16,
-S2U = utils.S2U16,
+const cloneDeep = require( 'lodash/cloneDeep' )
+const file = require( '../common/file.js' )
+const utils = require( '../common/utils.js' )
+const extend = utils.extend
+const U2S = utils.U2S16
+const S2U = utils.S2U16
 
 // Test whether we are running on a littleEndian system
-littleEndian = (function()
+const littleEndian = (function()
 {
 	var testUint8Array = new Uint8Array( 2 ),
 	testUint16Array = new Uint16Array( testUint8Array.buffer );
 	testUint16Array[0] = 1;
 	return testUint8Array[0] === 1;
-})();
+})()
 
 function fix_stack_endianness( view, start, end )
 {
@@ -144,24 +145,20 @@ module.exports = {
 	{
 		if ( !this.options.Dialog )
 		{
-			throw new Error( 'A reference to Dialog is required' );
+			throw new Error( 'A reference to Dialog is required' )
 		}
-
-		var snapshot = {
+		const snapshot = {
 			glk: this.Glk.save_allstate(),
-			io: this.io,
+			io: cloneDeep( this.io ),
 			ram: this.save_file( this.pc ),
-			read_data: this.read_data,
+			read_data: cloneDeep( this.read_data ),
 			xorshift_seed: this.xorshift_seed,
-		};
-		snapshot.io.streams[2] = {};
-		snapshot.io.streams[4] = {};
-		if ( snapshot.read_data.buffer )
-		{
-			snapshot.read_data.buffer = snapshot.read_data.buffer.length;
 		}
+		delete snapshot.io.streams[2].str
+		delete snapshot.io.streams[2].str
+		delete snapshot.read_data.buffer
 
-		this.options.Dialog.autosave_write( this.get_signature(), snapshot );
+		this.options.Dialog.autosave_write( this.get_signature(), snapshot )
 	},
 
 	encode_text: function( zscii, length, from, target )

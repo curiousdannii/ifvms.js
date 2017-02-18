@@ -37,8 +37,6 @@ rules:
     - unix
   no-constant-condition:
     - off
-  one-var:
-    - error
   quotes:
     - error
     - single

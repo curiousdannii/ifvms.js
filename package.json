@@ -27,6 +27,7 @@
   "bugs": "https://github.com/curiousdannii/ifvms.js/issues",
   "dependencies": {
     "glkote-term": "^0.3.0",
+    "lodash": "^4.17.4",
     "yargs": "^6.5.0"
   },
   "devDependencies": {
