@@ -76,7 +76,7 @@ module.exports = {
 	{
 		var Glk = this.Glk;
 
-		this.io = {
+		this.io = this.io || {
 			reverse: 0,
 			bold: 0,
 			italic: 0,

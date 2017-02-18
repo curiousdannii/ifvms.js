@@ -35,6 +35,8 @@ rules:
   linebreak-style:
     - error
     - unix
+  no-cond-assign:
+    - off
   no-constant-condition:
     - off
   quotes:

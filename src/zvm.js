@@ -82,9 +82,49 @@ api = {
 			this.ram = utils.MemoryView( this.m.buffer, 0, this.staticmem );
 			this.origram = this.m.getUint8Array( 0, this.staticmem );
 
+			// Cache the game signature
+			let signature = ''
+			let i = 0
+			while ( i < 0x1E )
+			{
+				signature += ( this.origram[i] < 0x10 ? '0' : '' ) + this.origram[i++].toString( 16 )
+			}
+			this.signature = signature
+
+			// Handle loading and clearing autosaves
+			let autorestored
+			const Dialog = this.options.Dialog
+			if ( Dialog )
+			{
+				if ( this.options.clear_vm_autosave )
+				{
+					Dialog.autosave_write( signature, null )
+				}
+				else if ( this.options.do_vm_autosave )
+				{
+					try
+					{
+						const snapshot = Dialog.autosave_read( signature )
+						if ( snapshot )
+						{
+							this.do_autorestore( snapshot )
+							autorestored = 1
+						}
+					}
+					catch (ex)
+					{
+						this.log( 'Autorestore failed, deleting it' )
+						Dialog.autosave_write( signature, null )
+					}
+				}
+			}
+
 			// Initiate the engine, run, and wait for our first Glk event
-			this.restart();
-			this.run();
+			if ( !autorestored )
+			{
+				this.restart();
+				this.run();
+			}
 			if ( !this.quit )
 			{
 				this.glk_event = new Glk.RefStruct();
@@ -175,16 +215,9 @@ api = {
 		}
 	},
 	
-	// Return a game signature from the header
 	get_signature: function()
 	{
-		var result = [],
-		i = 0;
-		while ( i < 0x1E )
-		{
-			result.push( ( this.origram[i] < 0x10 ? '0' : '' ) + this.origram[i++].toString( 16 ) );
-		}
-		return result.join( '' );
+		return this.signature
 	},
 
 	// Run

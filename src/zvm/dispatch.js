@@ -30,13 +30,32 @@ class ZVMDispatch
 		return !this.vm.glk_blocking_call
 	}
 
-	class_register( clas, obj /*, usedisprock*/ )
+	class_obj_from_id( clas, val )
 	{
-		if ( obj.disprock )
+		return this.class_map[clas][val]
+	}
+
+	class_register( clas, obj, usedisprock )
+	{
+		if ( usedisprock )
 		{
-			throw new Error( 'class_register: object is already registered' )
+			if ( obj.disprock !== usedisprock )
+			{
+				throw new Error( 'class_register: object is not already registered' )
+			}
+			if ( this.last_used_id <= usedisprock )
+			{
+				this.last_used_id = usedisprock + 1
+			}
 		}
-		obj.disprock = this.last_used_id++
+		else
+		{
+			if ( obj.disprock )
+			{
+				throw new Error( 'class_register: object is already registered' )
+			}
+			obj.disprock = this.last_used_id++
+		}
 		this.class_map[clas][obj.disprock] = obj
 	}
 

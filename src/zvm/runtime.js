@@ -141,6 +141,54 @@ module.exports = {
 		}
 	},
 
+	do_autorestore: function( snapshot )
+	{
+		const Glk = this.Glk
+
+		// Restore Glk
+		Glk.restore_allstate( snapshot.glk )
+
+		// Get references to our Glk objects
+		this.io = snapshot.io
+		const RockBox = new Glk.RefBox()
+		let obj
+		while ( obj = Glk.glk_window_iterate( obj, RockBox ) )
+		{
+			if ( RockBox.value === 201 )
+			{
+				this.mainwin = obj
+			}
+			if ( RockBox.value === 202 )
+			{
+				this.statuswin = obj
+			}
+			if ( RockBox.value === 203 )
+			{
+				this.upperwin = obj
+			}
+		}
+		obj = null
+		while ( obj = Glk.glk_stream_iterate( obj, RockBox ) )
+		{
+			if ( RockBox.value === 210 )
+			{
+				this.io.streams[2].str = obj
+			}
+			if ( RockBox.value === 211 )
+			{
+				this.io.streams[4].str = obj
+			}
+		}
+
+		// Restart and restore the RAM and stacks
+		this.restart()
+		this.restore_file( new Uint8Array( snapshot.ram ) )
+
+		// Set remaining data from the snapshot
+		this.read_data = snapshot.read_data
+		this.xorshift_seed = snapshot.xorshift_seed
+	},
+
 	do_autosave: function()
 	{
 		if ( !this.options.Dialog )
