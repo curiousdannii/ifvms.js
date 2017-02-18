@@ -677,6 +677,7 @@ module.exports = {
 		}
 
 		buffer = Array( len );
+		buffer.fill( 0 )
 		this.read_data = {
 			buffer: buffer,
 			bufaddr: text, // text-buffer

@@ -157,6 +157,10 @@ module.exports = {
 			if ( RockBox.value === 201 )
 			{
 				this.mainwin = obj
+				if ( obj.linebuf )
+				{
+					snapshot.read_data.buffer = obj.linebuf
+				}
 			}
 			if ( RockBox.value === 202 )
 			{
