@@ -18,12 +18,13 @@ clean:
 	rm -rf dist
 	rm tests/regtest.py
 
-dist/zvm.js: src/zvm.js src/common/* src/zvm/*
+dist/%.js: src/%.js src/common/* src/%/*
 	mkdir -p dist
-	browserify src/zvm.js --standalone ZVM > dist/zvm.js
+	browserify src/$*.js --noparse=clone --standalone $(shell echo $* | tr a-z A-Z) > $@
 
-dist/zvm.min.js: dist/zvm.js
-	uglifyjs dist/zvm.js -c warnings=false -m --preamble '/* ZVM v$(shell jq -r .version -- package.json) https://github.com/curiousdannii/ifvms.js */' > dist/zvm.min.js
+dist/%.min.js: dist/%.js
+	echo '/* $(shell echo $* | tr a-z A-Z) v$(shell jq -r .version -- package.json) https://github.com/curiousdannii/ifvms.js */' > $@
+	babili dist/$*.js >> $@
 
 lint:
 	eslint --ignore-path .gitignore .
@@ -32,7 +33,7 @@ tests/regtest.py:
 	$(CURL) -o tests/regtest.py https://raw.githubusercontent.com/erkyrath/plotex/master/regtest.py
 
 # Run the test suite
-test: dist/zvm.js tests/regtest.py
+test: dist/zvm.min.js tests/regtest.py
 	cd tests && python regtest.py praxix.regtest
-	#cd tests && python regtest.py praxix-bundled.regtest
+	cd tests && python regtest.py praxix-bundled.regtest
 	cd tests && python regtest.py curses.regtest

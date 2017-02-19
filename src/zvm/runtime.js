@@ -19,7 +19,7 @@ TODO:
 
 */
 
-const cloneDeep = require( 'lodash/cloneDeep' )
+const cloneDeep = require( 'clone' )
 const file = require( '../common/file.js' )
 const utils = require( '../common/utils.js' )
 const extend = utils.extend
