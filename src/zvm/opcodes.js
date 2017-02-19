@@ -95,7 +95,7 @@ V3SaveRestore = Stopper.subClass({
 
 	toString: function()
 	{
-		return 'e.' + ( this.code === 181 ? 'save' : 'restore' ) + '(' + ( this.pc + 1 ) + ')';
+		return 'e.stop=1;e.' + ( this.code === 181 ? 'save' : 'restore' ) + '(' + ( this.pc + 1 ) + ')';
 	},
 }),
 
