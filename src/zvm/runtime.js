@@ -14,7 +14,6 @@ https://github.com/curiousdannii/ifvms.js
 /*
 
 TODO:
-	Check when restoring that it's a savefile for this storyfile
 	Save/restore: table, name, prompt support
 
 */
@@ -35,9 +34,9 @@ const littleEndian = (function()
 	return testUint8Array[0] === 1;
 })()
 
-function fix_stack_endianness( view, start, end )
+function fix_stack_endianness( view, start, end, auto )
 {
-	if ( littleEndian )
+	if ( littleEndian && !auto )
 	{
 		while ( start < end )
 		{
@@ -186,7 +185,7 @@ module.exports = {
 
 		// Restart and restore the RAM and stacks
 		this.restart()
-		this.restore_file( new Uint8Array( snapshot.ram ) )
+		this.restore_file( new Uint8Array( snapshot.ram ), 1 )
 
 		// Set remaining data from the snapshot
 		this.read_data = snapshot.read_data
@@ -206,7 +205,7 @@ module.exports = {
 			snapshot = {
 				glk: this.Glk.save_allstate(),
 				io: cloneDeep( this.io ),
-				ram: this.save_file( this.pc ),
+				ram: this.save_file( this.pc, 1 ),
 				read_data: cloneDeep( this.read_data ),
 				xorshift_seed: this.xorshift_seed,
 			}
@@ -637,7 +636,7 @@ module.exports = {
 		});
 	},
 
-	restore_file: function( data )
+	restore_file: function( data, autorestoring )
 	{
 		var ram = this.ram,
 		quetzal = new file.Quetzal( data ),
@@ -696,8 +695,8 @@ module.exports = {
 			this.frameptr = i;
 			this.frames.push( i );
 			// Swap the bytes of the locals and stacks
-			fix_stack_endianness( stack, j = i + 8, j += ( stack.getUint8( i + 3 ) & 0x0F ) * 2 );
-			fix_stack_endianness( stack, j, j += stack.getUint16( i + 6 ) * 2 );
+			fix_stack_endianness( stack, j = i + 8, j += ( stack.getUint8( i + 3 ) & 0x0F ) * 2, autorestoring )
+			fix_stack_endianness( stack, j, j += stack.getUint16( i + 6 ) * 2, autorestoring )
 			i = j;
 		}
 		this.frames.pop();
@@ -775,11 +774,10 @@ module.exports = {
 		});
 	},
 	
-	save_file: function( pc )
+	save_file: function( pc, autosaving )
 	{
 		var memory = this.m,
 		quetzal = new file.Quetzal(),
-		compressed_mem = [],
 		stack = utils.MemoryView( this.stack.buffer.slice() ),
 		frames = this.frames.slice(),
 		zeroes = 0,
@@ -794,29 +792,37 @@ module.exports = {
 		quetzal.pc = pc;
 
 		// Memory chunk
-		quetzal.compressed = 1;
-		for ( i = 0; i < this.staticmem; i++ )
+		if ( autosaving )
 		{
-			abyte = memory.getUint8( i ) ^ this.origram[i];
-			if ( abyte === 0 )
-			{
-				if ( ++zeroes === 256 )
-				{
-					compressed_mem.push( 0, 255 );
-					zeroes = 0;
-				}
-			}
-			else
-			{
-				if ( zeroes )
-				{
-					compressed_mem.push( 0, zeroes - 1 );
-					zeroes = 0;
-				}
-				compressed_mem.push( abyte );
-			}
+			quetzal.memory = this.m.getUint8Array( 0, this.staticmem )
 		}
-		quetzal.memory = compressed_mem;
+		else
+		{
+			const compressed_mem = []
+			quetzal.compressed = 1;
+			for ( i = 0; i < this.staticmem; i++ )
+			{
+				abyte = memory.getUint8( i ) ^ this.origram[i];
+				if ( abyte === 0 )
+				{
+					if ( ++zeroes === 256 )
+					{
+						compressed_mem.push( 0, 255 );
+						zeroes = 0;
+					}
+				}
+				else
+				{
+					if ( zeroes )
+					{
+						compressed_mem.push( 0, zeroes - 1 );
+						zeroes = 0;
+					}
+					compressed_mem.push( abyte );
+				}
+			}
+			quetzal.memory = compressed_mem;
+		}
 
 		// Stacks
 		// Set the current sp
@@ -824,7 +830,7 @@ module.exports = {
 		frames.push( this.frameptr );
 
 		// Swap the bytes of the locals and stacks
-		if ( littleEndian )
+		if ( littleEndian && !autosaving )
 		{
 			for ( i = 0; i < frames.length; i++ )
 			{
