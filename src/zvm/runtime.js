@@ -193,24 +193,29 @@ module.exports = {
 		this.xorshift_seed = snapshot.xorshift_seed
 	},
 
-	do_autosave: function()
+	do_autosave: function( save )
 	{
 		if ( !this.options.Dialog )
 		{
 			throw new Error( 'A reference to Dialog is required' )
 		}
-		const snapshot = {
-			glk: this.Glk.save_allstate(),
-			io: cloneDeep( this.io ),
-			ram: this.save_file( this.pc ),
-			read_data: cloneDeep( this.read_data ),
-			xorshift_seed: this.xorshift_seed,
-		}
-		delete snapshot.io.streams[2].str
-		delete snapshot.io.streams[2].str
-		delete snapshot.read_data.buffer
 
-		this.options.Dialog.autosave_write( this.get_signature(), snapshot )
+		let snapshot = null
+		if ( ( save || 0 ) >= 0 )
+		{
+			snapshot = {
+				glk: this.Glk.save_allstate(),
+				io: cloneDeep( this.io ),
+				ram: this.save_file( this.pc ),
+				read_data: cloneDeep( this.read_data ),
+				xorshift_seed: this.xorshift_seed,
+			}
+			delete snapshot.io.streams[2].str
+			delete snapshot.io.streams[2].str
+			delete snapshot.read_data.buffer
+		}
+
+		this.options.Dialog.autosave_write( this.signature, snapshot )
 	},
 
 	encode_text: function( zscii, length, from, target )

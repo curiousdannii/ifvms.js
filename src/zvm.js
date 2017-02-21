@@ -136,8 +136,8 @@ api = {
 				{
 					this.glk_event.push_field( this.glk_blocking_call );
 				}
-				Glk.update();
 			}
+			Glk.update()
 		}
 		catch ( e )
 		{
@@ -201,8 +201,8 @@ api = {
 				{
 					this.glk_event.push_field( this.glk_blocking_call );
 				}
-				Glk.update();
 			}
+			Glk.update()
 		}
 		catch ( e )
 		{

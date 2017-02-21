@@ -119,7 +119,7 @@ module.exports = {
 				}
 			}
 		}
-		this.set_window( 0 );
+		this.set_window( this.io.currentwin )
 	},
 
 	erase_line: function( value )
