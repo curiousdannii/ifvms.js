@@ -31,7 +31,7 @@
     "yargs": "^6.5.0"
   },
   "devDependencies": {
-    "babili": "0.0.11",
+    "babili": "0.0.12",
     "browserify": "^14.0.0",
     "eslint": "^3.5.0"
   },
