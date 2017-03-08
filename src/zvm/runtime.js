@@ -779,10 +779,9 @@ module.exports = {
 		var memory = this.m,
 		quetzal = new file.Quetzal(),
 		stack = utils.MemoryView( this.stack.buffer.slice() ),
-		frames = this.frames.slice(),
 		zeroes = 0,
 		i, j,
-		frameptr,
+		frameptr = this.frameptr,
 		abyte;
 
 		// IFhd chunk
@@ -827,11 +826,12 @@ module.exports = {
 		// Stacks
 		// Set the current sp
 		stack.setUint16( frameptr + 6, this.sp );
-		frames.push( this.frameptr );
 
 		// Swap the bytes of the locals and stacks
 		if ( littleEndian && !autosaving )
 		{
+			const frames = this.frames.slice()
+			frames.push( frameptr )
 			for ( i = 0; i < frames.length; i++ )
 			{
 				frameptr = frames[i];

@@ -110,6 +110,7 @@ module.exports = {
 		if ( !this.mainwin )
 		{
 			this.mainwin = Glk.glk_window_open( 0, 0, 0, 3, 201 );
+			Glk.glk_set_window( this.mainwin )
 			if ( this.version3 )
 			{
 				this.statuswin = Glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 );
@@ -119,7 +120,6 @@ module.exports = {
 				}
 			}
 		}
-		this.set_window( this.io.currentwin )
 	},
 
 	erase_line: function( value )
