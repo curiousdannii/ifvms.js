@@ -17,12 +17,18 @@ This spreadsheet shows how the Z-Machine formatting is mapped to Glk styles
 
 http://docs.google.com/spreadsheets/d/1Nvwyb_twC3_fPYDrjQu86b3KRAmLFDllIUvPUpMz108
 
-This stylesheet is to be used in addition to a GlkOte stylesheet. The DarkTheme class is for Lectrote's dark theme
+This stylesheet is to be used in addition to a (recent) GlkOte stylesheet, and depends on the theme variables it defines.
 
 */
 
 /* Clear some default GlkOte styles */
-.BufferWindow .Style_header
+.GridWindow
+{
+	background: var(--main-bg-color);
+	color: var(--main-fg-color);
+}
+
+.BufferWindow .Style_header, .BufferWindow .Style_preformatted
 {
 	font-size: inherit;
 	font-weight: normal;
@@ -38,7 +44,17 @@ This stylesheet is to be used in addition to a GlkOte stylesheet. The DarkTheme 
 .BufferWindow .Style_blockquote,
 .Style_user2
 {
-	font-family: "Source Code Pro", Monaco, Courier, monospace;
+	font-family: var(--mono-font);
+}
+
+/* Remove the default line-height */
+.BufferWindow .BufferLine
+{
+	line-height: normal;
+}
+.BufferWindow .BufferLine span:not(.Style_preformatted):not(.Style_header):not(.Style_blockquote):not(.Style_user2)
+{
+	line-height: var(--base-line-height);
 }
 
 /* Italic styles */
@@ -56,22 +72,20 @@ This stylesheet is to be used in addition to a GlkOte stylesheet. The DarkTheme 
 }
 
 /* Reverse */
-.Style_header,
-.Style_note,
-.GridWindow .Style_blockquote,
-.Style_user1,
-.Style_user2
+.BufferWindow .Style_header,
+.BufferWindow .Style_note,
+.BufferWindow .Style_user1,
+.BufferWindow .Style_user2
 {
-	background: #000;
-	color: #fff;
+	background: var(--main-fg-color);
+	color: var(--main-bg-color);
 }
 
-.DarkTheme .Style_header,
-.DarkTheme .Style_note,
-.DarkTheme .GridWindow .Style_blockquote,
-.DarkTheme .Style_user1,
-.DarkTheme .Style_user2
+.GridWindow .Style_header,
+.GridWindow .Style_note,
+.GridWindow .Style_blockquote,
+.GridWindow .Style_user1
 {
-	background: #fff;
-	color: #000;
+	background: var(--grid-bg-color);
+	color: var(--grid-fg-color);
 }
