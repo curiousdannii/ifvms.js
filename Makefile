@@ -20,7 +20,7 @@ clean:
 
 dist/%.js: src/%.js src/common/* src/%/*
 	mkdir -p dist
-	browserify src/$*.js --noparse=clone --standalone $(shell echo $* | tr a-z A-Z) > $@
+	browserify src/$*.js --standalone $(shell echo $* | tr a-z A-Z) > $@
 
 dist/%.min.js: dist/%.js
 	echo '/* $(shell echo $* | tr a-z A-Z) v$(shell jq -r .version -- package.json) https://github.com/curiousdannii/ifvms.js */' > $@

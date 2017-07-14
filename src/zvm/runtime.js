@@ -18,12 +18,32 @@ TODO:
 
 */
 
-const cloneDeep = require( 'clone' )
 const file = require( '../common/file.js' )
 const utils = require( '../common/utils.js' )
 const extend = utils.extend
 const U2S = utils.U2S16
 const S2U = utils.S2U16
+
+// A clone function which ignores the properties we don't want to serialise
+function clone( obj )
+{
+	const recurse = obj => typeof obj === 'object' ? clone( obj ) : obj
+	const newobj = {}
+
+	if ( Array.isArray( obj ) )
+	{
+		return obj.map( recurse )
+	}
+
+	for ( let prop in obj )
+	{
+		if ( prop !== 'buffer' && prop !== 'str' )
+		{
+			newobj[prop] = recurse( obj[prop] )
+		}
+	}
+	return newobj
+}
 
 // Test whether we are running on a littleEndian system
 const littleEndian = (function()
@@ -204,14 +224,11 @@ module.exports = {
 		{
 			snapshot = {
 				glk: this.Glk.save_allstate(),
-				io: cloneDeep( this.io ),
+				io: clone( this.io ),
 				ram: this.save_file( this.pc, 1 ),
-				read_data: cloneDeep( this.read_data ),
+				read_data: clone( this.read_data ),
 				xorshift_seed: this.xorshift_seed,
 			}
-			delete snapshot.io.streams[2].str
-			delete snapshot.io.streams[2].str
-			delete snapshot.read_data.buffer
 		}
 
 		this.options.Dialog.autosave_write( this.signature, snapshot )
@@ -903,12 +920,13 @@ module.exports = {
 	save_undo: function( pc, variable )
 	{
 		// Drop an old undo state if we've reached the limit, but always save at least one state
+		var state
 		if ( this.undo_len > this.options.undo_len )
 		{
-			this.undo.shift();
+			state = this.undo.shift()
+			this.undo_len -= ( state.ram.byteLength + state.stack.byteLength )
 		}
-		this.undo_len += this.staticmem + this.s.byteOffset + this.sp * 2;
-		this.undo.push({
+		state = {
 			frameptr: this.frameptr,
 			frames: this.frames.slice(),
 			pc: pc,
@@ -916,8 +934,10 @@ module.exports = {
 			sp: this.sp,
 			stack: this.stack.getUint8Array( 0, this.s.byteOffset + this.sp * 2 ),
 			var: variable,
-		});
-		return 1;
+		}
+		this.undo_len += ( state.ram.byteLength + state.stack.byteLength )
+		this.undo.push( state )
+		return 1
 	},
 
 	scan_table: function( key, addr, length, form )
