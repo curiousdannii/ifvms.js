@@ -172,11 +172,13 @@ api = {
 				this.handle_line_input( glk_event.get_field( 2 ), glk_event.get_field( 3 ) );
 				run = 1;
 			}
+
 			// Arrange events
 			if ( event_type === 5 )
 			{
-				this.update_width();
+				this.update_screen_size()
 			}
+
 			// glk_fileref_create_by_prompt handler
 			if ( event_type === 'fileref_create_by_prompt' )
 			{

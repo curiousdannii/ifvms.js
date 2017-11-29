@@ -940,8 +940,8 @@ module.exports = {
 		// Reset the Xorshift seed
 		this.xorshift_seed = 0;
 
-		// Update the width - in version 3 does not actually set the header variables
-		this.update_width();
+		// Update the screen size variables - in version 3 does not actually set the header variables
+		this.update_screen_size()
 
 		// For version 3 we only set Flags 1
 		if ( this.version3 )
@@ -964,12 +964,10 @@ module.exports = {
 		// This is really a word, but we only care about the lower byte
 		ram.setUint8( 0x11, ram.getUint8( 0x11 ) & 0x57 );
 		
-		// Screen settings
-		ram.setUint8( 0x20, 255 ); // Infinite height
+		// Font height/width in "units"
 		if ( this.version > 4 )
 		{
-			ram.setUint16( 0x24, 255 );
-			ram.setUint16( 0x26, 0x0101 ); // Font height/width in "units"
+			ram.setUint16( 0x26, 0x0101 )
 		}
 		
 		// Colours
@@ -985,30 +983,62 @@ module.exports = {
 		this.extension_table( 4, 0 );
 	},
 
-	update_width: function()
+	update_screen_size: function()
 	{
-		var Glk = this.Glk,
-		tempwin = Glk.glk_window_open( this.mainwin, 0x12, 0, 4, 204 ),
-		box = new Glk.RefBox(),
-		width;
-		Glk.glk_window_get_size( tempwin || this.mainwin, box );
+		const Glk = this.Glk
+		const height_box = new Glk.RefBox()
+		const width_box = new Glk.RefBox()
+		const tempwin = Glk.glk_window_open( this.mainwin, 0x12, 0, 4, 0 )
+		let height = 0
+		let width = 0
+
+		// The main window is proportional, so its width may not be accurate
+		// If the upper or status window is present, use its width, or else try to make a temp window
+		// The height is the total of all windows
+
+		Glk.glk_window_get_size( this.mainwin, width_box, height_box )
+		height = height_box.get_value()
+
+		if ( this.upperwin )
+		{
+			Glk.glk_window_get_size( this.upperwin, width_box, height_box )
+			height += height_box.get_value()
+		}
+		if ( this.statuswin )
+		{
+			Glk.glk_window_get_size( this.statuswin, width_box, height_box )
+			height += height_box.get_value()
+		}
 		if ( tempwin )
 		{
-			Glk.glk_window_close( tempwin );
+			Glk.glk_window_get_size( tempwin, width_box, 0 )
+			Glk.glk_window_close( tempwin )
 		}
-		// Get the width but limit to a max of 255
-		this.io.width = width = Math.min( box.get_value(), 255 );
+
+		// Use whichever width was available
+		width = width_box.get_value()
+
+		// Cap the dimensions
+		// Height is capped to 254 as 255 means infinite, which breaks some games
+		height = Math.min( height, 254 )
+		width = this.io.width = Math.min( width, 255 )
+
+		// Update the header
 		if ( this.version > 3 )
 		{
-			this.ram.setUint8( 0x21, width );
+			this.ram.setUint8( 0x20, height )
+			this.ram.setUint8( 0x21, width )
 		}
 		if ( this.version > 4 )
 		{
-			this.ram.setUint16( 0x22, width );
+			this.ram.setUint16( 0x22, width )
+			this.ram.setUint16( 0x24, height )
 		}
+
+		// Fix the cursor if it is outside the window
 		if ( this.io.col >= width )
 		{
-			this.io.col = width - 1;
+			this.io.col = width - 1
 		}
 	},
 	
