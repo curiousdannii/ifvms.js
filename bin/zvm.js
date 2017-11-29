@@ -19,9 +19,7 @@ var argv = yargs
 			type: 'boolean',
 		},
 	})
-	.help()
 	.alias( 'h', 'help' )
-	.version()
 	.alias( 'v', 'version' )
 	.argv;
 
