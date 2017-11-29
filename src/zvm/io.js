@@ -710,7 +710,7 @@ module.exports = {
 		}
 
 		// TODO: pre-existing input
-		this.Glk.glk_request_line_event_uni( this.mainwin, buffer, initiallen );
+		this.Glk.glk_request_line_event_uni( this.io.currentwin ? this.upperwin : this.mainwin, buffer, initiallen );
 		this.fix_upper_window();
 	},
 
@@ -738,7 +738,7 @@ module.exports = {
 			storer: storer,
 			time: time,
 		};
-		this.Glk.glk_request_char_event_uni( this.mainwin );
+		this.Glk.glk_request_char_event_uni( this.io.currentwin ? this.upperwin : this.mainwin );
 		this.fix_upper_window();
 	},
 
@@ -766,6 +766,13 @@ module.exports = {
 	set_cursor: function( row, col )
 	{
 		var io = this.io;
+
+		// 8.7.2.3: do nothing if the lower window is selected
+		if ( !io.currentwin )
+		{
+			return
+		}
+
 		if ( row >= io.height )
 		{
 			// Moving the cursor to a row forces the upper window
