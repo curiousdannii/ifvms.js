@@ -12,7 +12,7 @@ CURL = curl -L -s -S
 # Mark which rules are not actually generating files
 .PHONY: all clean lint test
 
-all: lint test
+all: ifvms.zip
 
 clean:
 	rm -rf dist
@@ -25,6 +25,11 @@ dist/%.js: src/%.js src/common/* src/%/*
 dist/%.min.js: dist/%.js
 	echo '/* $(shell echo $* | tr a-z A-Z) v$(shell jq -r .version -- package.json) https://github.com/curiousdannii/ifvms.js */' > $@
 	babili dist/$*.js >> $@
+
+ifvms.zip: dist/zvm.min.js
+	zip -j ifvms.zip \
+	LICENSE README.md package.json \
+	dist/zvm.min.js src/zvm/dispatch.js
 
 lint:
 	eslint --ignore-path .gitignore .
