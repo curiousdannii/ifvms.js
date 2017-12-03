@@ -248,15 +248,15 @@ module.exports = {
 			{
 				zchars.push( 5, temp + 6 );
 			}
-			// 10-bit ZSCII / Unicode table
-			else if ( ( temp = this.reverse_unicode_table[achar] ) )
-			{
-				zchars.push( 5, 6, temp >> 5, temp & 0x1F );
-			}
 			// Pad character
 			else if ( achar === undefined )
 			{
 				zchars.push( 5 );
+			}
+			// 10-bit ZSCII
+			else
+			{
+				zchars.push( 5, 6, achar >> 5, achar & 0x1F )
 			}
 		}
 		zchars.length = word_len;
