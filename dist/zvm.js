@@ -2587,7 +2587,7 @@ TODO:
 	
 	test: function( bitmap, flag )
 	{
-		return bitmap & flag === flag;
+		return ( bitmap & flag ) === flag;
 	},
 	
 	test_attr: function( object, attribute )
@@ -2771,7 +2771,6 @@ TODO:
 		result = [],
 		resulttexts = [],
 		usesabbr,
-		tenbit,
 		unicodecount = 0;
 		
 		// Check if this one's been cached already
@@ -2828,28 +2827,7 @@ TODO:
 				// Check we have enough Z-chars left.
 				if ( i + 1 < buffer.length )
 				{
-					tenbit = buffer[i++] << 5 | buffer[i++];
-					// A regular character
-					if ( tenbit < 768 )
-					{
-						result.push( tenbit );
-					}
-					// 1.1 spec Unicode strings - not the most efficient code, but then noone uses this
-					else
-					{
-						tenbit -= 767;
-						unicodecount += tenbit;
-						temp = i;
-						i = ( i % 3 ) + 3;
-						while ( tenbit-- )
-						{
-							result.push( -1 );
-							resulttexts.push( String.fromCharCode( buffer[i] << 10 | buffer[i + 1] << 5 | buffer[i + 2] ) );
-							// Set those characters so they won't be decoded again
-							buffer[i++] = buffer[i++] = buffer[i++] = 0x20;
-						}
-						i = temp;
-					}
+					result.push( buffer[i++] << 5 | buffer[i++] );
 				}
 			}
 			// Regular characters
@@ -2917,15 +2895,15 @@ TODO:
 			{
 				zchars.push( 5, temp + 6 );
 			}
-			// 10-bit ZSCII / Unicode table
-			else if ( temp = this.reverse_unicode_table[achar] )
-			{
-				zchars.push( 5, 6, temp >> 5, temp & 0x1F );
-			}
 			// Pad character
 			else if ( achar === undefined )
 			{
 				zchars.push( 5 );
+			}
+			// 10-bit ZSCII
+			else
+			{
+				zchars.push( 5, 6, achar >> 5, achar & 0x1F );
 			}
 		}
 		zchars.length = 9;

@@ -156,7 +156,7 @@ TODO:
 				// Check we have enough Z-chars left.
 				if ( i + 1 < buffer.length )
 				{
-					result.push( buffer[i++] << 5 | buffer[i++] )
+					result.push( buffer[i++] << 5 | buffer[i++] );
 				}
 			}
 			// Regular characters
@@ -232,7 +232,7 @@ TODO:
 			// 10-bit ZSCII
 			else
 			{
-				zchars.push( 5, 6, achar >> 5, achar & 0x1F )
+				zchars.push( 5, 6, achar >> 5, achar & 0x1F );
 			}
 		}
 		zchars.length = 9;
