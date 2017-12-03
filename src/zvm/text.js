@@ -101,7 +101,6 @@ module.exports = {
 		result = [],
 		resulttexts = [],
 		usesabbr,
-		tenbit,
 		unicodecount = 0;
 
 		// Check if this one's been cached already
@@ -158,28 +157,7 @@ module.exports = {
 				// Check we have enough Z-chars left.
 				if ( i + 1 < buffer.length )
 				{
-					tenbit = buffer[i++] << 5 | buffer[i++];
-					// A regular character
-					if ( tenbit < 768 )
-					{
-						result.push( tenbit );
-					}
-					// 1.1 spec Unicode strings - not the most efficient code, but then noone uses this
-					else
-					{
-						tenbit -= 767;
-						unicodecount += tenbit;
-						temp = i;
-						i = ( i % 3 ) + 3;
-						while ( tenbit-- )
-						{
-							result.push( -1 );
-							resulttexts.push( String.fromCharCode( buffer[i] << 10 | buffer[i + 1] << 5 | buffer[i + 2] ) );
-							// Set those characters so they won't be decoded again
-							buffer[i++] = buffer[i++] = buffer[i++] = 0x20;
-						}
-						i = temp;
-					}
+					result.push( buffer[i++] << 5 | buffer[i++] )
 				}
 			}
 			// Regular characters
