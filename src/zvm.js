@@ -141,12 +141,8 @@ api = {
 		}
 		catch ( e )
 		{
-			if ( e instanceof Error )
-			{
-				e.message = 'ZVM start: ' + e.message;
-			}
 			Glk.fatal_error( e );
-			throw e;
+			console.log( e );
 		}
 	},
 
@@ -208,12 +204,8 @@ api = {
 		}
 		catch ( e )
 		{
-			if ( e instanceof Error )
-			{
-				e.message = 'ZVM: ' + e.message;
-			}
 			Glk.fatal_error( e );
-			throw e;
+			console.log( e );
 		}
 	},
 	
