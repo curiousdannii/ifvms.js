@@ -37,6 +37,8 @@ rules:
     - unix
   no-cond-assign:
     - off
+  no-console:
+    - off
   no-constant-condition:
     - off
   quotes:
