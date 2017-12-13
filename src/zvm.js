@@ -25,15 +25,36 @@ Any other non-standard behaviour should be considered a bug
 
 'use strict';
 
-var utils = require( './common/utils.js' ),
-file = require( './common/file.js' ),
+const utils = require( './common/utils.js' )
+const file = require( './common/file.js' )
 
-default_options = {
+const default_options = {
 	stack_len: 100 * 1000,
 	undo_len: 1000 * 1000,
-},
+}
 
-api = {
+// A clone function which ignores the properties we don't want to serialise
+function clone( obj )
+{
+	const recurse = obj => typeof obj === 'object' ? clone( obj ) : obj
+	const newobj = {}
+
+	if ( Array.isArray( obj ) )
+	{
+		return obj.map( recurse )
+	}
+
+	for ( let prop in obj )
+	{
+		if ( prop !== 'buffer' && prop !== 'str' )
+		{
+			newobj[prop] = recurse( obj[prop] )
+		}
+	}
+	return newobj
+}
+
+const api = {
 
 	init: function()
 	{
@@ -53,209 +74,176 @@ api = {
 		}
 		this.Glk = options.Glk;
 		this.data = storydata;
-		this.options = utils.extend( {}, default_options, options );
+		this.options = Object.assign( {}, default_options, options )
 	},
 
-	start: function()
+	start: async function()
 	{
-		var Glk = this.Glk,
-		data;
-		try
+		const Glk = this.Glk
+
+		// Identify the format and version number of the data file we were given
+		const data = file.identify( this.data )
+		delete this.data
+		if ( !data || data.format !== 'ZCOD' )
 		{
-			// Identify the format and version number of the data file we were given
-			data = file.identify( this.data );
-			delete this.data;
-			if ( !data || data.format !== 'ZCOD' )
-			{
-				throw new Error( 'This is not a Z-Code file' );
-			}
-			if ( [ 3, 4, 5, 8 ].indexOf( data.version ) < 0 )
-			{
-				throw new Error( 'Unsupported Z-Machine version: ' + data.version );
-			}
-			
-			// Load the storyfile we are given into our MemoryView (an enhanced DataView)
-			this.m = utils.MemoryView( data.data );
-			
-			// Make a seperate MemoryView for the ram, and store the original ram
-			this.staticmem = this.m.getUint16( 0x0E );
-			this.ram = utils.MemoryView( this.m.buffer, 0, this.staticmem );
-			this.origram = this.m.getUint8Array( 0, this.staticmem );
+			throw new Error( 'This is not a Z-Code file' )
+		}
+		if ( [ 3, 4, 5, 8 ].indexOf( data.version ) < 0 )
+		{
+			throw new Error( 'Unsupported Z-Machine version: ' + data.version )
+		}
 
-			// Cache the game signature
-			let signature = ''
-			let i = 0
-			while ( i < 0x1E )
-			{
-				signature += ( this.origram[i] < 0x10 ? '0' : '' ) + this.origram[i++].toString( 16 )
-			}
-			this.signature = signature
+		// Load the storyfile we are given into our MemoryView (an enhanced DataView)
+		this.m = utils.MemoryView( data.data )
 
-			// Handle loading and clearing autosaves
-			let autorestored
-			const Dialog = this.options.Dialog
-			if ( Dialog )
+		// Make a seperate MemoryView for the ram, and store the original ram
+		this.staticmem = this.m.getUint16( 0x0E )
+		this.ram = utils.MemoryView( this.m.buffer, 0, this.staticmem )
+		this.origram = this.m.getUint8Array( 0, this.staticmem )
+
+		// Cache the game signature
+		let signature = ''
+		let i = 0
+		while ( i < 0x1E )
+		{
+			signature += ( this.origram[i] < 0x10 ? '0' : '' ) + this.origram[i++].toString( 16 )
+		}
+		this.signature = signature
+
+		// Handle loading and clearing autosaves
+		let autorestored
+		const Dialog = this.options.Dialog
+		if ( Dialog )
+		{
+			if ( this.options.clear_vm_autosave )
 			{
-				if ( this.options.clear_vm_autosave )
+				Dialog.autosave_write( signature, null )
+			}
+			else if ( this.options.do_vm_autosave )
+			{
+				try
 				{
+					const snapshot = Dialog.autosave_read( signature )
+					if ( snapshot )
+					{
+						await this.do_autorestore( snapshot )
+						autorestored = 1
+					}
+				}
+				catch (ex)
+				{
+					this.log( 'Autorestore failed, deleting it' )
 					Dialog.autosave_write( signature, null )
 				}
-				else if ( this.options.do_vm_autosave )
-				{
-					try
-					{
-						const snapshot = Dialog.autosave_read( signature )
-						if ( snapshot )
-						{
-							this.do_autorestore( snapshot )
-							autorestored = 1
-						}
-					}
-					catch (ex)
-					{
-						this.log( 'Autorestore failed, deleting it' )
-						Dialog.autosave_write( signature, null )
-					}
-				}
 			}
+		}
 
-			// Initiate the engine, run, and wait for our first Glk event
-			if ( !autorestored )
-			{
-				this.restart();
-				this.run();
-			}
-			if ( !this.quit )
-			{
-				this.glk_event = new Glk.RefStruct();
-				if ( !this.glk_blocking_call )
-				{
-					Glk.glk_select( this.glk_event );
-				}
-				else
-				{
-					this.glk_event.push_field( this.glk_blocking_call );
-				}
-			}
-			Glk.update()
-		}
-		catch ( e )
+		// Initiate the engine, run, and wait for our first Glk event
+		if ( !autorestored )
 		{
-			Glk.fatal_error( e );
-			console.log( e );
+			await this.restart()
+			this.run()
 		}
+		if ( !this.quit )
+		{
+			this.glk_event = new Glk.RefStruct()
+			if ( !this.glk_blocking_call )
+			{
+				await Glk.glk_select( this.glk_event )
+			}
+			else
+			{
+				this.glk_event.push_field( this.glk_blocking_call )
+			}
+		}
+		await Glk.update()
 	},
 
-	resume: function( resumearg )
+	resume: async function( resumearg )
 	{
 		var Glk = this.Glk,
 		glk_event = this.glk_event,
 		event_type,
 		run;
 		
-		try
+		event_type = glk_event.get_field( 0 );
+		
+		// Process the event
+		if ( event_type === 2 )
 		{
-			event_type = glk_event.get_field( 0 );
-			
-			// Process the event
-			if ( event_type === 2 )
-			{
-				this.handle_char_input( glk_event.get_field( 2 ) );
-				run = 1;
-			}
-			if ( event_type === 3 )
-			{
-				this.handle_line_input( glk_event.get_field( 2 ), glk_event.get_field( 3 ) );
-				run = 1;
-			}
-
-			// Arrange events
-			if ( event_type === 5 )
-			{
-				this.update_screen_size()
-			}
-
-			// glk_fileref_create_by_prompt handler
-			if ( event_type === 'fileref_create_by_prompt' )
-			{
-				run = this.handle_create_fileref( resumearg );
-			}
-			
-			this.glk_blocking_call = null;
-			if ( run )
-			{
-				this.run();
-			}
-			
-			// Wait for another event
-			if ( !this.quit )
-			{
-				this.glk_event = new Glk.RefStruct();
-				if ( !this.glk_blocking_call )
-				{
-					Glk.glk_select( this.glk_event );
-				}
-				else
-				{
-					this.glk_event.push_field( this.glk_blocking_call );
-				}
-			}
-			Glk.update()
+			this.handle_char_input( glk_event.get_field( 2 ) );
+			run = 1;
 		}
-		catch ( e )
+		if ( event_type === 3 )
 		{
-			Glk.fatal_error( e );
-			console.log( e );
+			this.handle_line_input( glk_event.get_field( 2 ), glk_event.get_field( 3 ) );
+			run = 1;
 		}
+
+		// Arrange events
+		if ( event_type === 5 )
+		{
+			await this.update_screen_size()
+		}
+
+		// glk_fileref_create_by_prompt handler
+		if ( event_type === 'fileref_create_by_prompt' )
+		{
+			run = this.handle_create_fileref( resumearg );
+		}
+		
+		this.glk_blocking_call = null;
+		if ( run )
+		{
+			this.run();
+		}
+		
+		// Wait for another event
+		if ( !this.quit )
+		{
+			this.glk_event = new Glk.RefStruct();
+			if ( !this.glk_blocking_call )
+			{
+				Glk.glk_select( this.glk_event );
+			}
+			else
+			{
+				this.glk_event.push_field( this.glk_blocking_call );
+			}
+		}
+		Glk.update()
 	},
-	
+
+	do_autosave: async function( save )
+	{
+		if ( !this.options.Dialog )
+		{
+			throw new Error( 'A reference to Dialog is required' )
+		}
+
+		let snapshot = null
+		if ( ( save || 0 ) >= 0 )
+		{
+			snapshot = {
+				glk: await this.Glk.save_allstate(),
+				io: clone( this.io ),
+				ram: this.save_file( this.pc, 1 ),
+				read_data: clone( this.read_data ),
+				xorshift_seed: this.xorshift_seed,
+			}
+		}
+
+		await this.options.Dialog.autosave_write( this.signature, snapshot )
+	},
+
 	get_signature: function()
 	{
 		return this.signature
 	},
 
-	// Run
-	run: function()
-	{
-		var pc,
-		result;
+}
 
-		// Stop when ordered to
-		this.stop = 0;
-		while ( !this.stop )
-		{
-			pc = this.pc;
-			if ( !this.jit[pc] )
-			{
-				this.compile();
-			}
-			result = this.jit[pc]( this );
-
-			// Return from a VM func if the JIT function returned a result
-			if ( !isNaN( result ) )
-			{
-				this.ret( result );
-			}
-		}
-	},
-
-	// Compile a JIT routine
-	compile: function()
-	{
-		var context = this.disassemble();
-		
-		// Compile the routine with new Function()
-		this.jit[context.pc] = new Function( 'e', '' + context );
-
-		if ( context.pc < this.staticmem )
-		{
-			this.log( 'Caching a JIT function in dynamic memory: ' + context.pc );
-		}
-	},
-
-},
-
-VM = utils.Class.subClass( utils.extend(
+const VM = utils.Class.subClass( Object.assign(
 	api,
 	require( './zvm/runtime.js' ),
 	require( './zvm/text.js' ),

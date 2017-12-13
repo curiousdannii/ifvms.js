@@ -24,26 +24,8 @@ const extend = utils.extend
 const U2S = utils.U2S16
 const S2U = utils.S2U16
 
-// A clone function which ignores the properties we don't want to serialise
-function clone( obj )
-{
-	const recurse = obj => typeof obj === 'object' ? clone( obj ) : obj
-	const newobj = {}
-
-	if ( Array.isArray( obj ) )
-	{
-		return obj.map( recurse )
-	}
-
-	for ( let prop in obj )
-	{
-		if ( prop !== 'buffer' && prop !== 'str' )
-		{
-			newobj[prop] = recurse( obj[prop] )
-		}
-	}
-	return newobj
-}
+// eslint-disable-next-line brace-style
+const AsyncFunction = Object.getPrototypeOf( async function() {} ).constructor
 
 // Test whether we are running on a littleEndian system
 const littleEndian = (function()
@@ -129,6 +111,20 @@ module.exports = {
 		this.ram.setUint8( addr, this.m.getUint8( addr ) & ~( 0x80 >> attribute % 8 ) );
 	},
 
+	// Compile a JIT routine
+	compile: function()
+	{
+		const context = this.disassemble()
+		
+		// Compile the routine with new AsyncFunction() as it could call async Glk functions
+		this.jit[context.pc] = new AsyncFunction( 'e', '' + context )
+
+		if ( context.pc < this.staticmem )
+		{
+			this.log( 'Caching a JIT function in dynamic memory: ' + context.pc )
+		}
+	},
+
 	copy_table: function( first, second, size )
 	{
 		size = U2S( size );
@@ -160,12 +156,12 @@ module.exports = {
 		}
 	},
 
-	do_autorestore: function( snapshot )
+	do_autorestore: async function( snapshot )
 	{
 		const Glk = this.Glk
 
 		// Restore Glk
-		Glk.restore_allstate( snapshot.glk )
+		await Glk.restore_allstate( snapshot.glk )
 
 		// Get references to our Glk objects
 		this.io = snapshot.io
@@ -205,33 +201,11 @@ module.exports = {
 
 		// Restart and restore the RAM and stacks
 		this.restart()
-		this.restore_file( new Uint8Array( snapshot.ram ), 1 )
+		await this.restore_file( new Uint8Array( snapshot.ram ), 1 )
 
 		// Set remaining data from the snapshot
 		this.read_data = snapshot.read_data
 		this.xorshift_seed = snapshot.xorshift_seed
-	},
-
-	do_autosave: function( save )
-	{
-		if ( !this.options.Dialog )
-		{
-			throw new Error( 'A reference to Dialog is required' )
-		}
-
-		let snapshot = null
-		if ( ( save || 0 ) >= 0 )
-		{
-			snapshot = {
-				glk: this.Glk.save_allstate(),
-				io: clone( this.io ),
-				ram: this.save_file( this.pc, 1 ),
-				read_data: clone( this.read_data ),
-				xorshift_seed: this.xorshift_seed,
-			}
-		}
-
-		this.options.Dialog.autosave_write( this.signature, snapshot )
 	},
 
 	encode_text: function( zscii, length, from, target )
@@ -586,7 +560,7 @@ module.exports = {
 	},
 
 	// (Re)start the VM
-	restart: function()
+	restart: async function()
 	{
 		var ram = this.ram,
 		version = ram.getUint8( 0x00 ),
@@ -636,14 +610,14 @@ module.exports = {
 		});
 
 		this.init_text();
-		this.init_io();
+		await this.init_io()
 
 		// Update the header
-		this.update_header();
+		await this.update_header()
 	},
 
 	// Request a restore
-	restore: function( pc )
+	restore: async function( pc )
 	{
 		this.pc = pc;
 		this.fileref_create_by_prompt({
@@ -653,7 +627,7 @@ module.exports = {
 		});
 	},
 
-	restore_file: function( data, autorestoring )
+	restore_file: async function( data, autorestoring )
 	{
 		var ram = this.ram,
 		quetzal = new file.Quetzal( data ),
@@ -726,7 +700,7 @@ module.exports = {
 		// Collapse the upper window (8.6.1.3)
 		if ( this.version3 )
 		{
-			this.split_window( 0 );
+			await this.split_window( 0 )
 		}
 
 		return 2;
@@ -780,10 +754,32 @@ module.exports = {
 		}
 	},
 
-	// pc is the address of the storer operand (or branch in v3)
-	save: function( pc )
+	// Run
+	run: async function()
 	{
-		this.pc = pc;
+		// Stop when ordered to
+		this.stop = 0
+		while ( !this.stop )
+		{
+			const pc = this.pc
+			if ( !this.jit[pc] )
+			{
+				this.compile()
+			}
+			const result = await this.jit[pc]( this )
+
+			// Return from a VM func if the JIT function returned a result
+			if ( !isNaN( result ) )
+			{
+				this.ret( result )
+			}
+		}
+	},
+
+	// pc is the address of the storer operand (or branch in v3)
+	save: async function( pc )
+	{
+		this.pc = pc
 		this.fileref_create_by_prompt({
 			func: 'save',
 			mode: 0x01,
@@ -861,7 +857,7 @@ module.exports = {
 		return quetzal.write();
 	},
 	
-	save_restore_handler: function( str )
+	save_restore_handler: async function( str )
 	{
 		var memory = this.m,
 		Glk = this.Glk,
@@ -882,9 +878,9 @@ module.exports = {
 			{
 				buffer = new Uint8Array( 128 * 1024 );
 				Glk.glk_get_buffer_stream( str, buffer );
-				result = this.restore_file( buffer.buffer );
+				result = await this.restore_file( buffer.buffer )
 			}
-			Glk.glk_stream_close( str );
+			await Glk.glk_stream_close( str )
 		}
 		
 		// Store the result / branch in z3

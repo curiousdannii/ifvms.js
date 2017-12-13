@@ -72,7 +72,7 @@ style_mappings = [
 
 module.exports = {
 
-	init_io: function()
+	init_io: async function()
 	{
 		var Glk = this.Glk;
 
@@ -109,11 +109,11 @@ module.exports = {
 		// Construct the windows if they do not already exist
 		if ( !this.mainwin )
 		{
-			this.mainwin = Glk.glk_window_open( 0, 0, 0, 3, 201 );
+			this.mainwin = await Glk.glk_window_open( 0, 0, 0, 3, 201 )
 			Glk.glk_set_window( this.mainwin )
 			if ( this.version3 )
 			{
-				this.statuswin = Glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 );
+				this.statuswin = await Glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 )
 				if ( this.statuswin )
 				{
 					Glk.glk_set_style_stream( Glk.glk_window_get_stream( this.statuswin ), style_mappings[1][ 0x08 ] );
@@ -122,7 +122,7 @@ module.exports = {
 		}
 	},
 
-	erase_line: function( value )
+	erase_line: async function( value )
 	{
 		if ( value === 1 )
 		{
@@ -130,11 +130,11 @@ module.exports = {
 			row = io.row,
 			col = io.col;
 			this._print( Array( io.width - io.col + 1 ).join( ' ' ) );
-			this.set_cursor( row, col );
+			await this.set_cursor( row, col )
 		}
 	},
 
-	erase_window: function( window )
+	erase_window: async function( window )
 	{
 		if ( window < 1 )
 		{
@@ -145,12 +145,12 @@ module.exports = {
 			if ( this.upperwin )
 			{
 				this.Glk.glk_window_clear( this.upperwin );
-				this.set_cursor( 0, 0 );
+				await this.set_cursor( 0, 0 )
 			}
 		}
 		if ( window === -1 )
 		{
-			this.split_window( 0 );
+			await this.split_window( 0 )
 		}
 	},
 
@@ -166,7 +166,7 @@ module.exports = {
 	},
 
 	// Fix the upper window height before an input event
-	fix_upper_window: function()
+	fix_upper_window: async function()
 	{
 		var Glk = this.Glk,
 		io = this.io;
@@ -180,12 +180,12 @@ module.exports = {
 		{
 			if ( io.maxheight === 0 )
 			{
-				Glk.glk_window_close( this.upperwin );
+				await Glk.glk_window_close( this.upperwin )
 				this.upperwin = null;
 			}
 			else
 			{
-				Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, io.maxheight, null );
+				await Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, io.maxheight, null )
 			}
 		}
 		io.seenheight = io.maxheight;
@@ -659,7 +659,7 @@ module.exports = {
 	},
 
 	// Request line input
-	read: function( storer, text, parse, time, routine )
+	read: async function( storer, text, parse, time, routine )
 	{
 		var len = this.m.getUint8( text ),
 		initiallen = 0,
@@ -711,11 +711,11 @@ module.exports = {
 
 		// TODO: pre-existing input
 		this.Glk.glk_request_line_event_uni( this.io.currentwin ? this.upperwin : this.mainwin, buffer, initiallen );
-		this.fix_upper_window();
+		await this.fix_upper_window()
 	},
 
 	// Request character input
-	read_char: function( storer, one, time, routine )
+	read_char: async function( storer, one, time, routine )
 	{
 		// Input stream 1
 		if ( this.io.streams[0] )
@@ -739,7 +739,7 @@ module.exports = {
 			time: time,
 		};
 		this.Glk.glk_request_char_event_uni( this.io.currentwin ? this.upperwin : this.mainwin );
-		this.fix_upper_window();
+		await this.fix_upper_window()
 	},
 
 	set_colour: function( /*foreground, background*/ )
@@ -763,7 +763,7 @@ module.exports = {
 	},
 
 	// Note that row and col must be decremented in JIT code
-	set_cursor: function( row, col )
+	set_cursor: async function( row, col )
 	{
 		var io = this.io;
 
@@ -777,7 +777,7 @@ module.exports = {
 		{
 			// Moving the cursor to a row forces the upper window
 			// to open enough for that line to exist
-			this.split_window( row + 1 );
+			await this.split_window( row + 1 )
 		}
 		if ( this.upperwin && row >= 0 && col >= 0 && col < io.width )
 		{
@@ -871,7 +871,7 @@ module.exports = {
 		}*/
 	},
 
-	set_window: function( window )
+	set_window: async function( window )
 	{
 		this.io.currentwin = window;
 		
@@ -879,14 +879,14 @@ module.exports = {
 		// it also opens the upper window if it's not open
 		if ( window )
 		{
-			this.set_cursor( 0, 0 );
+			await this.set_cursor( 0, 0 )
 		}
 
 		this.Glk.glk_set_window( this.upperwin && window ? this.upperwin : this.mainwin );
 		this.format();
 	},
 
-	split_window: function( lines )
+	split_window: async function( lines )
 	{
 		var Glk = this.Glk,
 		io = this.io,
@@ -916,11 +916,11 @@ module.exports = {
 			// Create the window if it doesn't exist
 			if ( !this.upperwin )
 			{
-				this.upperwin = Glk.glk_window_open( this.mainwin, 0x12, io.maxheight, 4, 203 );
+				this.upperwin = await Glk.glk_window_open( this.mainwin, 0x12, io.maxheight, 4, 203 )
 			}
 			else
 			{
-				Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, io.maxheight, null );
+				await Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, io.maxheight, null )
 			}
 		}
 
@@ -929,7 +929,7 @@ module.exports = {
 			// Reset the cursor if it is now outside the window
 			if ( io.row >= lines )
 			{
-				this.set_cursor( 0, 0 );
+				await this.set_cursor( 0, 0 )
 			}
 			// 8.6.1.1.2: In version three the upper window is always cleared
 			if ( this.version3 )
@@ -940,7 +940,7 @@ module.exports = {
 	},
 
 	// Update the header after restarting or restoring
-	update_header: function()
+	update_header: async function()
 	{
 		var ram = this.ram;
 
@@ -948,7 +948,7 @@ module.exports = {
 		this.xorshift_seed = 0;
 
 		// Update the screen size variables - in version 3 does not actually set the header variables
-		this.update_screen_size()
+		await this.update_screen_size()
 
 		// For version 3 we only set Flags 1
 		if ( this.version3 )
@@ -990,12 +990,12 @@ module.exports = {
 		this.extension_table( 4, 0 );
 	},
 
-	update_screen_size: function()
+	update_screen_size: async function()
 	{
 		const Glk = this.Glk
 		const height_box = new Glk.RefBox()
 		const width_box = new Glk.RefBox()
-		const tempwin = Glk.glk_window_open( this.mainwin, 0x12, 0, 4, 0 )
+		const tempwin = await Glk.glk_window_open( this.mainwin, 0x12, 0, 4, 0 )
 		let height = 0
 		let width = 0
 
@@ -1003,22 +1003,22 @@ module.exports = {
 		// If the upper or status window is present, use its width, or else try to make a temp window
 		// The height is the total of all windows
 
-		Glk.glk_window_get_size( this.mainwin, width_box, height_box )
+		await Glk.glk_window_get_size( this.mainwin, width_box, height_box )
 		height = height_box.get_value()
 
 		if ( this.upperwin )
 		{
-			Glk.glk_window_get_size( this.upperwin, width_box, height_box )
+			await Glk.glk_window_get_size( this.upperwin, width_box, height_box )
 			height += height_box.get_value()
 		}
 		if ( this.statuswin )
 		{
-			Glk.glk_window_get_size( this.statuswin, width_box, height_box )
+			await Glk.glk_window_get_size( this.statuswin, width_box, height_box )
 			height += height_box.get_value()
 		}
 		if ( tempwin )
 		{
-			Glk.glk_window_get_size( tempwin, width_box, 0 )
+			await Glk.glk_window_get_size( tempwin, width_box, 0 )
 			Glk.glk_window_close( tempwin )
 		}
 
