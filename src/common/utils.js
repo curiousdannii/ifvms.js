@@ -59,7 +59,8 @@ function MemoryView( buffer, byteOffset, byteLength )
 	// Typed arrays
 	if ( buffer.buffer )
 	{
-		buffer = buffer.buffer;
+		// Note that typed array may not span the entire undelying buffer.
+		buffer = buffer.buffer.slice( /* start */ buffer.byteOffset, /* end */ ( buffer.byteOffset + buffer.byteLength ) );
 	}
 	
 	return extend( new DataView( buffer, byteOffset, byteLength ), {
