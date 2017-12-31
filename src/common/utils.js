@@ -50,27 +50,45 @@ Class.subClass = function( props )
 
 // An enhanced DataView
 // Accepts an ArrayBuffer, typed array, or a length number
-function MemoryView( buffer, byteOffset, byteLength )
+function MemoryView( buffer, byteOffset = 0, byteLength )
 {
-	if ( typeof buffer === 'number' )
+	if ( typeof buffer === 'number' )			// number
 	{
 		buffer = new ArrayBuffer( buffer );
-	}
-	// Typed arrays
-	if ( buffer.buffer )
+	}	
+	else if ( buffer.buffer )					// TypedArray
 	{
-		// Note that typed array may not span the entire undelying buffer.
-		buffer = buffer.buffer.slice( /* start */ buffer.byteOffset, /* end */ ( buffer.byteOffset + buffer.byteLength ) );
+		// Note that a typed array is a view over a potentially larger array buffer.  Before
+		// extracting the underlying buffer, map the given 'byteLength' and byteOffset' to
+		// the underlying array buffer from which we will construct the DataView.
+
+		// A specified 'byteLength' does not need to be adjusted, but if no byteLength was
+		// given, we need to ensure that the resulting MemoryView does not extend past the
+		// end of the typed array (see above).
+		if ( byteLength === undefined )
+		{
+			byteLength = buffer.byteLength - byteOffset;
+		}
+
+		// Map the 'byteOffset' specified relative to the typed array to the same location
+		// in the underlying array buffer.
+		byteOffset += buffer.byteOffset;
+
+		// Finally, extract the underlying array buffer.
+		buffer = buffer.buffer;
 	}
+	// Else already an ArrayBuffer.  No adjustments to 'byteOffset'/'byteLength' necessary.
 	
 	return extend( new DataView( buffer, byteOffset, byteLength ), {
 		getUint8Array: function( start, length )
 		{
+			start += this.byteOffset;
 			return new Uint8Array( this.buffer.slice( start, start + length ) );
 		},
 		getUint16Array: function( start, length )
 		{
 			// We cannot simply return a Uint16Array as most systems are little-endian
+			start += this.byteOffset;
 			return Uint8toUint16Array( new Uint8Array( this.buffer, start, length * 2 ) );
 		},
 		setUint8Array: function( start, data )
@@ -79,7 +97,7 @@ function MemoryView( buffer, byteOffset, byteLength )
 			{
 				data = new Uint8Array( data );
 			}
-			( new Uint8Array( this.buffer ) ).set( data, start );
+			( new Uint8Array( this.buffer, this.byteOffset, this.byteLength ) ).set( data, start );
 		},
 		//setBuffer16 NOTE: if we implement this we cannot simply set a Uint16Array as most systems are little-endian
 		

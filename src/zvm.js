@@ -79,7 +79,7 @@ api = {
 			
 			// Make a seperate MemoryView for the ram, and store the original ram
 			this.staticmem = this.m.getUint16( 0x0E );
-			this.ram = utils.MemoryView( this.m.buffer, 0, this.staticmem );
+			this.ram = utils.MemoryView( this.m.buffer, this.m.byteOffset, this.staticmem );
 			this.origram = this.m.getUint8Array( 0, this.staticmem );
 
 			// Cache the game signature
