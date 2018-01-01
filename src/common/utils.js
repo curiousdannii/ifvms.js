@@ -49,29 +49,34 @@ Class.subClass = function( props )
 };
 
 // An enhanced DataView
-// Accepts an ArrayBuffer, typed array, or a length number
-function MemoryView( buffer, byteOffset = 0, byteLength )
+// Accepts an ArrayBuffer, another view (MemoryView / DataView / TypedArray), or a length number
+function MemoryView( buffer, byteOffset, byteLength )
 {
 	if ( typeof buffer === 'number' )			// number
 	{
 		buffer = new ArrayBuffer( buffer );
 	}	
-	else if ( buffer.buffer )					// TypedArray
+	else if ( buffer.buffer )					// MemoryView / DataView / TypedArray
 	{
-		// Note that a typed array is a view over a potentially larger array buffer.  Before
-		// extracting the underlying buffer, map the given 'byteLength' and byteOffset' to
-		// the underlying array buffer from which we will construct the DataView.
+		// If unspecified, byteOffset defaults at the beginning of the given view.  Note
+		// that We will adjust 'byteOffset' after using the initial value to calculate
+		// the default byteLength below.
+		byteOffset |= 0;
+
+		// A view may be a subset of a potentially larger array buffer.  Before extracting
+		// the underlying buffer, map the given 'byteLength' and byteOffset' to the underlying
+		// array buffer from which we will construct the DataView.
 
 		// A specified 'byteLength' does not need to be adjusted, but if no byteLength was
 		// given, we need to ensure that the resulting MemoryView does not extend past the
 		// end of the typed array (see above).
-		if ( byteLength === undefined )
+		if ( typeof byteLength === 'undefined' )
 		{
 			byteLength = buffer.byteLength - byteOffset;
 		}
 
-		// Map the 'byteOffset' specified relative to the typed array to the same location
-		// in the underlying array buffer.
+		// Map the 'byteOffset', which is currently relative to the typed array, to the same
+		// location in the underlying array buffer.
 		byteOffset += buffer.byteOffset;
 
 		// Finally, extract the underlying array buffer.
@@ -82,13 +87,19 @@ function MemoryView( buffer, byteOffset = 0, byteLength )
 	return extend( new DataView( buffer, byteOffset, byteLength ), {
 		getUint8Array: function( start, length )
 		{
+			// Note that start/length are non-optional, so we only need to adjust the start to
+			// the byteOffset of the view.  (See MemoryView ctor comments.)
 			start += this.byteOffset;
+
 			return new Uint8Array( this.buffer.slice( start, start + length ) );
 		},
 		getUint16Array: function( start, length )
 		{
-			// We cannot simply return a Uint16Array as most systems are little-endian
+			// Note that start/length are non-optional, so we only need to adjust the start to
+			// the byteOffset of the view.  (See MemoryView ctor comments.)
 			start += this.byteOffset;
+
+			// We cannot simply return a Uint16Array as most systems are little-endian
 			return Uint8toUint16Array( new Uint8Array( this.buffer, start, length * 2 ) );
 		},
 		setUint8Array: function( start, data )
