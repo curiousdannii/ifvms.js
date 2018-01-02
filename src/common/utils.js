@@ -52,11 +52,14 @@ Class.subClass = function( props )
 // Accepts an ArrayBuffer, another view (MemoryView / DataView / TypedArray), or a length number
 function MemoryView( buffer, byteOffset, byteLength )
 {
-	if ( typeof buffer === 'number' )			// number
+	// Length number
+	if ( typeof buffer === 'number' )
 	{
 		buffer = new ArrayBuffer( buffer );
-	}	
-	else if ( buffer.buffer )					// MemoryView / DataView / TypedArray
+	}
+
+	// MemoryView / DataView / TypedArray
+	else if ( buffer.buffer )
 	{
 		// If unspecified, byteOffset defaults at the beginning of the given view.  Note
 		// that We will adjust 'byteOffset' after using the initial value to calculate
@@ -82,7 +85,7 @@ function MemoryView( buffer, byteOffset, byteLength )
 		// Finally, extract the underlying array buffer.
 		buffer = buffer.buffer;
 	}
-	// Else already an ArrayBuffer.  No adjustments to 'byteOffset'/'byteLength' necessary.
+	// Else already an ArrayBuffer. No adjustments to 'byteOffset'/'byteLength' necessary.
 	
 	return extend( new DataView( buffer, byteOffset, byteLength ), {
 		getUint8Array: function( start, length )
