@@ -79,8 +79,6 @@ const api = {
 
     start: async function()
     {
-        const Glk = this.Glk
-
         // Identify the format and version number of the data file we were given
         const data = file.identify( this.data )
         delete this.data

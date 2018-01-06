@@ -780,8 +780,6 @@ module.exports = {
     // Run and handle Glk events
     run: async function()
     {
-        const Glk = this.Glk
-
         // Stop when ordered to
         //this.stop = 0
         while ( !this.quit )

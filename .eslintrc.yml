@@ -27,7 +27,7 @@ rules:
     -
       null: ignore
   indent:
-    - error
+    - off
     - tab
     -
       SwitchCase: 1

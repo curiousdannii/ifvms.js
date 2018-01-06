@@ -599,7 +599,7 @@ module.exports = {
 	},
 
     // Request and handle line input
-    read: async function( storer, textbuf_addr, parsebuf_addr, time, routine )
+    read: async function( storer, textbuf_addr, parsebuf_addr /*, time, routine */ )
     {
         const Glk = this.Glk
         let initiallen = 0
