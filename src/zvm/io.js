@@ -3,7 +3,7 @@
 Z-Machine IO
 ============
 
-Copyright (c) 2017 The ifvms.js team
+Copyright (c) 2018 The ifvms.js team
 MIT licenced
 https://github.com/curiousdannii/ifvms.js
 
@@ -255,66 +255,6 @@ module.exports = {
 
 		// Signal to resume() to call run() if required
 		return data.run;
-	},
-
-	// Handle line input
-	handle_line_input: function( len, terminator )
-	{
-		var ram = this.ram,
-		options = this.read_data,
-		streams = this.io.streams,
-		
-		// Cut the response to len, convert to a lower case string, and then to a ZSCII array
-		command = String.fromCharCode.apply( null, options.buffer.slice( 0, len ) ) + '\n',
-		response = this.text_to_zscii( command.slice( 0, -1 ).toLowerCase() );
-		
-		// 7.1.1.1: The response must be echoed, Glk will handle this
-		
-		// But we do have to echo to the transcripts
-		if ( streams[2].mode === 1 )
-		{
-			streams[2].cache += command;
-		}
-		if ( streams[2].mode === 2 )
-		{
-			this.Glk.glk_put_jstring_stream( streams[2].str, command );
-		}
-		
-		if ( streams[4].mode === 1 )
-		{
-			streams[4].cache += command;
-		}
-		if ( streams[4].mode === 2 )
-		{
-			this.Glk.glk_put_jstring_stream( streams[4].str, command );
-		}
-
-		// Store the response
-		if ( this.version < 5 )
-		{
-			// Append zero terminator
-			response.push( 0 );
-
-			// Store the response in the buffer
-			ram.setUint8Array( options.bufaddr + 1, response );
-		}
-		else
-		{
-			// Store the response length
-			ram.setUint8( options.bufaddr + 1, len );
-
-			// Store the response in the buffer
-			ram.setUint8Array( options.bufaddr + 2, response );
-
-			// Store the terminator
-			this.variable( options.storer, isNaN( terminator ) ? 13 : terminator );
-		}
-
-		if ( options.parseaddr )
-		{
-			// Tokenise the response
-			this.tokenise( options.bufaddr, options.parseaddr );
-		}
 	},
 
 	input_stream: function( stream )
@@ -658,61 +598,115 @@ module.exports = {
 		});*/
 	},
 
-	// Request line input
-	read: async function( storer, text, parse, time, routine )
-	{
-		var len = this.m.getUint8( text ),
-		initiallen = 0,
-		buffer,
-		input_stream1_len;
+    // Request and handle line input
+    read: async function( storer, textbuf_addr, parsebuf_addr, time, routine )
+    {
+        const Glk = this.Glk
+        let initiallen = 0
+        let maxlen = this.m.getUint8( textbuf_addr )
+        const streams = this.io.streams
 
-		if ( this.version3 )
-		{
-			len++;
-			this.v3_status();
-		}
-		else
-		{
-			//initiallen = this.m.getUint8( text + 1 );
-		}
+        if ( this.version3 )
+        {
+            maxlen++
+            this.v3_status()
+        }
+        else
+        {
+            //initiallen = this.m.getUint8( textbuf_addr + 1 )
+        }
 
-		buffer = Array( len );
-		buffer.fill( 0 )
-		this.read_data = {
-			buffer: buffer,
-			bufaddr: text, // text-buffer
-			parseaddr: parse, // parse-buffer
-			routine: routine,
-			storer: storer,
-			time: time,
-		};
-		
-		// Input stream 1
-		if ( this.io.streams[0] )
-		{
-			input_stream1_len = this.Glk.glk_get_line_stream_uni( this.io.streams[0], buffer );
+        // Get a line of input
+        const buffer = Array( maxlen )
+        buffer.fill( 0 )
+        let len
+        let terminator
 
-			// Check for a newline character
-			if ( buffer[input_stream1_len - 1] === 0x0A )
-			{
-				input_stream1_len--;
-			}
-			if ( input_stream1_len )
-			{
-				this._print( String.fromCharCode.apply( null, buffer.slice( 0, input_stream1_len ) ) + '\n' );
-				this.handle_line_input( input_stream1_len );
-				return this.stop = 0;
-			}
-			else
-			{
-				this.input_stream( 0 );
-			}
-		}
+        // Input stream 1
+        if ( streams[0] )
+        {
+            let input_stream1_len = await Glk.glk_get_line_stream_uni( streams[0], buffer )
 
-		// TODO: pre-existing input
-		this.Glk.glk_request_line_event_uni( this.io.currentwin ? this.upperwin : this.mainwin, buffer, initiallen );
-		await this.fix_upper_window()
-	},
+            // Check for a newline character
+            if ( buffer[input_stream1_len - 1] === 0x0A )
+            {
+                input_stream1_len--
+            }
+            if ( input_stream1_len )
+            {
+                this._print( String.fromCharCode.apply( null, buffer.slice( 0, input_stream1_len ) ) + '\n' )
+                len = input_stream1_len
+            }
+            else
+            {
+                this.input_stream( 0 )
+            }
+        }
+
+        // TODO: pre-existing input
+        if ( !len )
+        {
+            Glk.glk_request_line_event_uni( this.io.currentwin ? this.upperwin : this.mainwin, buffer, initiallen )
+            await this.fix_upper_window()
+
+            // Event loop
+            const event = await this.glk_event( 3 )
+            len = event.get_field( 2 )
+            terminator = event.get_field( 3 )
+        }
+
+        // Cut the response to len, convert to a lower case string, and then to a ZSCII array
+        const command = String.fromCharCode.apply( null, buffer.slice( 0, len ) ) + '\n'
+        const response = this.text_to_zscii( command.slice( 0, -1 ).toLowerCase() )
+        
+        // 7.1.1.1: The response must be echoed, Glk will handle this
+        
+        // But we do have to echo to the transcripts
+        if ( streams[2].mode === 1 )
+        {
+            streams[2].cache += command
+        }
+        if ( streams[2].mode === 2 )
+        {
+            Glk.glk_put_jstring_stream( streams[2].str, command )
+        }
+        
+        if ( streams[4].mode === 1 )
+        {
+            streams[4].cache += command
+        }
+        if ( streams[4].mode === 2 )
+        {
+            Glk.glk_put_jstring_stream( streams[4].str, command )
+        }
+
+        // Store the response
+        if ( this.version < 5 )
+        {
+            // Append zero terminator
+            response.push( 0 )
+
+            // Store the response in the buffer
+            this.ram.setUint8Array( textbuf_addr + 1, response )
+        }
+        else
+        {
+            // Store the response length
+            this.ram.setUint8( textbuf_addr + 1, len )
+
+            // Store the response in the buffer
+            this.ram.setUint8Array( textbuf_addr + 2, response )
+
+            // Store the terminator
+            this.variable( storer, isNaN( terminator ) ? 13 : terminator )
+        }
+
+        if ( parsebuf_addr )
+        {
+            // Tokenise the response
+            this.tokenise( textbuf_addr, parsebuf_addr )
+        }
+    },
 
 	// Request character input
 	read_char: async function( storer, one, time, routine )

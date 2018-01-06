@@ -39,6 +39,6 @@ tests/regtest.py:
 
 # Run the test suite
 test: dist/zvm.min.js tests/regtest.py
-	cd tests && python regtest.py praxix.regtest
-	cd tests && python regtest.py praxix-bundled.regtest
-	cd tests && python regtest.py curses.regtest
+	cd tests && python regtest.py -i "../bin/zvm" praxix.regtest
+	cd tests && python regtest.py -i "../bin/zvm -b" praxix.regtest
+	cd tests && python regtest.py -i "../bin/zvm" curses.regtest

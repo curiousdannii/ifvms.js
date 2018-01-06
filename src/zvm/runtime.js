@@ -3,7 +3,7 @@
 Z-Machine runtime functions
 ===========================
 
-Copyright (c) 2017 The ifvms.js team
+Copyright (c) 2018 The ifvms.js team
 MIT licenced
 https://github.com/curiousdannii/ifvms.js
 
@@ -391,7 +391,30 @@ module.exports = {
 		}
 		// One byte size/number
 		return value & 0x40 ? 2 : 1;
-	},
+    },
+
+    // Run the Glk event loop waiting for a particular kind of event
+    glk_event: async function( event_type )
+    {
+        while ( 1 )
+        {
+            const glk_event = new this.Glk.RefStruct()
+            await this.Glk.glk_select( glk_event )
+
+            const this_event_type = glk_event.get_field( 0 )
+
+            // Handle arrange events
+            if ( this_event_type === 5 )
+            {
+                await this.update_screen_size()
+            }
+
+            if ( this_event_type === event_type )
+            {
+                return glk_event
+            }
+        }
+    },
 
 	// Quick hack for @inc/@dec/@inc_chk/@dec_chk
 	incdec: function( varnum, change )
@@ -754,27 +777,29 @@ module.exports = {
 		}
 	},
 
-	// Run
-	run: async function()
-	{
-		// Stop when ordered to
-		this.stop = 0
-		while ( !this.stop )
-		{
-			const pc = this.pc
-			if ( !this.jit[pc] )
-			{
-				this.compile()
-			}
-			const result = await this.jit[pc]( this )
+    // Run and handle Glk events
+    run: async function()
+    {
+        const Glk = this.Glk
 
-			// Return from a VM func if the JIT function returned a result
-			if ( !isNaN( result ) )
-			{
-				this.ret( result )
-			}
-		}
-	},
+        // Stop when ordered to
+        //this.stop = 0
+        while ( !this.quit )
+        {
+            const pc = this.pc
+            if ( !this.jit[pc] )
+            {
+                this.compile()
+            }
+            const result = await this.jit[pc]( this )
+
+            // Return from a VM func if the JIT function returned a result
+            if ( !isNaN( result ) )
+            {
+                this.ret( result )
+            }
+        }
+    },
 
 	// pc is the address of the storer operand (or branch in v3)
 	save: async function( pc )

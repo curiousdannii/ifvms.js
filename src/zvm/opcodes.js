@@ -3,7 +3,7 @@
 Z-Machine opcodes
 =================
 
-Copyright (c) 2017 The ifvms.js team
+Copyright (c) 2018 The ifvms.js team
 MIT licenced
 https://github.com/curiousdannii/ifvms.js
 
@@ -14,8 +14,8 @@ https://github.com/curiousdannii/ifvms.js
 /*
 
 TODO:
-	Abstract out the signed conversions such that they can be eliminated if possible
-	don't access memory directly
+    Abstract out the signed conversions such that they can be eliminated if possible
+    don't access memory directly
 
 */
 
@@ -23,8 +23,6 @@ var AST = require( '../common/ast.js' ),
 Variable = AST.Variable,
 Opcode = AST.Opcode,
 Stopper = AST.Stopper,
-Pauser = AST.Pauser,
-PauserStorer = AST.PauserStorer,
 Brancher = AST.Brancher,
 BrancherStorer = AST.BrancherStorer,
 Storer = AST.Storer,
@@ -44,63 +42,63 @@ not = opcode_builder( Storer, function( a ) { return 'e.S2U(~' + a + ')'; } ),
 // @pull (variable)
 // @store (variable) value
 Indirect = Storer.subClass({
-	storer: 0,
+    storer: 0,
 
-	post: function()
-	{
-		var operands = this.operands,
-		op0 = operands[0],
-		op0isVar = op0 instanceof Variable;
+    post: function()
+    {
+        var operands = this.operands,
+        op0 = operands[0],
+        op0isVar = op0 instanceof Variable;
 
-		// Replace the indirect operand with a Variable, and set .indirect if needed
-		operands[0] = new Variable( this.e, op0isVar ? op0 : op0.v );
-		if ( op0isVar || op0.v === 0 )
-		{
-			operands[0].indirect = 1;
-		}
+        // Replace the indirect operand with a Variable, and set .indirect if needed
+        operands[0] = new Variable( this.e, op0isVar ? op0 : op0.v );
+        if ( op0isVar || op0.v === 0 )
+        {
+            operands[0].indirect = 1;
+        }
 
-		// Get the storer
-		this.storer = this.code === 142 ? operands.pop() : operands.shift();
+        // Get the storer
+        this.storer = this.code === 142 ? operands.pop() : operands.shift();
 
-		// @pull needs an added stack. If for some reason it was compiled with two operands this will break!
-		if ( operands.length === 0 )
-		{
-			operands.push( stack_var );
-		}
-	},
+        // @pull needs an added stack. If for some reason it was compiled with two operands this will break!
+        if ( operands.length === 0 )
+        {
+            operands.push( stack_var );
+        }
+    },
 
-	func: simple_func,
+    func: simple_func,
 }),
 
 Incdec = Opcode.subClass({
-	func: function( variable )
-	{
-		var varnum = variable.v - 1,
-		operator = this.code % 2 ? 1 : -1;
+    func: function( variable )
+    {
+        var varnum = variable.v - 1,
+        operator = this.code % 2 ? 1 : -1;
 
-		// Fallback to the runtime function if our variable is a variable operand itself
-		// Or, if it's a global
-		if ( variable instanceof Variable || varnum > 14 )
-		{
-			return 'e.incdec(' + variable + ',' + operator + ')';
-		}
+        // Fallback to the runtime function if our variable is a variable operand itself
+        // Or, if it's a global
+        if ( variable instanceof Variable || varnum > 14 )
+        {
+            return 'e.incdec(' + variable + ',' + operator + ')';
+        }
 
-		return ( varnum < 0 ? 'e.s[e.sp-1]' : 'e.l[' + varnum + ']' ) + ( operator === 1 ? '++' : '--' );
-	},
+        return ( varnum < 0 ? 'e.s[e.sp-1]' : 'e.l[' + varnum + ']' ) + ( operator === 1 ? '++' : '--' );
+    },
 }),
 
 // Version 3 @save/restore branch instead of store
 V3SaveRestore = Stopper.subClass({
-	brancher: 1,
+    brancher: 1,
 
-	toString: function()
-	{
-		return `e.stop=1;await e.${ this.code === 181 ? 'save' : 'restore' }(${ this.pc + 1 })`
-	},
+    toString: function()
+    {
+        return `e.stop=1;await e.${ this.code === 181 ? 'save' : 'restore' }(${ this.pc + 1 })`
+    },
 }),
 
-V45Restore = opcode_builder( PauserStorer, function() { return `await e.restore(${ this.next - 1 })` } ),
-V45Save = opcode_builder( PauserStorer, function() { return `await e.save(${ this.next - 1 })` } );
+V45Restore = opcode_builder( Storer, function() { return `await e.restore(${ this.next - 1 })` } ),
+V45Save = opcode_builder( Storer, function() { return `await e.save(${ this.next - 1 })` } );
 
 /*eslint brace-style: "off" */
 /*eslint indent: "off" */
@@ -155,8 +153,8 @@ return {
 /* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(2,' + addr + '*' + this.e.addr_multipler + ')'; } ),
 /* load */ 142: Indirect.subClass( { storer: 1 } ),
 143: version < 5 ?
-	/* not (v3/4) */ not :
-	/* call_1n (v5/8) */ Caller,
+    /* not (v3/4) */ not :
+    /* call_1n (v5/8) */ Caller,
 /* rtrue */ 176: opcode_builder( Stopper, function() { return 'return 1'; } ),
 /* rfalse */ 177: opcode_builder( Stopper, function() { return 'return 0'; } ),
 // Reconsider a generalised class for @print/@print_ret?
@@ -164,21 +162,21 @@ return {
 /* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print(2,' + text + ');e.print(1,13);return 1'; }, { printer: 1 } ),
 /* nop */ 180: Opcode,
 /* save (v3/4) */ 181: version < 4 ?
-	V3SaveRestore :
-	V45Save,
+    V3SaveRestore :
+    V45Save,
 /* restore(v3/4) */ 182: version < 4 ?
-	V3SaveRestore :
-	V45Restore,
+    V3SaveRestore :
+    V45Restore,
 /* restart */ 183: opcode_builder( Stopper, function() { return 'await e.erase_window(-1);await e.restart()' } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( stack_var ); } } ),
 185: version < 5 ?
-	/* pop (v3/4) */ opcode_builder( Opcode, function() { return 's[--e.sp]'; } ) :
-	/* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.frames.length+1'; } ),
-/* quit */ 186: opcode_builder( Pauser, function() { return 'e.quit=1;await e.Glk.glk_exit()' } ),
+    /* pop (v3/4) */ opcode_builder( Opcode, function() { return 's[--e.sp]'; } ) :
+    /* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.frames.length+1'; } ),
+/* quit */ 186: opcode_builder( Stopper, function() { return 'e.quit=1;await e.Glk.glk_exit()' } ),
 /* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
 188: version < 4 ?
-	/* show_status (v3) */ opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.v3_status()'; } ) :
-	/* act as a nop in later versions */ Opcode,
+    /* show_status (v3) */ opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.v3_status()'; } ) :
+    /* act as a nop in later versions */ Opcode,
 /* verify */ 189: alwaysbranch, // Actually check??
 /* piracy */ 191: alwaysbranch,
 /* call_vs */ 224: CallerStorer,
@@ -186,8 +184,8 @@ return {
 /* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'e.ram.setUint8(e.S2U(' + array + '+' + index.U2S() + '),' + value + ')'; } ),
 /* put_prop */ 227: opcode_builder( Opcode, function() { return 'e.put_prop(' + this.args() + ')'; } ),
 /* read */ 228: version < 5 ?
-	opcode_builder( Pauser, function() { return `await e.read(0,${ this.args() })` } ) :
-	opcode_builder( PauserStorer, function() { return `await e.read(${ this.storer.v },${ this.args() })` } ),
+    opcode_builder( Opcode, function() { return `await e.read(0,${ this.args() })` } ) :
+    opcode_builder( Storer, function() { return `await e.read(${ this.storer.v },${ this.args() })` } ),
 /* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(4,' + a + ')'; } ),
 /* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.print(0,' + a.U2S() + ')'; } ),
 /* random */ 231: opcode_builder( Storer, function( a ) { return 'e.random(' + a.U2S() + ')'; } ),
@@ -203,9 +201,9 @@ return {
 /* set_text_style */ 241: opcode_builder( Opcode, function( stylebyte ) { return 'e.set_style(' + stylebyte + ')'; } ),
 /* buffer_mode */ 242: Opcode, // We don't support non-buffered output
 /* output_stream */ 243: opcode_builder( Stopper, function() { return `e.pc=${ this.next };await e.output_stream(${ this.args() })` } ),
-/* input_stream */ 244: opcode_builder( Pauser, function() { return `await e.input_stream(${ this.args() })` } ),
+/* input_stream */ 244: opcode_builder( Opcode, function() { return `await e.input_stream(${ this.args() })` } ),
 /* sound_effect */ 245: Opcode, // We don't support sounds
-/* read_char */ 246: opcode_builder( PauserStorer, function() { return `await e.read_char(${ this.storer.v },${ this.args() || '1' })` } ),
+/* read_char */ 246: opcode_builder( Storer, function() { return `await e.read_char(${ this.storer.v },${ this.args() || '1' })` } ),
 /* scan_table */ 247: opcode_builder( BrancherStorer, function() { return 'e.scan_table(' + this.args() + ')'; } ),
 /* not (v5/8) */ 248: not,
 /* call_vn */ 249: Caller,
