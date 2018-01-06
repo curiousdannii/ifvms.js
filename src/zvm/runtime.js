@@ -780,8 +780,7 @@ module.exports = {
     // Run and handle Glk events
     run: async function()
     {
-        // Stop when ordered to
-        //this.stop = 0
+        // Run until the VM has quit
         while ( !this.quit )
         {
             const pc = this.pc

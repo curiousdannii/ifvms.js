@@ -203,24 +203,6 @@ module.exports = {
 		this.ram.setUint16( array + 2, this.io.col + 1 );
 	},
 
-	// Handle char input
-	handle_char_input: function( charcode )
-	{
-		var stream4 = this.io.streams[4],
-		code = ZSCII_keyCodes[ charcode ] || this.reverse_unicode_table[ charcode ] || 63;
-		this.variable( this.read_data.storer, code );
-
-		// Echo to the commands log
-		if ( stream4.mode === 1 )
-		{
-			stream4.cache += code;
-		}
-		if ( stream4.mode === 2 )
-		{
-			this.Glk.glk_put_char_stream_uni( stream4.str, code );
-		}
-	},
-
 	// Handle the result of glk_fileref_create_by_prompt()
 	handle_create_fileref: function( fref )
 	{
@@ -599,7 +581,7 @@ module.exports = {
 	},
 
     // Request and handle line input
-    read: async function( storer, textbuf_addr, parsebuf_addr /*, time, routine */ )
+    read: async function( textbuf_addr, parsebuf_addr /*, time, routine */ )
     {
         const Glk = this.Glk
         let initiallen = 0
@@ -696,9 +678,6 @@ module.exports = {
 
             // Store the response in the buffer
             this.ram.setUint8Array( textbuf_addr + 2, response )
-
-            // Store the terminator
-            this.variable( storer, isNaN( terminator ) ? 13 : terminator )
         }
 
         if ( parsebuf_addr )
@@ -706,35 +685,52 @@ module.exports = {
             // Tokenise the response
             this.tokenise( textbuf_addr, parsebuf_addr )
         }
+
+        // Return the terminator
+        return isNaN( terminator ) ? 13 : terminator
     },
 
-	// Request character input
-	read_char: async function( storer, one, time, routine )
-	{
-		// Input stream 1
-		if ( this.io.streams[0] )
-		{
-			var code = this.Glk.glk_get_char_stream_uni( this.io.streams[0] );
-			// Check for EOF
-			if ( code === -1 )
-			{
-				this.input_stream( 0 );
-			}
-			else
-			{
-				this.variable( storer, code );
-				return this.stop = 0;
-			}
-		}
+    // Request and handle character input
+    read_char: async function( /* one, time, routine */ )
+    {
+        const Glk = this.Glk
+        const streams = this.io.streams
+        let code
 
-		this.read_data = {
-			routine: routine,
-			storer: storer,
-			time: time,
-		};
-		this.Glk.glk_request_char_event_uni( this.io.currentwin ? this.upperwin : this.mainwin );
-		await this.fix_upper_window()
-	},
+        // Input stream 1
+        if ( streams[0] )
+        {
+            code = Glk.glk_get_char_stream_uni( streams[0] )
+            // Check for EOF
+            if ( code === -1 )
+            {
+                this.input_stream( 0 )
+            }
+            else
+            {
+                return code
+            }
+        }
+
+        Glk.glk_request_char_event_uni( this.io.currentwin ? this.upperwin : this.mainwin )
+        await this.fix_upper_window()
+
+        // Event loop
+        const event = await this.glk_event( 2 )
+        const charcode = event.get_field( 2 )
+        code = ZSCII_keyCodes[ charcode ] || this.reverse_unicode_table[ charcode ] || 63
+
+        // Echo to the commands log
+        if ( streams[4].mode === 1 )
+        {
+            streams[4].cache += code
+        }
+        if ( streams[4].mode === 2 )
+        {
+            Glk.glk_put_char_stream_uni( streams[4].str, code )
+        }
+        return code
+    },
 
 	set_colour: function( /*foreground, background*/ )
 	{
