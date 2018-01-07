@@ -144,13 +144,13 @@ return {
 /* get_prop_length */ 132: opcode_builder( Storer, function( a ) { return 'e.get_prop_len(' + a + ')'; } ),
 /* inc */ 133: Incdec,
 /* dec */ 134: Incdec,
-/* print_addr */ 135: opcode_builder( Opcode, function( addr ) { return 'e.print(2,' + addr + ')'; } ),
+/* print_addr */ 135: opcode_builder( Opcode, addr => `await e.print(2,${ addr })` ),
 /* call_1s */ 136: CallerStorer,
 /* remove_obj */ 137: opcode_builder( Opcode, function( obj ) { return 'e.remove_obj(' + obj + ')'; } ),
-/* print_obj */ 138: opcode_builder( Opcode, function( obj ) { return 'e.print(3,' + obj + ')'; } ),
+/* print_obj */ 138: opcode_builder( Opcode, obj => `await e.print(3,${ obj })` ),
 /* ret */ 139: opcode_builder( Stopper, function( a ) { return 'return ' + a; } ),
 /* jump */ 140: opcode_builder( Stopper, function( a ) { return 'e.pc=' + a.U2S() + '+' + ( this.next - 2 ); } ),
-/* print_paddr */ 141: opcode_builder( Opcode, function( addr ) { return 'e.print(2,' + addr + '*' + this.e.addr_multipler + ')'; } ),
+/* print_paddr */ 141: opcode_builder( Opcode, function ( addr ) { return `await e.print(2,${ addr }*${ this.e.addr_multipler })` } ),
 /* load */ 142: Indirect.subClass( { storer: 1 } ),
 143: version < 5 ?
     /* not (v3/4) */ not :
@@ -158,8 +158,8 @@ return {
 /* rtrue */ 176: opcode_builder( Stopper, function() { return 'return 1'; } ),
 /* rfalse */ 177: opcode_builder( Stopper, function() { return 'return 0'; } ),
 // Reconsider a generalised class for @print/@print_ret?
-/* print */ 178: opcode_builder( Opcode, function( text ) { return 'e.print(2,' + text + ')'; }, { printer: 1 } ),
-/* print_ret */ 179: opcode_builder( Stopper, function( text ) { return 'e.print(2,' + text + ');e.print(1,13);return 1'; }, { printer: 1 } ),
+/* print */ 178: opcode_builder( Opcode, text => `await e.print(2,${ text })`, { printer: 1 } ),
+/* print_ret */ 179: opcode_builder( Stopper, text => `await e.print(2,${ text });await e.print(1,13);return 1`, { printer: 1 } ),
 /* nop */ 180: Opcode,
 /* save (v3/4) */ 181: version < 4 ?
     V3SaveRestore :
@@ -173,7 +173,7 @@ return {
     /* pop (v3/4) */ opcode_builder( Opcode, function() { return 's[--e.sp]'; } ) :
     /* catch (v5/8) */ opcode_builder( Storer, function() { return 'e.frames.length+1'; } ),
 /* quit */ 186: opcode_builder( Stopper, function() { return 'e.quit=1;await e.Glk.glk_exit()' } ),
-/* new_line */ 187: opcode_builder( Opcode, function() { return 'e.print(1,13)'; } ),
+/* new_line */ 187: opcode_builder( Opcode, () => 'await e.print(1,13)' ),
 188: version < 4 ?
     /* show_status (v3) */ opcode_builder( Stopper, function() { return 'e.pc=' + this.next + ';e.v3_status()'; } ) :
     /* act as a nop in later versions */ Opcode,
@@ -183,11 +183,9 @@ return {
 /* storew */ 225: opcode_builder( Opcode, function( array, index, value ) { return 'e.ram.setUint16(e.S2U(' + array + '+2*' + index.U2S() + '),' + value + ')'; } ),
 /* storeb */ 226: opcode_builder( Opcode, function( array, index, value ) { return 'e.ram.setUint8(e.S2U(' + array + '+' + index.U2S() + '),' + value + ')'; } ),
 /* put_prop */ 227: opcode_builder( Opcode, function() { return 'e.put_prop(' + this.args() + ')'; } ),
-/* read */ 228: version < 5 ?
-    opcode_builder( Opcode, function() { return `await e.read(${ this.args() })` } ) :
-    opcode_builder( Storer, function() { return `await e.read(${ this.args() })` } ),
-/* print_char */ 229: opcode_builder( Opcode, function( a ) { return 'e.print(4,' + a + ')'; } ),
-/* print_num */ 230: opcode_builder( Opcode, function( a ) { return 'e.print(0,' + a.U2S() + ')'; } ),
+/* read */ 228: opcode_builder( version < 5 ? Opcode : Storer, function() { return `await e.read(${ this.args() })` } ),
+/* print_char */ 229: opcode_builder( Opcode, a => `await e.print(4,${ a })` ),
+/* print_num */ 230: opcode_builder( Opcode, a =>`await e.print(0,${ a.U2S() })` ),
 /* random */ 231: opcode_builder( Storer, function( a ) { return 'e.random(' + a.U2S() + ')'; } ),
 /* push */ 232: opcode_builder( Storer, simple_func, { post: function() { this.storer = stack_var; }, storer: 0 } ),
 /* pull */ 233: Indirect,
@@ -200,8 +198,8 @@ return {
 /* get_cursor */ 240: opcode_builder( Opcode, function( addr ) { return 'e.get_cursor(' + addr + ')'; } ),
 /* set_text_style */ 241: opcode_builder( Opcode, function( stylebyte ) { return 'e.set_style(' + stylebyte + ')'; } ),
 /* buffer_mode */ 242: Opcode, // We don't support non-buffered output
-/* output_stream */ 243: opcode_builder( Stopper, function() { return `e.pc=${ this.next };await e.output_stream(${ this.args() })` } ),
-/* input_stream */ 244: opcode_builder( Opcode, function() { return `await e.input_stream(${ this.args() })` } ),
+/* output_stream */ 243: opcode_builder( Opcode, function() { return `await e.output_stream(${ this.args() })` } ),
+/* input_stream */ 244: opcode_builder( Opcode, on => `await e.input_stream(${ on })` ),
 /* sound_effect */ 245: Opcode, // We don't support sounds
 /* read_char */ 246: opcode_builder( Storer, function() { return `await e.read_char(${ this.args() || '1' })` } ),
 /* scan_table */ 247: opcode_builder( BrancherStorer, function() { return 'e.scan_table(' + this.args() + ')'; } ),
@@ -211,7 +209,7 @@ return {
 /* tokenise */ 251: opcode_builder( Opcode, function() { return 'e.tokenise(' + this.args() + ')'; } ),
 /* encode_text */ 252: opcode_builder( Opcode, function() { return 'e.encode_text(' + this.args() + ')'; } ),
 /* copy_table */ 253: opcode_builder( Opcode, function() { return 'e.copy_table(' + this.args() + ')'; } ),
-/* print_table */ 254: opcode_builder( Opcode, function() { return 'e.print_table(' + this.args() + ')'; } ),
+/* print_table */ 254: opcode_builder( Opcode, function() { return `await e.print_table(${ this.args() })` } ),
 /* check_arg_count */ 255: opcode_builder( Brancher, function( arg ) { return 'e.stack.getUint8(e.frameptr+5)&(1<<(' + arg + '-1))'; } ),
 /* save */ 1000: V45Save,
 /* restore */ 1001: V45Restore,
@@ -221,13 +219,12 @@ return {
 /* save_undo */ 1009: opcode_builder( Storer, function() { return 'e.save_undo(' + this.next + ',' + this.storer.v + ')'; } ),
 // As the standard says calling this without a save point is illegal, we don't need to actually store anything (but it must still be disassembled)
 /* restore_undo */ 1010: opcode_builder( Opcode, function() { return 'if(e.restore_undo())return'; }, { storer: 1 } ),
-/* print_unicode */ 1011: opcode_builder( Opcode, function( a ) { return 'e.print(1,' + a + ')'; } ),
+/* print_unicode */ 1011: opcode_builder( Opcode, a => `await e.print(1,${ a })` ),
 // Assume we can print and read all unicode characters rather than actually testing
 /* check_unicode */ 1012: opcode_builder( Storer, function() { return 3; } ),
 /* set_true_colour */ 1013: opcode_builder( Opcode, function() { return 'e.set_true_colour(' + this.args() + ')'; } ),
 /* sound_data */ 1014: Opcode.subClass( { brancher: 1 } ), // We don't support sounds (but disassemble the branch address)
 /* gestalt */ 1030: opcode_builder( Storer, function() { return 'e.gestalt(' + this.args() + ')'; } ),
-/* parchment */ //1031: opcode_builder( Storer, function() { return 'e.op_parchment(' + this.args() + ')'; } ),
 
 };
 

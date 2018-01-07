@@ -32,7 +32,7 @@ ifvms.zip: dist/zvm.min.js
 	dist/zvm.min.js src/zvm/dispatch.js
 
 lint:
-	eslint --ignore-path .gitignore .
+	eslint --ignore-path .gitignore --ext .js,.mjs .
 
 tests/regtest.py:
 	$(CURL) -o tests/regtest.py https://raw.githubusercontent.com/erkyrath/plotex/master/regtest.py

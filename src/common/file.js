@@ -21,12 +21,12 @@ IFF = utils.Class.subClass({
 	{
 		this.type = '';
 		this.chunks = [];
-		
+
 		if ( data )
 		{
 			var view = MemoryView( data ),
 			i = 12, length, chunk_length;
-			
+
 			// Check that it is actually an IFF file
 			if ( view.getFourCC( 0 ) !== 'FORM' )
 			{
@@ -82,12 +82,12 @@ IFF = utils.Class.subClass({
 				buffer_len++;
 			}
 		}
-		
+
 		out = MemoryView( buffer_len );
 		out.setFourCC( 0, 'FORM' );
 		out.setUint32( 4, buffer_len - 8 );
 		out.setFourCC( 8, this.type );
-		
+
 		// Go through the chunks and write them out
 		i = 0;
 		while ( i < this.chunks.length )
@@ -117,7 +117,7 @@ Blorb = IFF.subClass({
 			{
 				throw new Error( 'Not a Blorb file' );
 			}
-			
+
 			// Process the RIdx chunk to find the main exec chunk
 			if ( this.chunks[0].type !== 'RIdx' )
 			{
@@ -157,7 +157,7 @@ Quetzal = IFF.subClass({
 			// Go through the chunks and extract the useful ones
 			var i = 0,
 			type, chunk_data, view;
-			
+
 			while ( i < this.chunks.length )
 			{
 				type = this.chunks[i].type;
@@ -221,7 +221,7 @@ function identify( buffer )
 	blorb,
 	format,
 	version;
-	
+
 	// Blorb
 	if ( view.getFourCC( 0 ) === 'FORM' && view.getFourCC( 8 ) === 'IFRS' )
 	{
@@ -256,7 +256,7 @@ function identify( buffer )
 			format = 'ZCOD';
 		}
 	}
-	
+
 	if ( format && version )
 	{
 		return {

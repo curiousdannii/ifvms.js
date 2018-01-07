@@ -1,8 +1,19 @@
 parserOptions:
-  ecmaVersion: 6
+  ecmaFeatures:
+    impliedStrict: true
+  ecmaVersion: 2017
+  sourceType: module
 
 rules:
-  no-console:
-    - off
-  one-var:
-    - off
+  indent:
+    - error
+    - 4
+    -
+      SwitchCase: 1
+  no-var:
+    - error
+  prefer-const:
+    - error
+  semi:
+    - error
+    - never

@@ -80,7 +80,7 @@ module.exports = {
 			reverse: 0,
 			bold: 0,
 			italic: 0,
-			
+
 			// A variable for whether we are outputing in a monospaced font. If non-zero then we are
 			// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
 			mono: this.m.getUint8( 0x11 ) & 0x02,
@@ -89,10 +89,10 @@ module.exports = {
 			transcript: this.m.getUint8( 0x11 ) & 0x01,
 
 			// Index 0 is input stream 1, the output streams follow
-			streams: [ 0, 1, {}, [], {} ],
+			streams: [ 0, 1, 0, [], 0 ],
 
 			currentwin: 0,
-			
+
 			// Use Zarf's algorithm for the upper window
 			// http://eblong.com/zarf/glk/quote-box.html
 			// Implemented in fix_upper_window() and split_window()
@@ -154,17 +154,6 @@ module.exports = {
 		}
 	},
 
-	fileref_create_by_prompt: function( data )
-	{
-		if ( typeof data.run === 'undefined' )
-		{
-			data.run = 1;
-		}
-		this.fileref_data = data;
-		this.glk_blocking_call = 'fileref_create_by_prompt';
-		this.Glk.glk_fileref_create_by_prompt( data.usage, data.mode, data.rock || 0 );
-	},
-
 	// Fix the upper window height before an input event
 	fix_upper_window: async function()
 	{
@@ -203,197 +192,106 @@ module.exports = {
 		this.ram.setUint16( array + 2, this.io.col + 1 );
 	},
 
-	// Handle the result of glk_fileref_create_by_prompt()
-	handle_create_fileref: function( fref )
-	{
-		var Glk = this.Glk,
-		data = this.fileref_data,
-		str;
+    input_stream: async function( stream )
+    {
+        const Glk = this.Glk
+        const streams = this.io.streams
 
-		if ( fref )
-		{
-			if ( data.unicode )
-			{
-				str = Glk.glk_stream_open_file_uni( fref, data.mode, data.rock || 0 );
-			}
-			else
-			{
-				str = Glk.glk_stream_open_file( fref, data.mode, data.rock || 0 );
-			}
-			Glk.glk_fileref_destroy( fref );
-		}
-		if ( data.func === 'restore' || data.func === 'save' )
-		{
-			this.save_restore_handler( str );
-		}
-		if ( data.func === 'input_stream' )
-		{
-			this.io.streams[0] = str;
-		}
-		if ( data.func === 'output_stream' )
-		{
-			this.output_stream_handler( str );
-		}
+        if ( stream && !streams[0] )
+        {
+            const fref = await Glk.glk_fileref_create_by_prompt( 0x103, 0x02, 212 )
+            if ( fref )
+            {
+                streams[0] = await Glk.glk_stream_open_file_uni( fref, 0x02, 212 )
+                await Glk.glk_fileref_destroy( fref )
+            }
+        }
+        if ( !stream && streams[0] )
+        {
+            await Glk.glk_stream_close( streams[0] )
+            streams[0] = 0
+        }
+    },
 
-		// Signal to resume() to call run() if required
-		return data.run;
-	},
+    // Manage output streams
+    output_stream: async function( stream, addr )
+    {
+        const Glk = this.Glk
+        const ram = this.ram
+        const streams = this.io.streams
 
-	input_stream: function( stream )
-	{
-		var io = this.io;
-		if ( stream && !io.streams[0] )
-		{
-			this.fileref_create_by_prompt({
-				func: 'input_stream',
-				mode: 0x02,
-				rock: 212,
-				unicode: 1,
-				usage: 0x103,
-			});
-		}
-		if ( !stream && io.streams[0] )
-		{
-			this.Glk.glk_stream_close( io.streams[0] );
-			io.streams[0] = 0;
-		}
-	},
+        stream = U2S( stream )
 
-	// Manage output streams
-	output_stream: function( stream, addr, called_from_print )
-	{
-		var ram = this.ram,
-		streams = this.io.streams,
-		data, text;
-		stream = U2S( stream );
+        // The screen
+        if ( stream === 1 )
+        {
+            streams[1] = 1
+        }
+        if ( stream === -1 )
+        {
+            streams[1] = 0
+        }
 
-		// The screen
-		if ( stream === 1 )
-		{
-			streams[1] = 1;
-		}
-		if ( stream === -1 )
-		{
-			streams[1] = 0;
-		}
+        // Transcript
+        if ( stream === 2 && !streams[2] )
+        {
+            const fref = await Glk.glk_fileref_create_by_prompt( 0x102, 0x05, 210 )
+            if ( fref )
+            {
+                const str = await Glk.glk_stream_open_file_uni( fref, 0x05, 210 )
+                streams[2] = str
+                this.io.transcript = str | 0
+                ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) | !!str )
+                await Glk.glk_fileref_destroy( fref )
+            }
+        }
+        if ( stream === -2 )
+        {
+            ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) )
+            if ( streams[2] )
+            {
+                await Glk.glk_stream_close( streams[2] )
+            }
+            streams[2] = this.io.transcript = 0
+        }
 
-		// Transcript
-		if ( stream === 2 && !streams[2].mode )
-		{
-			this.fileref_create_by_prompt({
-				func: 'output_stream',
-				mode: 0x05,
-				rock: 210,
-				run: !called_from_print,
-				str: 2,
-				unicode: 1,
-				usage: 0x102,
-			});
-			streams[2].cache = '';
-			streams[2].mode = 1;
-			if ( !called_from_print )
-			{
-				this.stop = 1;
-			}
-		}
-		if ( stream === -2 )
-		{
-			ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) );
-			if ( streams[2].mode === 2 )
-			{
-				this.Glk.glk_stream_close( streams[2].str );
-			}
-			streams[2].mode = this.io.transcript = 0;
-		}
+        // Memory
+        if ( stream === 3 )
+        {
+            streams[3].unshift( [ addr, '' ] )
+        }
+        if ( stream === -3 )
+        {
+            const data = streams[3].shift()
+            const text = this.text_to_zscii( data[1] )
+            ram.setUint16( data[0], text.length )
+            ram.setUint8Array( data[0] + 2, text )
+        }
 
-		// Memory
-		if ( stream === 3 )
-		{
-			streams[3].unshift( [ addr, '' ] );
-		}
-		if ( stream === -3 )
-		{
-			data = streams[3].shift();
-			text = this.text_to_zscii( data[1] );
-			ram.setUint16( data[0], text.length );
-			ram.setUint8Array( data[0] + 2, text );
-		}
-
-		// Command list
-		if ( stream === 4 && !streams[4].mode )
-		{
-			this.fileref_create_by_prompt({
-				func: 'output_stream',
-				mode: 0x05,
-				rock: 211,
-				str: 4,
-				unicode: 1,
-				usage: 0x103,
-			});
-			streams[4].cache = '';
-			streams[4].mode = 1;
-			this.stop = 1;
-		}
-		if ( stream === -4 )
-		{
-			if ( streams[4].mode === 2 )
-			{
-				this.Glk.glk_stream_close( streams[4].str );
-			}
-			streams[4].mode = 0;
-		}
-	},
-	
-	output_stream_handler: function( str )
-	{
-		var ram = this.ram,
-		streams = this.io.streams,
-		data = this.fileref_data;
-
-		if ( data.str === 2 )
-		{
-			ram.setUint8( 0x11, ( ram.getUint8( 0x11 ) & 0xFE ) | ( str ? 1 : 0 ) );
-			if ( str )
-			{
-				streams[2].mode = 2;
-				streams[2].str = str;
-				this.io.transcript = 1;
-				if ( streams[2].cache )
-				{
-					this.Glk.glk_put_jstring_stream( streams[2].str, streams[2].cache );
-				}
-			}
-			else
-			{
-				streams[2].mode = this.io.transcript = 0;
-			}
-		}
-
-		if ( data.str === 4 )
-		{
-			if ( str )
-			{
-				streams[4].mode = 2;
-				streams[4].str = str;
-				if ( streams[4].cache )
-				{
-					this.Glk.glk_put_jstring_stream( streams[4].str, streams[4].cache );
-				}
-			}
-			else
-			{
-				streams[4].mode = 0;
-			}
-		}
-	},
+        // Command list
+        if ( stream === 4 && !streams[4] )
+        {
+            const fref = await Glk.glk_fileref_create_by_prompt( 0x103, 0x05, 211 )
+            if ( fref )
+            {
+                streams[4] = await Glk.glk_stream_open_file_uni( fref, 0x05, 211 )
+                await Glk.glk_fileref_destroy( fref )
+            }
+        }
+        if ( stream === -4 && streams[4] )
+        {
+            await Glk.glk_stream_close( streams[4] )
+            streams[4] = 0
+        }
+    },
 
 	// Print text!
-	_print: function( text )
+	_print: async function( text )
 	{
 		var Glk = this.Glk,
 		io = this.io,
 		i = 0;
-		
+
 		// Stream 3 gets the text first
 		if ( io.streams[3].length )
 		{
@@ -403,14 +301,14 @@ module.exports = {
 		{
 			// Convert CR into LF
 			text = text.replace( /\r/g, '\n' );
-			
+
 			// Check the transcript bit
 			// Because it might need to prompt for a file name, we return here, and will print again in the handler
 			if ( ( this.m.getUint8( 0x11 ) & 0x01 ) !== io.transcript )
 			{
-				this.output_stream( io.transcript ? -2 : 2, 0, 1 );
+				await this.output_stream( io.transcript ? -2 : 2 )
 			}
-			
+
 			// Check if the monospace font bit has changed
 			// Unfortunately, even now Inform changes this bit for the font statement, even though the 1.1 standard depreciated it :(
 			if ( ( this.m.getUint8( 0x11 ) & 0x02 ) !== ( io.mono & 0x02 ) )
@@ -418,7 +316,7 @@ module.exports = {
 				io.mono ^= 0x02;
 				this.format();
 			}
-			
+
 			// For the upper window we print each character individually so that we can track the cursor position
 			if ( io.currentwin && this.upperwin )
 			{
@@ -439,26 +337,22 @@ module.exports = {
 			{
 				if ( io.streams[1] )
 				{
-					Glk.glk_put_jstring( text );
+					Glk.glk_put_jstring( text )
 				}
 				// Transcript
-				if ( io.streams[2].mode === 1 )
+				if ( io.streams[2] )
 				{
-					io.streams[2].cache += text;
-				}
-				if ( io.streams[2].mode === 2 )
-				{
-					Glk.glk_put_jstring_stream( io.streams[2].str, text );
+					Glk.glk_put_jstring_stream( io.streams[2], text )
 				}
 			}
 		}
 	},
 
 	// Print many things
-	print: function( type, val )
+	print: async function( type, val )
 	{
 		var proptable, result;
-		
+
 		// Number
 		if ( type === 0 )
 		{
@@ -489,20 +383,20 @@ module.exports = {
 			}
 			result = this.unicode_table[ val ];
 		}
-		this._print( '' + result );
+		await this._print( '' + result )
 	},
 
-	print_table: function( zscii, width, height, skip )
-	{
-		height = height || 1;
-		skip = skip || 0;
-		var i = 0;
-		while ( i++ < height )
-		{
-			this._print( this.zscii_to_text( this.m.getUint8Array( zscii, width ) ) + ( i < height ? '\r' : '' ) );
-			zscii += width + skip;
-		}
-	},
+    print_table: async function( zscii, width, height, skip )
+    {
+        height = height || 1
+        skip = skip || 0
+        let i = 0
+        while ( i++ < height )
+        {
+            await this._print( this.zscii_to_text( this.m.getUint8Array( zscii, width ) ) + ( i < height ? '\r' : '' ) )
+            zscii += width + skip
+        }
+    },
 
 	// Process CSS default colours
 	process_colours: function()
@@ -640,26 +534,17 @@ module.exports = {
         // Cut the response to len, convert to a lower case string, and then to a ZSCII array
         const command = String.fromCharCode.apply( null, buffer.slice( 0, len ) ) + '\n'
         const response = this.text_to_zscii( command.slice( 0, -1 ).toLowerCase() )
-        
+
         // 7.1.1.1: The response must be echoed, Glk will handle this
-        
+
         // But we do have to echo to the transcripts
-        if ( streams[2].mode === 1 )
+        if ( streams[2] )
         {
-            streams[2].cache += command
+            Glk.glk_put_jstring_stream( streams[2], command )
         }
-        if ( streams[2].mode === 2 )
+        if ( streams[4] )
         {
-            Glk.glk_put_jstring_stream( streams[2].str, command )
-        }
-        
-        if ( streams[4].mode === 1 )
-        {
-            streams[4].cache += command
-        }
-        if ( streams[4].mode === 2 )
-        {
-            Glk.glk_put_jstring_stream( streams[4].str, command )
+            Glk.glk_put_jstring_stream( streams[4], command )
         }
 
         // Store the response
@@ -721,13 +606,9 @@ module.exports = {
         code = ZSCII_keyCodes[ charcode ] || this.reverse_unicode_table[ charcode ] || 63
 
         // Echo to the commands log
-        if ( streams[4].mode === 1 )
+        if ( streams[4] )
         {
-            streams[4].cache += code
-        }
-        if ( streams[4].mode === 2 )
-        {
-            Glk.glk_put_char_stream_uni( streams[4].str, code )
+            Glk.glk_put_char_stream_uni( streams[4], code )
         }
         return code
     },
@@ -864,7 +745,7 @@ module.exports = {
 	set_window: async function( window )
 	{
 		this.io.currentwin = window;
-		
+
 		// Focusing the upper window resets the cursor to the top left;
 		// it also opens the upper window if it's not open
 		if ( window )
@@ -949,33 +830,33 @@ module.exports = {
 				| 0x40 // Variable pitch font is default - Or can we tell from options if the font is fixed pitch?
 			);
 		}
-		
+
 		// Flags 1
 		ram.setUint8( 0x01,
 			0x00 // Colour is not supported yet
 			| 0x1C // Bold, italic and mono are supported
 			| 0x00 // Timed input not supported yet
 		);
-		
+
 		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects
 		// This is really a word, but we only care about the lower byte
 		ram.setUint8( 0x11, ram.getUint8( 0x11 ) & 0x57 );
-		
+
 		// Font height/width in "units"
 		if ( this.version > 4 )
 		{
 			ram.setUint16( 0x26, 0x0101 )
 		}
-		
+
 		// Colours
 		//ram.setUint8( 0x2C, isNaN( this.options.bg ) ? 1 : this.options.bg );
 		//ram.setUint8( 0x2D, isNaN( this.options.fg ) ? 1 : this.options.fg );
 		//this.extension_table( 5, this.options.fg_true );
 		//this.extension_table( 6, this.options.bg_true );
-		
+
 		// Z Machine Spec revision
 		ram.setUint16( 0x32, 0x0102 );
-		
+
 		// Clear flags three, we don't support any of that stuff
 		this.extension_table( 4, 0 );
 	},
@@ -1038,7 +919,7 @@ module.exports = {
 			this.io.col = width - 1
 		}
 	},
-	
+
 	// Output the version 3 status line
 	v3_status: function()
 	{

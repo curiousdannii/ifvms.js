@@ -60,7 +60,7 @@ const api = {
     {
         // Create this here so that it won't be cleared on restart
         this.jit = {};
-        
+
         // The Quixe API expects the start function to be named init
         this.init = this.start;
     },

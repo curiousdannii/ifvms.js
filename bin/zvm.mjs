@@ -40,7 +40,7 @@ if ( !fs.existsSync( storyfile ) )
 {
     console.error( `Error: "${ storyfile }" does not exist` )
     process.exitCode = 1
-    proxess.exit()
+    process.exit()
 }
 
 // Use the bundled (and minified) VM if requested

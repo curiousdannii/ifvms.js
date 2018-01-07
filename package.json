@@ -36,7 +36,7 @@
   },
   "scripts": {
     "build": "make dist/zvm.min.js",
-    "lint": "eslint --ignore-path .gitignore .",
+    "lint": "eslint --ignore-path .gitignore --ext .js,.mjs .",
     "test": "make test"
   }
 }

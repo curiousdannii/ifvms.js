@@ -115,7 +115,7 @@ module.exports = {
 	compile: function()
 	{
 		const context = this.disassemble()
-		
+
 		// Compile the routine with new AsyncFunction() as it could call async Glk functions
 		this.jit[context.pc] = new AsyncFunction( 'e', '' + context )
 
@@ -191,11 +191,11 @@ module.exports = {
 		{
 			if ( RockBox.value === 210 )
 			{
-				this.io.streams[2].str = obj
+				this.io.streams[2] = obj
 			}
 			if ( RockBox.value === 211 )
 			{
-				this.io.streams[4].str = obj
+				this.io.streams[4] = obj
 			}
 		}
 
@@ -609,7 +609,7 @@ module.exports = {
 			l: [],
 			undo: [],
 			undo_len: 0,
-			
+
 			glk_blocking_call: null,
 
 			// Get some header variables
@@ -642,12 +642,26 @@ module.exports = {
 	// Request a restore
 	restore: async function( pc )
 	{
-		this.pc = pc;
-		this.fileref_create_by_prompt({
-			func: 'restore',
-			mode: 0x02,
-			usage: 0x01,
-		});
+        const Glk = this.Glk
+        let result = 0
+
+        this.pc = pc
+
+        const fref = await Glk.glk_fileref_create_by_prompt( 0x01, 0x02, 0 )
+        if ( fref )
+        {
+            const str = await Glk.glk_stream_open_file( fref, 0x02, 0 )
+            if ( str )
+            {
+                const buffer = new Uint8Array( 128 * 1024 )
+				await Glk.glk_get_buffer_stream( str, buffer )
+				result = await this.restore_file( buffer.buffer )
+                await Glk.glk_stream_close( str )
+            }
+            await Glk.glk_fileref_destroy( fref )
+        }
+
+        this.save_restore_result( result )
 	},
 
 	restore_file: async function( data, autorestoring )
@@ -659,7 +673,7 @@ module.exports = {
 		flags2 = ram.getUint8( 0x11 ),
 		temp,
 		i = 0, j = 0;
-		
+
 		// Check this is a savefile for this story
 		if ( ram.getUint16( 0x02 ) !== quetzal.release || ram.getUint16( 0x1C ) !== quetzal.checksum )
 		{
@@ -798,17 +812,30 @@ module.exports = {
         }
     },
 
-	// pc is the address of the storer operand (or branch in v3)
-	save: async function( pc )
-	{
-		this.pc = pc
-		this.fileref_create_by_prompt({
-			func: 'save',
-			mode: 0x01,
-			usage: 0x01,
-		});
-	},
-	
+    // pc is the address of the storer operand (or branch in v3)
+    save: async function( pc )
+    {
+        const Glk = this.Glk
+        let result = 0
+
+        this.pc = pc
+
+        const fref = await Glk.glk_fileref_create_by_prompt( 0x01, 0x01, 0 )
+        if ( fref )
+        {
+            const str = await Glk.glk_stream_open_file( fref, 0x01, 0 )
+            if ( str )
+            {
+                Glk.glk_put_buffer_stream( str, new Uint8Array( this.save_file( this.pc ) ) )
+                result = 1
+                await Glk.glk_stream_close( str )
+            }
+            await Glk.glk_fileref_destroy( fref )
+        }
+
+        this.save_restore_result( result )
+    },
+
 	save_file: function( pc, autosaving )
 	{
 		var memory = this.m,
@@ -878,62 +905,40 @@ module.exports = {
 
 		return quetzal.write();
 	},
-	
-	save_restore_handler: async function( str )
-	{
-		var memory = this.m,
-		Glk = this.Glk,
-		result = 0,
-		buffer = [],
-		temp, iftrue, offset;
-		
-		if ( str )
-		{
-			// Save
-			if ( this.fileref_data.func === 'save' )
-			{
-				Glk.glk_put_buffer_stream( str, new Uint8Array( this.save_file( this.pc ) ) );
-				result = 1;
-			}
-			// Restore
-			else
-			{
-				buffer = new Uint8Array( 128 * 1024 );
-				Glk.glk_get_buffer_stream( str, buffer );
-				result = await this.restore_file( buffer.buffer )
-			}
-			await Glk.glk_stream_close( str )
-		}
-		
-		// Store the result / branch in z3
-		if ( this.version3 )
-		{
-			// Calculate the branch
-			temp = memory.getUint8( this.pc++ );
-			iftrue = temp & 0x80;
-			offset = temp & 0x40 ?
-				// single byte address
-				temp & 0x3F :
-				// word address, but first get the second byte of it
-				( temp << 8 | memory.getUint8( this.pc++ ) ) << 18 >> 18;
 
-			if ( !result === !iftrue )
-			{
-				if ( offset === 0 || offset === 1 )
-				{
-					this.ret( offset );
-				}
-				else
-				{
-					this.pc += offset - 2;
-				}
-			}
-		}
-		else
-		{
-			this.variable( memory.getUint8( this.pc++ ), result );
-		}
-	},
+    save_restore_result: function( result )
+    {
+        const memory = this.m
+
+        // Store the result / branch in z3
+        if ( this.version3 )
+        {
+            // Calculate the branch
+            const temp = memory.getUint8( this.pc++ )
+            const iftrue = temp & 0x80
+            const offset = temp & 0x40 ?
+                // single byte address
+                temp & 0x3F :
+                // word address, but first get the second byte of it
+                ( temp << 8 | memory.getUint8( this.pc++ ) ) << 18 >> 18
+
+            if ( !result === !iftrue )
+            {
+                if ( offset === 0 || offset === 1 )
+                {
+                    this.ret( offset )
+                }
+                else
+                {
+                    this.pc += offset - 2
+                }
+            }
+        }
+        else
+        {
+            this.variable( memory.getUint8( this.pc++ ), result )
+        }
+    },
 
 	save_undo: function( pc, variable )
 	{

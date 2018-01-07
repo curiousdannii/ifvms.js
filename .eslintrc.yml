@@ -41,6 +41,8 @@ rules:
     - off
   no-constant-condition:
     - off
+  no-trailing-spaces:
+    - error
   quotes:
     - error
     - single

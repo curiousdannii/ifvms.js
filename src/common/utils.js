@@ -61,7 +61,7 @@ function MemoryView( buffer, byteOffset, byteLength )
 	{
 		buffer = buffer.buffer;
 	}
-	
+
 	return extend( new DataView( buffer, byteOffset, byteLength ), {
 		getUint8Array: function( start, length )
 		{
@@ -81,7 +81,7 @@ function MemoryView( buffer, byteOffset, byteLength )
 			( new Uint8Array( this.buffer ) ).set( data, start );
 		},
 		//setBuffer16 NOTE: if we implement this we cannot simply set a Uint16Array as most systems are little-endian
-		
+
 		// For use with IFF files
 		getFourCC: function( index )
 		{
