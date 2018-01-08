@@ -14,11 +14,12 @@ https://github.com/curiousdannii/ifvms.js
 // Run a ZVM instance
 
 import fs from 'fs'
-import process from 'process'
-import yargs from 'yargs'
+import readline from 'readline'
 
-import AsyncGlkProxy from '../src/asyncglk/src/asyncglk/asyncglkproxy.mjs'
+import { DialogTerm, Glk as AsyncGlk } from '../src/asyncglk/'
 import GlkOte from 'glkote-term'
+import MuteStream from 'mute-stream'
+import yargs from 'yargs'
 
 const argv = yargs
     .usage( 'Usage: zvm <file> [options]' )
@@ -48,14 +49,29 @@ import SourceZVM from '../src/zvm.js'
 import BundledZVM from '../dist/zvm.min.js'
 const ZVM = argv.b ? BundledZVM : SourceZVM
 
+// Readline options
+const stdin = process.stdin
+const stdout = new MuteStream()
+stdout.pipe( process.stdout )
+const rl = readline.createInterface({
+    input: stdin,
+    output: stdout,
+    prompt: '',
+})
+const rl_opts = {
+    rl: rl,
+    stdin: stdin,
+    stdout: stdout,
+}
+
 const vm = new ZVM()
-const Glk = new AsyncGlkProxy( GlkOte.Glk )
+const Glk = new AsyncGlk()
 
 const options = {
-    vm: vm,
-    Dialog: new GlkOte.Dialog(),
-    Glk: Glk,
-    GlkOte: new GlkOte(),
+    vm,
+    Dialog: new DialogTerm( rl_opts ),
+    Glk,
+    GlkOte: new GlkOte( rl_opts ),
 }
 
 vm.prepare( fs.readFileSync( storyfile ), options )

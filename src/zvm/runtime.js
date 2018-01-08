@@ -199,14 +199,15 @@ module.exports = {
 			}
 		}
 
-		// Restart and restore the RAM and stacks
-		this.restart()
-		await this.restore_file( new Uint8Array( snapshot.ram ), 1 )
+        // Restore the RAM and stacks
+        await this.restore_file( new Uint8Array( snapshot.ram ), 1 )
 
-		// Set remaining data from the snapshot
-		this.read_data = snapshot.read_data
-		this.xorshift_seed = snapshot.xorshift_seed
-	},
+        // Set remaining data from the snapshot
+        this.read_data = snapshot.read_data
+        this.xorshift_seed = snapshot.xorshift_seed
+
+        // TODO: run the event loop here for the pending input event
+    },
 
 	encode_text: function( zscii, length, from, target )
 	{
@@ -639,13 +640,11 @@ module.exports = {
 		await this.update_header()
 	},
 
-	// Request a restore
-	restore: async function( pc )
-	{
+    // Request a restore
+    restore: async function()
+    {
         const Glk = this.Glk
         let result = 0
-
-        this.pc = pc
 
         const fref = await Glk.glk_fileref_create_by_prompt( 0x01, 0x02, 0 )
         if ( fref )
@@ -654,15 +653,15 @@ module.exports = {
             if ( str )
             {
                 const buffer = new Uint8Array( 128 * 1024 )
-				await Glk.glk_get_buffer_stream( str, buffer )
-				result = await this.restore_file( buffer.buffer )
+                await Glk.glk_get_buffer_stream( str, buffer )
+                result = await this.restore_file( buffer.buffer )
                 await Glk.glk_stream_close( str )
             }
             await Glk.glk_fileref_destroy( fref )
         }
 
-        this.save_restore_result( result )
-	},
+        return result
+    },
 
 	restore_file: async function( data, autorestoring )
 	{
@@ -813,12 +812,10 @@ module.exports = {
     },
 
     // pc is the address of the storer operand (or branch in v3)
-    save: async function( pc )
+    save: async function()
     {
         const Glk = this.Glk
         let result = 0
-
-        this.pc = pc
 
         const fref = await Glk.glk_fileref_create_by_prompt( 0x01, 0x01, 0 )
         if ( fref )
@@ -833,7 +830,7 @@ module.exports = {
             await Glk.glk_fileref_destroy( fref )
         }
 
-        this.save_restore_result( result )
+        return result
     },
 
 	save_file: function( pc, autosaving )
@@ -905,40 +902,6 @@ module.exports = {
 
 		return quetzal.write();
 	},
-
-    save_restore_result: function( result )
-    {
-        const memory = this.m
-
-        // Store the result / branch in z3
-        if ( this.version3 )
-        {
-            // Calculate the branch
-            const temp = memory.getUint8( this.pc++ )
-            const iftrue = temp & 0x80
-            const offset = temp & 0x40 ?
-                // single byte address
-                temp & 0x3F :
-                // word address, but first get the second byte of it
-                ( temp << 8 | memory.getUint8( this.pc++ ) ) << 18 >> 18
-
-            if ( !result === !iftrue )
-            {
-                if ( offset === 0 || offset === 1 )
-                {
-                    this.ret( offset )
-                }
-                else
-                {
-                    this.pc += offset - 2
-                }
-            }
-        }
-        else
-        {
-            this.variable( memory.getUint8( this.pc++ ), result )
-        }
-    },
 
 	save_undo: function( pc, variable )
 	{

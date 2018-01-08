@@ -108,8 +108,10 @@ const api = {
         }
         this.signature = signature
 
+        // Set up the rest of the engine
+        await this.restart()
+
         // Handle loading and clearing autosaves
-        let autorestored
         const Dialog = this.options.Dialog
         if ( Dialog )
         {
@@ -124,8 +126,8 @@ const api = {
                     const snapshot = Dialog.autosave_read( signature )
                     if ( snapshot )
                     {
+                        // Restore the snapshot and wait for the pending event
                         await this.do_autorestore( snapshot )
-                        autorestored = 1
                     }
                 }
                 catch (ex)
@@ -136,12 +138,8 @@ const api = {
             }
         }
 
-        // Initiate the engine, run, and wait for our first Glk event
-        if ( !autorestored )
-        {
-            await this.restart()
-            await this.run()
-        }
+        // Run the game loop
+        this.run()
     },
 
     do_autosave: async function( save )

@@ -85,20 +85,10 @@ Incdec = Opcode.subClass({
 
         return ( varnum < 0 ? 'e.s[e.sp-1]' : 'e.l[' + varnum + ']' ) + ( operator === 1 ? '++' : '--' );
     },
-}),
+})
 
-// Version 3 @save/restore branch instead of store
-V3SaveRestore = Stopper.subClass({
-    brancher: 1,
-
-    toString: function()
-    {
-        return `e.stop=1;await e.${ this.code === 181 ? 'save' : 'restore' }(${ this.pc + 1 })`
-    },
-}),
-
-V45Restore = opcode_builder( Storer, function() { return `await e.restore(${ this.next - 1 })` } ),
-V45Save = opcode_builder( Storer, function() { return `await e.save(${ this.next - 1 })` } );
+const V45Restore = opcode_builder( Storer, () => 'await e.restore()' )
+const V45Save = opcode_builder( Storer, () => 'await e.save()' )
 
 /*eslint brace-style: "off" */
 /*eslint indent: "off" */
@@ -162,10 +152,10 @@ return {
 /* print_ret */ 179: opcode_builder( Stopper, text => `await e.print(2,${ text });await e.print(1,13);return 1`, { printer: 1 } ),
 /* nop */ 180: Opcode,
 /* save (v3/4) */ 181: version < 4 ?
-    V3SaveRestore :
+    opcode_builder( Brancher, () => 'await e.save()' ) :
     V45Save,
 /* restore(v3/4) */ 182: version < 4 ?
-    V3SaveRestore :
+    opcode_builder( Brancher, () => 'await e.restore()' ) :
     V45Restore,
 /* restart */ 183: opcode_builder( Stopper, function() { return 'await e.erase_window(-1);await e.restart()' } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( stack_var ); } } ),
