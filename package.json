@@ -27,7 +27,7 @@
   "bugs": "https://github.com/curiousdannii/ifvms.js/issues",
   "dependencies": {
     "glkote-term": "^0.3.0",
-    "yargs": "^10.0.3"
+    "yargs": "^11.0.0"
   },
   "devDependencies": {
     "babili": "^0.1.2",
