@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "babili": "^0.1.2",
-    "browserify": "^15.0.0",
+    "browserify": "^16.0.0",
     "eslint": "^4.1.0"
   },
   "scripts": {
