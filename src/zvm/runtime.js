@@ -323,12 +323,6 @@ module.exports = {
 		{
 			case 1:
 				return 0x0102;
-			case 0x2000:
-				return 1;
-			// These aren't really applicable, but 2 is closer than 1
-			case 0x2001:
-			case 0x2002:
-				return 2;
 		}
 		return 0;
 	},

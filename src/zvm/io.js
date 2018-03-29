@@ -789,12 +789,16 @@ module.exports = {
 
 	set_font: function( font )
 	{
+		var returnval = this.io.mono & 0x04 ? 4 : 1;
+		if ( font === 0 )
+		{
+			return returnval;
+		}
 		// We only support fonts 1 and 4
 		if ( font !== 1 && font !== 4 )
 		{
 			return 0;
 		}
-		var returnval = this.io.mono & 0x04 ? 4 : 1;
 		if ( font !== returnval )
 		{
 			this.io.mono ^= 0x04;
