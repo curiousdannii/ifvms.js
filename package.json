@@ -28,7 +28,7 @@
   "dependencies": {
     "glkote-term": "^0.4.0",
     "mute-stream": "0.0.7",
-    "yargs": "^11.0.0"
+    "yargs": "^12.0.1"
   },
   "devDependencies": {
     "babili": "^0.1.2",
