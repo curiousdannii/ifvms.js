@@ -33,7 +33,7 @@
   "devDependencies": {
     "babili": "^0.1.2",
     "browserify": "^16.0.0",
-    "eslint": "^5.0.0"
+    "eslint": "^6.0.0"
   },
   "scripts": {
     "build": "make dist/zvm.min.js",
