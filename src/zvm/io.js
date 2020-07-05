@@ -15,19 +15,19 @@ https://github.com/curiousdannii/ifvms.js
 
 TODO:
 
- - style and colour support
  - pre-existing line input
  - timed input
  - mouse input
+ - write colours into header
 
 */
 
-var utils = require( '../common/utils.js' ),
-U2S = utils.U2S16,
-//S2U = utils.S2U16,
+const utils = require('../common/utils.js')
+const U2S = utils.U2S16
+//S2U = utils.S2U16
 
 // Glulx key codes accepted by the Z-Machine
-ZSCII_keyCodes = (function()
+const ZSCII_keyCodes = (function()
 {
 	var codes = {
 		0xfffffff9: 8, // delete/backspace
@@ -48,34 +48,16 @@ ZSCII_keyCodes = (function()
 		codes[ 0xffffffef - i ] = 133 + i++; // function keys
 	}
 	return codes;
-})(),
+})()
 
-/*
-
-Try to support as many of the Z-Machine's formatting combinations as possible.
-There are not enough styles to support them all, so sometimes bold formatting misses out.
-This spreadsheet shows how the Z-Machine formatting is mapped to Glk styles
-
-http://docs.google.com/spreadsheets/d/1Nvwyb_twC3_fPYDrjQu86b3KRAmLFDllIUvPUpMz108
-
-The index bits are (lowest to highest): mono, italic, bold, reverse
-
-We use the default GlkOte styles as much as possible, but for full support zvm.css must also be used
-
-*/
-style_mappings = [
-	// main window
-	[ 0, 2, 1, 7, 4, 7, 5, 7, 9, 10, 6, 3, 6, 3, 6, 3 ],
-	// status window
-	[ 0, 0, 1, 1, 4, 4, 5, 5, 9, 9, 6, 6, 3, 3, 7, 7 ],
-];
+// Style mappings
+// The index bits are (lowest to highest): mono, italic, bold
+const style_mappings = [0, 2, 1, 10, 4, 9, 5, 6]
 
 module.exports = {
 
 	init_io: function()
 	{
-		var Glk = this.Glk;
-
 		this.io = this.io || {
 			reverse: 0,
 			bold: 0,
@@ -107,19 +89,7 @@ module.exports = {
 		//this.process_colours();
 
 		// Construct the windows if they do not already exist
-		if ( !this.mainwin )
-		{
-			this.mainwin = Glk.glk_window_open( 0, 0, 0, 3, 201 );
-			Glk.glk_set_window( this.mainwin )
-			if ( this.version3 )
-			{
-				this.statuswin = Glk.glk_window_open( this.mainwin, 0x12, 1, 4, 202 );
-				if ( this.statuswin )
-				{
-					Glk.glk_set_style_stream( Glk.glk_window_get_stream( this.statuswin ), style_mappings[1][ 0x08 ] );
-				}
-			}
-		}
+		this.open_windows()
 	},
 
 	erase_line: function( value )
@@ -194,7 +164,11 @@ module.exports = {
 
 	format: function()
 	{
-		this.Glk.glk_set_style( style_mappings[ this.io.currentwin ][ !!this.io.mono | this.io.italic | this.io.bold | this.io.reverse ] );
+		this.Glk.glk_set_style(style_mappings[!!this.io.mono | this.io.italic | this.io.bold])
+		if (this.Glk.glk_gestalt(0x1100, 0))
+		{
+			this.Glk.garglk_set_reversevideo(this.io.reverse)
+		}
 	},
 
 	get_cursor: function( array )
@@ -334,6 +308,63 @@ module.exports = {
 		{
 			this.Glk.glk_stream_close( io.streams[0] );
 			io.streams[0] = 0;
+		}
+	},
+
+	// Open windows
+	open_windows: function()
+	{
+		if (!this.mainwin)
+		{
+			const Glk = this.Glk
+
+			// We will borrow the general approach of Bocfel to implement the Z-Machine's formatting model in Glk
+			// https://github.com/garglk/garglk/blob/master/terps/bocfel/screen.c
+
+			// Reset some Glk stylehints just in case
+			const styles_to_reset = [1, 2, 4, 5, 6, 9, 10]
+			for (let i = 0; i < 7; i++)
+			{
+				// Reset the size, weight, and obliqueness
+				Glk.glk_stylehint_set(0, styles_to_reset[i], 3, 0)
+				Glk.glk_stylehint_set(0, styles_to_reset[i], 4, 0)
+				Glk.glk_stylehint_set(0, styles_to_reset[i], 5, 0)
+				// And force proportional font
+				Glk.glk_stylehint_set(0, styles_to_reset[i], 6, 1)
+			}
+
+			// Now set the style hints we will use
+
+			// Bold will use subheader
+			Glk.glk_stylehint_set(0, 4, 4, 1)
+			// Italic will use emphasised
+			Glk.glk_stylehint_set(0, 1, 5, 1)
+			// Bold+italic will use alert
+			Glk.glk_stylehint_set(0, 5, 4, 1)
+			Glk.glk_stylehint_set(0, 5, 5, 1)
+			// Fixed will use preformated
+			Glk.glk_stylehint_set(0, 2, 6, 0)
+			// Bold+fixed will use user1
+			Glk.glk_stylehint_set(0, 9, 4, 1)
+			Glk.glk_stylehint_set(0, 9, 6, 0)
+			// Italic+fixed will use user2
+			Glk.glk_stylehint_set(0, 10, 5, 1)
+			Glk.glk_stylehint_set(0, 10, 6, 0)
+			// Bold+italic+fixed will use note
+			Glk.glk_stylehint_set(0, 6, 4, 1)
+			Glk.glk_stylehint_set(0, 6, 5, 1)
+			Glk.glk_stylehint_set(0, 6, 6, 0)
+
+			this.mainwin = Glk.glk_window_open(0, 0, 0, 3, 201)
+			Glk.glk_set_window(this.mainwin)
+			if (this.version3)
+			{
+				this.statuswin = Glk.glk_window_open(this.mainwin, 0x12, 1, 4, 202)
+				if (this.statuswin)
+				{
+					Glk.garglk_set_reversevideo_stream(Glk.glk_window_get_stream(this.statuswin), 1)
+				}
+			}
 		}
 	},
 
@@ -583,11 +614,11 @@ module.exports = {
 	},
 
 	// Process CSS default colours
-	process_colours: function()
+	/*process_colours: function()
 	{
 		// Convert RGB to a Z-Machine true colour
 		// RGB is a css colour code. rgb(), #000000 and #000 formats are supported.
-		/*function convert_RGB( code )
+		function convert_RGB( code )
 		{
 			var round = Math.round,
 			data = /(\d+),\s*(\d+),\s*(\d+)|#(\w{1,2})(\w{1,2})(\w{1,2})/.exec( code ),
@@ -655,8 +686,8 @@ module.exports = {
 			bg: bg,
 			fg_true: fg_true,
 			bg_true: bg_true,
-		});*/
-	},
+		});
+	},*/
 
 	// Request line input
 	read: function( storer, text, parse, time, routine )
@@ -820,7 +851,7 @@ module.exports = {
 		}
 		if ( stylebyte & 0x01 )
 		{
-			io.reverse = 0x08;
+			io.reverse = 1;
 		}
 		if ( stylebyte & 0x02 )
 		{
