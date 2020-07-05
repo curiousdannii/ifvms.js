@@ -3,7 +3,7 @@
 Z-Machine IO
 ============
 
-Copyright (c) 2017 The ifvms.js team
+Copyright (c) 2020 The ifvms.js team
 MIT licenced
 https://github.com/curiousdannii/ifvms.js
 
@@ -53,6 +53,33 @@ const ZSCII_keyCodes = (function()
 // Style mappings
 // The index bits are (lowest to highest): mono, italic, bold
 const style_mappings = [0, 2, 1, 10, 4, 9, 5, 6]
+
+// Convert a 15 bit colour to RGB
+function convert_true_colour(colour)
+{
+	const from5to8 = [0, 8, 16, 25, 33, 41, 49, 58, 66, 74, 82, 90, 99, 107, 115, 123, 132,
+		140, 148, 156, 165, 173, 181, 189, 197, 206, 214, 222, 230, 239, 247, 255]
+
+	// Stretch the five bits per colour out to 8 bits
+	return (from5to8[colour & 0x1F] << 16) | (from5to8[(colour & 0x03E0) >> 5] << 8) | (from5to8[(colour & 0x7C00) >> 10])
+}
+
+// The standard 15 bit colour values
+const zcolours = [
+	0xFFFE, // Current
+	0xFFFF, // Default
+	0x0000, // Black
+	0x001D, // Red
+	0x0340, // Green
+	0x03BD, // Yellow
+	0x59A0, // Blue
+	0x7C1F, // Magenta
+	0x77A0, // Cyan
+	0x7FFF, // White
+	0x5AD6, // Light grey
+	0x4631, // Medium grey
+	0x2D6B,	 // Dark grey
+]
 
 module.exports = {
 
@@ -773,24 +800,9 @@ module.exports = {
 		this.fix_upper_window();
 	},
 
-	set_colour: function( /*foreground, background*/ )
+	set_colour: function(foreground, background)
 	{
-		/*if ( foreground === 1 )
-		{
-			this.fg = undefined;
-		}
-		if ( foreground > 1 && foreground < 13 )
-		{
-			this.fg = foreground;
-		}
-		if ( background === 1 )
-		{
-			this.bg = undefined;
-		}
-		if ( background > 1 && background < 13 )
-		{
-			this.bg = background;
-		}*/
+		this.set_true_colour(zcolours[foreground], zcolours[background])
 	},
 
 	// Note that row and col must be decremented in JIT code
@@ -869,41 +881,37 @@ module.exports = {
 	},
 
 	// Set true colours
-	set_true_colour: function( /*foreground, background*/ )
+	set_true_colour: function(foreground, background)
 	{
-		// Convert a 15 bit colour to RGB
-		/*function convert_true_colour( colour )
+		if (this.Glk.glk_gestalt(0x1100, 0))
 		{
-			// Stretch the five bits per colour out to 8 bits
-			var newcolour = Math.round( ( colour & 0x1F ) * 8.226 ) << 16
-				| Math.round( ( ( colour & 0x03E0 ) >> 5 ) * 8.226 ) << 8
-				| Math.round( ( ( colour & 0x7C00 ) >> 10 ) * 8.226 );
-			newcolour = newcolour.toString( 16 );
-			// Ensure the colour is 6 bytes long
-			while ( newcolour.length < 6 )
+			let fg, bg
+			if (foreground === 0xFFFE)
 			{
-				newcolour = '0' + newcolour;
+				fg = -2
 			}
-			return '#' + newcolour;
+			else if (foreground === 0xFFFF)
+			{
+				fg = -1
+			}
+			else
+			{
+				fg = convert_true_colour(foreground)
+			}
+			if (background === 0xFFFE)
+			{
+				bg = -2
+			}
+			else if (background === 0xFFFF)
+			{
+				bg = -1
+			}
+			else
+			{
+				bg = convert_true_colour(background)
+			}
+			this.Glk.garglk_set_zcolors(fg, bg)
 		}
-
-		if ( foreground === 0xFFFF )
-		{
-			this.fg = undefined;
-		}
-		else if ( foreground < 0x8000 )
-		{
-			this.fg = convert_true_colour( foreground );
-		}
-
-		if ( background === 0xFFFF )
-		{
-			this.bg = undefined;
-		}
-		else if ( background < 0x8000 )
-		{
-			this.bg = convert_true_colour( background );
-		}*/
 	},
 
 	set_window: function( window )
@@ -997,7 +1005,7 @@ module.exports = {
 		
 		// Flags 1
 		ram.setUint8( 0x01,
-			0x00 // Colour is not supported yet
+			(this.Glk.glk_gestalt(0x1100, 0) ? 1 : 0) // Check if colour is supported
 			| 0x1C // Bold, italic and mono are supported
 			| 0x00 // Timed input not supported yet
 		);
