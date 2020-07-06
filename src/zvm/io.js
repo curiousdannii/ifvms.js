@@ -883,7 +883,8 @@ module.exports = {
 	// Set true colours
 	set_true_colour: function(foreground, background)
 	{
-		if (this.Glk.glk_gestalt(0x1100, 0))
+		const Glk = this.Glk
+		if (Glk.glk_gestalt(0x1100, 0))
 		{
 			let fg, bg
 			if (foreground === 0xFFFE)
@@ -897,6 +898,8 @@ module.exports = {
 			else
 			{
 				fg = convert_true_colour(foreground)
+				// Set colour for next opened window
+				Glk.glk_stylehint_set(0, 0, 7, fg)
 			}
 			if (background === 0xFFFE)
 			{
@@ -909,8 +912,20 @@ module.exports = {
 			else
 			{
 				bg = convert_true_colour(background)
+				// Set colour for next opened window
+				Glk.glk_stylehint_set(0, 0, 8, bg)
 			}
-			this.Glk.garglk_set_zcolors(fg, bg)
+
+			// Set the colours for each open window
+			Glk.garglk_set_zcolors_stream(this.mainwin.str, fg, bg)
+			if (this.upperwin)
+			{
+				Glk.garglk_set_zcolors_stream(this.upperwin.str, fg, bg)
+			}
+			if (this.statuswin)
+			{
+				Glk.garglk_set_zcolors_stream(this.statuswin.str, fg, bg)
+			}
 		}
 	},
 
