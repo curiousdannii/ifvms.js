@@ -169,7 +169,7 @@ module.exports = {
 		io = this.io;
 
 		// If we have seen the entire window, shrink it to what it should be
-		if ( io.seenheight === io.maxheight )
+		if (io.seenheight >= io.maxheight)
 		{
 			io.maxheight = io.height;
 		}
