@@ -3,7 +3,7 @@
 Z-Machine runtime functions
 ===========================
 
-Copyright (c) 2017 The ifvms.js team
+Copyright (c) 2020 The ifvms.js team
 MIT licenced
 https://github.com/curiousdannii/ifvms.js
 
@@ -205,7 +205,7 @@ module.exports = {
 
 		// Restart and restore the RAM and stacks
 		this.restart()
-		this.restore_file( new Uint8Array( snapshot.ram ), 1 )
+		this.restore_file(this.options.Dialog.streaming ? new Uint8Array(snapshot.ram) : Uint8Array.from(snapshot.ram), 1)
 
 		// Set remaining data from the snapshot
 		this.read_data = snapshot.read_data
@@ -222,10 +222,11 @@ module.exports = {
 		let snapshot = null
 		if ( ( save || 0 ) >= 0 )
 		{
+			const ram = this.save_file(this.pc, 1)
 			snapshot = {
 				glk: this.Glk.save_allstate(),
 				io: clone( this.io ),
-				ram: this.save_file( this.pc, 1 ),
+				ram: this.options.Dialog.streaming ? ram : Array.from(new Uint8Array(ram)),
 				read_data: clone( this.read_data ),
 				xorshift_seed: this.xorshift_seed,
 			}
