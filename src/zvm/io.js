@@ -85,10 +85,12 @@ module.exports = {
 
 	init_io: function()
 	{
-		this.io = this.io || {
+		this.io = {
 			reverse: 0,
 			bold: 0,
 			italic: 0,
+			bg: -1,
+			fg: -1,
 			
 			// A variable for whether we are outputing in a monospaced font. If non-zero then we are
 			// Bit 0 is for @set_style, bit 1 for the header, and bit 2 for @set_font
@@ -106,6 +108,7 @@ module.exports = {
 			// http://eblong.com/zarf/glk/quote-box.html
 			// Implemented in fix_upper_window() and split_window()
 			height: 0, // What the VM thinks the height is
+			glkheight: 0, // Actual height of the Glk window
 			maxheight: 0, // Height including quote boxes etc
 			seenheight: 0, // Last height the player saw
 			width: 0,
@@ -131,23 +134,31 @@ module.exports = {
 		}
 	},
 
-	erase_window: function( window )
+	erase_window: function(window)
 	{
-		if ( window < 1 )
+		if (window < 1)
 		{
-			this.Glk.glk_window_clear( this.mainwin );
-		}
-		if ( window === 1 || window === -2 )
-		{
-			if ( this.upperwin )
+			this.Glk.glk_window_clear(this.mainwin)
+			if (this.io.bg >= 0)
 			{
-				this.Glk.glk_window_clear( this.upperwin );
-				this.set_cursor( 0, 0 );
+				this.Glk.glk_stylehint_set(3, 0, 8, this.io.bg)
+			}
+			else if (this.io.bg === -1)
+			{
+				this.Glk.glk_stylehint_clear(3, 0, 8)
 			}
 		}
-		if ( window === -1 )
+		if (window !== 0)
 		{
-			this.split_window( 0 );
+			if (window === -1)
+			{
+				this.split_window(0)
+			}
+			if (this.upperwin)
+			{
+				this.Glk.glk_window_clear(this.upperwin)
+				this.set_cursor(0, 0)
+			}
 		}
 	},
 
@@ -180,10 +191,11 @@ module.exports = {
 				Glk.glk_window_close( this.upperwin );
 				this.upperwin = null;
 			}
-			else
+			else if (io.maxheight !== io.glkheight)
 			{
 				Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, io.maxheight, null );
 			}
+			io.glkheight = io.maxheight
 		}
 		io.seenheight = io.maxheight;
 		io.maxheight = io.height;
@@ -341,10 +353,10 @@ module.exports = {
 	// Open windows
 	open_windows: function()
 	{
+		const Glk = this.Glk
+
 		if (!this.mainwin)
 		{
-			const Glk = this.Glk
-
 			// We will borrow the general approach of Bocfel to implement the Z-Machine's formatting model in Glk
 			// https://github.com/garglk/garglk/blob/master/terps/bocfel/screen.c
 
@@ -391,6 +403,18 @@ module.exports = {
 				{
 					Glk.garglk_set_reversevideo_stream(Glk.glk_window_get_stream(this.statuswin), 1)
 				}
+			}
+		}
+		else
+		{
+			// Clean up after restarting
+			Glk.glk_stylehint_clear(0, 0, 8)
+			Glk.garglk_set_zcolors_stream(this.mainwin.str, this.io.fg, this.io.bg)
+			Glk.glk_window_clear(this.mainwin)
+			if (this.upperwin)
+			{
+				Glk.glk_window_close(this.upperwin)
+				this.upperwin = null
 			}
 		}
 	},
@@ -891,29 +915,34 @@ module.exports = {
 			{
 				fg = -2
 			}
-			else if (foreground === 0xFFFF)
-			{
-				fg = -1
-			}
 			else
 			{
-				fg = convert_true_colour(foreground)
-				// Set colour for next opened window
-				Glk.glk_stylehint_set(0, 0, 7, fg)
+				if (foreground === 0xFFFF)
+				{
+					fg = -1
+				}
+				else
+				{
+					fg = convert_true_colour(foreground)
+				}
+				this.io.fg = fg
 			}
+
 			if (background === 0xFFFE)
 			{
 				bg = -2
 			}
-			else if (background === 0xFFFF)
-			{
-				bg = -1
-			}
 			else
 			{
-				bg = convert_true_colour(background)
-				// Set colour for next opened window
-				Glk.glk_stylehint_set(0, 0, 8, bg)
+				if (background === 0xFFFF)
+				{
+					bg = -1
+				}
+				else
+				{
+					bg = convert_true_colour(background)
+				}
+				this.io.bg = bg
 			}
 
 			// Set the colours for each open window
@@ -921,10 +950,6 @@ module.exports = {
 			if (this.upperwin)
 			{
 				Glk.garglk_set_zcolors_stream(this.upperwin.str, fg, bg)
-			}
-			if (this.statuswin)
-			{
-				Glk.garglk_set_zcolors_stream(this.statuswin.str, fg, bg)
 			}
 		}
 	},
@@ -974,12 +999,19 @@ module.exports = {
 			// Create the window if it doesn't exist
 			if ( !this.upperwin )
 			{
+				if (this.io.bg >= 0)
+				{
+					Glk.glk_stylehint_set(4, 0, 8, this.io.bg)
+				}
 				this.upperwin = Glk.glk_window_open( this.mainwin, 0x12, io.maxheight, 4, 203 );
+				Glk.garglk_set_zcolors_stream(this.upperwin.str, this.io.fg, this.io.bg)
+				Glk.glk_stylehint_clear(4, 0, 8)
 			}
 			else
 			{
 				Glk.glk_window_set_arrangement( Glk.glk_window_get_parent( this.upperwin ), 0x12, io.maxheight, null );
 			}
+			io.glkheight = io.maxheight
 		}
 
 		if ( lines )

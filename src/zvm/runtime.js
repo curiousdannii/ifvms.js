@@ -204,7 +204,7 @@ module.exports = {
 		}
 
 		// Restart and restore the RAM and stacks
-		this.restart()
+		this.restart(1)
 		this.restore_file(this.options.Dialog.streaming ? new Uint8Array(snapshot.ram) : Uint8Array.from(snapshot.ram), 1)
 
 		// Set remaining data from the snapshot
@@ -581,7 +581,7 @@ module.exports = {
 	},
 
 	// (Re)start the VM
-	restart: function()
+	restart: function(autorestoring)
 	{
 		var ram = this.ram,
 		version = ram.getUint8( 0x00 ),
@@ -631,7 +631,10 @@ module.exports = {
 		});
 
 		this.init_text();
-		this.init_io();
+		if (!autorestoring)
+		{
+			this.init_io()
+		}
 
 		// Update the header
 		this.update_header();

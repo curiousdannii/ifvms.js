@@ -113,7 +113,7 @@ api = {
 					}
 					catch (ex)
 					{
-						this.log( 'Autorestore failed, deleting it' )
+						this.log('Autorestore failed, deleting it: ' + ex)
 						Dialog.autosave_write( signature, null )
 					}
 				}

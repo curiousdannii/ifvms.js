@@ -169,7 +169,7 @@ return {
 /* restore(v3/4) */ 182: version < 4 ?
 	V3SaveRestore :
 	V45Restore,
-/* restart */ 183: opcode_builder( Stopper, function() { return 'e.erase_window(-1);e.restart()'; } ),
+/* restart */ 183: opcode_builder( Stopper, function() { return 'e.restart()'; } ),
 /* ret_popped */ 184: opcode_builder( Stopper, function( a ) { return 'return ' + a; }, { post: function() { this.operands.push( stack_var ); } } ),
 185: version < 5 ?
 	/* pop (v3/4) */ opcode_builder( Opcode, function() { return 's[--e.sp]'; } ) :
