@@ -1,0 +1,19 @@
+[package]
+name = "ifvms"
+version = "2.0.0"
+authors = ["Dannii Willis <curiousdannii@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+bytes = "0.5.6"
+console_error_panic_hook = "0.1.6"
+ifvms-decompiler = {path = "../ifvms-decompiler"}
+wasm-bindgen = "0.2.68"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

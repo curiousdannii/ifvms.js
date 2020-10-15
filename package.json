@@ -33,11 +33,13 @@
   "devDependencies": {
     "babili": "^0.1.2",
     "browserify": "^16.0.0",
-    "eslint": "^6.0.0"
+    "eslint": "^6.0.0",
+    "wasm-pack": "^0.9.1"
   },
   "scripts": {
     "build": "make dist/zvm.min.js",
+    "build-decompiler": "wasm-pack build src/decompiler/ifvms --target nodejs",
     "lint": "eslint --ignore-path .gitignore .",
-    "test": "make test"
+    "test": "./tests/runtests.sh"
   }
 }

@@ -26,12 +26,12 @@ rules:
     - always
     -
       null: ignore
-  indent:
-    - error
-    - tab
-    -
-      SwitchCase: 1
-      VariableDeclarator: 0
+#  indent:
+#    - error
+#    - tab
+#    -
+#      SwitchCase: 1
+#      VariableDeclarator: 0
   linebreak-style:
     - error
     - unix

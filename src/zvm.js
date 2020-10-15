@@ -27,6 +27,7 @@ Any other non-standard behaviour should be considered a bug
 
 var utils = require( './common/utils.js' ),
 file = require( './common/file.js' ),
+decompiler = require('./decompiler/ifvms/pkg/ifvms.js'),
 
 default_options = {
 	stack_len: 100 * 1000,
@@ -74,12 +75,18 @@ api = {
 				throw new Error( 'Unsupported Z-Machine version: ' + data.version );
 			}
 			
-			// Load the storyfile we are given into our MemoryView (an enhanced DataView)
-			this.m = utils.MemoryView( data.data );
+			// Set up the ZVMDecompiler
+			const image = data.data
+			const image_view = utils.MemoryView(image)
+			const version = image_view.getUint8(0)
+			const globals_addr = image_view.getUint16(0x0C)
+			this.decompiler = new decompiler.ZVMDecompiler(image.length, version, globals_addr)
+
+			// Set up our memory
+			this.image_length = image.length
+			this.make_memory(image)
 			
-			// Make a seperate MemoryView for the ram, and store the original ram
-			this.staticmem = this.m.getUint16( 0x0E );
-			this.ram = utils.MemoryView( this.m, 0, this.staticmem );
+			// Store the original ram
 			this.origram = this.m.getUint8Array( 0, this.staticmem );
 
 			// Cache the game signature
@@ -239,19 +246,25 @@ api = {
 		}
 	},
 
-	// Compile a JIT routine
-	compile: function()
-	{
-		var context = this.disassemble();
-		
-		// Compile the routine with new Function()
-		this.jit[context.pc] = new Function( 'e', '' + context );
+    // Compile a JIT routine
+    compile: function()
+    {
+        // Compile the routine with new Function()
+        const pc = this.pc
+        const code = this.decompiler.output_block(pc)
+        this.jit[pc] = new Function('e', code)
 
-		if ( context.pc < this.staticmem )
-		{
-			this.log( 'Caching a JIT function in dynamic memory: ' + context.pc );
-		}
-	},
+        // Check for a detached memory because the WASM grew
+        if (this.m.buffer.byteLength === 0)
+        {
+            this.make_memory()
+        }
+
+        if (pc < this.staticmem)
+        {
+            this.log('Caching a JIT function in dynamic memory: ' + pc)
+        }
+    },
 
 },
 

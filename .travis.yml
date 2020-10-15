@@ -1,9 +1,15 @@
 notifications:
   email: false
 
-language: node_js
-node_js:
-  - node
+language: rust
+rust:
+  - stable
+
+before_install:
+  - nvm install node
+  - npm install
 
 script:
-  - make lint test
+  - npm run lint
+  - npm run build-decompiler
+  - npm run test

@@ -20,6 +20,7 @@ TODO:
 
 const file = require( '../common/file.js' )
 const utils = require( '../common/utils.js' )
+const decompiler = require('../decompiler/ifvms/pkg/ifvms.js')
 const extend = utils.extend
 const U2S = utils.U2S16
 const S2U = utils.S2U16
@@ -492,6 +493,21 @@ module.exports = {
 	{
 		return places > 0 ? number << places : number >>> -places;
 	},
+
+    make_memory: function(image)
+    {
+        // Set up our memory
+        const image_addr = this.decompiler.image_addr
+        this.m = utils.MemoryView(decompiler.__wasm.memory.buffer, image_addr, this.image_length)
+        if (image)
+        {
+            this.m.setUint8Array(0, image)
+        }
+
+        // Make a seperate MemoryView for the ram
+        this.staticmem = this.m.getUint16(0x0E)
+        this.ram = utils.MemoryView(this.m, 0, this.staticmem)
+    },
 
 	make_stacks: function()
 	{

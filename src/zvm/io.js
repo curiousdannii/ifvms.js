@@ -875,6 +875,7 @@ module.exports = {
 	},
 
 	// Set styles
+	// TODO - rename to match opcode name?
 	set_style: function( stylebyte )
 	{
 		var io = this.io;
