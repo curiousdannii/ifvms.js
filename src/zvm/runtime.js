@@ -516,6 +516,18 @@ module.exports = {
 		this.s = new Uint16Array( this.stack.buffer, this.frameptr + 8 + locals_count * 2 );
 	},
 
+	print_table(zscii, width, height, skip)
+	{
+		height = height || 1
+		skip = skip || 0
+		let i = 0
+		while (i++ < height)
+		{
+			this.io._print(this.zscii_to_text(this.m.getUint8Array(zscii, width)) + (i < height ? '\r' : ''))
+			zscii += width + skip
+		}
+	},
+
 	put_prop: function( object, property, value )
 	{
 		// Try to find the property
@@ -649,7 +661,7 @@ module.exports = {
 		this.init_text();
 		if (!autorestoring)
 		{
-			this.init_io()
+			this.io.reset()
 		}
 
 		// Update the header
@@ -1023,6 +1035,57 @@ module.exports = {
 	test_attr: function( object, attribute )
 	{
 		return ( this.m.getUint8( this.objects + ( this.version3 ? 9 : 14 ) * object + ( attribute / 8 ) | 0 ) << attribute % 8 ) & 0x80;
+	},
+
+	// Update the header after restarting or restoring
+	update_header: function()
+	{
+		var ram = this.ram
+		
+		// Reset the Xorshift seed
+		this.xorshift_seed = 0
+		
+		// Update the screen size variables - in version 3 does not actually set the header variables
+		this.io.update_screen_size()
+		
+		// For version 3 we only set Flags 1
+		if ( this.version3 )
+		{
+			return ram.setUint8(0x01,
+				( ram.getUint8(0x01) & 0x8F) // Keep all except bits 4-6
+				| (this.statuswin ? 0x20 : 0x10) // If status win is available then set 0x20 for the upper win also being available, otherwise 0x10 for the status win itself
+				| 0x40 // Variable pitch font is default - Or can we tell from options if the font is fixed pitch?
+			)
+		}
+		
+		// Flags 1
+		ram.setUint8(0x01,
+			(this.Glk.glk_gestalt(0x1100, 0) ? 1 : 0) // Check if colour is supported
+			| 0x1C // Bold, italic and mono are supported
+			| 0x00 // Timed input not supported yet
+		);
+		
+		// Flags 2: Clear bits 3, 5, 7: no character graphics, mouse or sound effects
+		// This is really a word, but we only care about the lower byte
+		ram.setUint8(0x11, ram.getUint8(0x11) & 0x57)
+		
+		// Font height/width in "units"
+		if (this.version > 4)
+		{
+			ram.setUint16(0x26, 0x0101)
+		}
+
+		// Colours
+		//ram.setUint8( 0x2C, isNaN( this.options.bg ) ? 1 : this.options.bg );
+		//ram.setUint8( 0x2D, isNaN( this.options.fg ) ? 1 : this.options.fg );
+		//this.extension_table( 5, this.options.fg_true );
+		//this.extension_table( 6, this.options.bg_true );
+		
+		// Z Machine Spec revision
+		ram.setUint16(0x32, 0x0102)
+		
+		// Clear flags three, we don't support any of that stuff
+		this.extension_table(4, 0 )
 	},
 
 	// Read or write a variable

@@ -33,6 +33,10 @@ fn end_block() -> OpcodeDefinition {
     OpcodeDefinition {stores: false, branches: false, ends_block: true, pauses_vm: false, operands: None}
 }
 
+fn end_block_with_operands(operands: Vec<OperandTypes>) -> OpcodeDefinition {
+    OpcodeDefinition {stores: false, branches: false, ends_block: true, pauses_vm: false, operands: Some(operands)}
+}
+
 fn pause_vm() -> OpcodeDefinition {
     OpcodeDefinition {stores: false, branches: false, ends_block: true, pauses_vm: true, operands: None}
 }
@@ -110,7 +114,7 @@ pub fn get_opcode_definitions(version: u8) -> FnvHashMap<u16, OpcodeDefinition> 
     /* remove_obj */
     /* print_obj */
     /* ret */ map.insert(139, end_block());
-    /* jump */ map.insert(140, OpcodeDefinition {stores: false, branches: false, ends_block: true, pauses_vm: false, operands: Some(vec![Signed])});
+    /* jump */ map.insert(140, end_block_with_operands(vec![Signed]));
     /* print_paddr */
     /* load */ map.insert(142, store());
     /* rtrue */ map.insert(176, end_block());
@@ -142,7 +146,7 @@ pub fn get_opcode_definitions(version: u8) -> FnvHashMap<u16, OpcodeDefinition> 
     /* get_cursor */
     /* set_text_style */
     /* buffer_mode */
-    /* output_stream */ map.insert(243, end_block());
+    /* output_stream */ map.insert(243, end_block_with_operands(vec![Signed]));
     /* input_stream */ map.insert(244, pause_vm());
     /* sound_effect */
     /* read_char */ map.insert(246, store_and_pause_vm());

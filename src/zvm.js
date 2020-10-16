@@ -23,18 +23,17 @@ Any other non-standard behaviour should be considered a bug
 
 */
 
-'use strict';
+const utils = require( './common/utils.js' )
+const file = require( './common/file.js' )
+const decompiler = require('./decompiler/ifvms/pkg/ifvms.js')
+const ZVMIO = require('./zvm/io.js')
 
-var utils = require( './common/utils.js' ),
-file = require( './common/file.js' ),
-decompiler = require('./decompiler/ifvms/pkg/ifvms.js'),
-
-default_options = {
+const default_options = {
 	stack_len: 100 * 1000,
 	undo_len: 1000 * 1000,
-},
+}
 
-api = {
+const api = {
 
 	init: function()
 	{
@@ -97,6 +96,9 @@ api = {
 				signature += ( this.origram[i] < 0x10 ? '0' : '' ) + this.origram[i++].toString( 16 )
 			}
 			this.signature = signature
+
+			// Set up the sub-components
+			this.io = new ZVMIO(this)
 
 			// Handle loading and clearing autosaves
 			let autorestored
@@ -167,12 +169,12 @@ api = {
 			// Process the event
 			if ( event_type === 2 )
 			{
-				this.handle_char_input( glk_event.get_field( 2 ) );
+				this.io.handle_char_input(glk_event.get_field(2))
 				run = 1;
 			}
 			if ( event_type === 3 )
 			{
-				this.handle_line_input( glk_event.get_field( 2 ), glk_event.get_field( 3 ) );
+				this.io.handle_line_input(glk_event.get_field(2), glk_event.get_field(3))
 				run = 1;
 			}
 
@@ -185,7 +187,7 @@ api = {
 			// glk_fileref_create_by_prompt handler
 			if ( event_type === 'fileref_create_by_prompt' )
 			{
-				run = this.handle_create_fileref( resumearg );
+				run = this.io.handle_create_fileref(resumearg)
 			}
 			
 			this.glk_blocking_call = null;
@@ -266,14 +268,13 @@ api = {
         }
     },
 
-},
+}
 
-VM = utils.Class.subClass( utils.extend(
+const VM = utils.Class.subClass(utils.extend(
 	api,
 	require( './zvm/runtime.js' ),
 	require( './zvm/text.js' ),
-	require( './zvm/io.js' ),
 	require( './zvm/disassembler.js' )
-) );
+))
 
-module.exports = VM;
+module.exports = VM
