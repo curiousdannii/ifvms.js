@@ -3,4 +3,4 @@ node_modules
 npm-debug.log
 dist
 src/decompiler/ifvms/pkg
-src/decompiler/target
+src/decompiler/**/target

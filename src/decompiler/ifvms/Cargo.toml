@@ -10,10 +10,12 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-bytes = "0.5.6"
-console_error_panic_hook = "0.1.6"
+console_error_panic_hook = {version = "0.1.6", optional = true}
 ifvms-decompiler = {path = "../ifvms-decompiler"}
 wasm-bindgen = "0.2.68"
 
+[features]
+panic_hook = ["console_error_panic_hook"]
+
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = false
+wasm-opt = ["-O3", "--enable-mutable-globals"]

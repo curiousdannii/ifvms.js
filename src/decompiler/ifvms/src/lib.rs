@@ -9,12 +9,21 @@ https://github.com/curiousdannii/ifvms.js
 
 */
 use std::io::Cursor;
-use console_error_panic_hook;
 use wasm_bindgen::prelude::*;
 
 use ifvms_decompiler::zvm;
 
 mod codegen_zvm;
+
+// Functions to optionally set up the console error panic hook
+#[cfg(feature = "panic_hook")]
+use console_error_panic_hook;
+#[cfg(feature = "panic_hook")]
+fn setup_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+#[cfg(not(feature = "panic_hook"))]
+fn setup_panic_hook() {}
 
 #[wasm_bindgen]
 pub struct ZVMDecompiler {
@@ -29,8 +38,8 @@ impl ZVMDecompiler {
     // Allocate space for the image
     #[wasm_bindgen(constructor)]
     pub fn new(image_length: u32, version: u8, globals_addr: u16) -> ZVMDecompiler {
-        // Set up the console error hook
-        console_error_panic_hook::set_once();
+        // Set up the console error panic hook
+        setup_panic_hook();
 
         // Allocate space for the image
         let image = vec![0 as u8; image_length as usize];
@@ -48,7 +57,7 @@ impl ZVMDecompiler {
         }
     }
 
-    pub fn output_block(&mut self, addr :u32) -> String {
+    pub fn output_fragment(&mut self, addr :u32) -> String {
         codegen_zvm::output_block(&mut self.state, addr)
     }
 }

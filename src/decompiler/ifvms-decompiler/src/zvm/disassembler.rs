@@ -8,6 +8,7 @@ MIT licenced
 https://github.com/curiousdannii/ifvms.js
 
 */
+
 use bytes::Buf;
 
 use super::*;

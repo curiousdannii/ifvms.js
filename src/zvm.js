@@ -251,7 +251,7 @@ api = {
     {
         // Compile the routine with new Function()
         const pc = this.pc
-        const code = this.decompiler.output_block(pc)
+        const code = this.decompiler.output_fragment(pc)
         this.jit[pc] = new Function('e', code)
 
         // Check for a detached memory because the WASM grew

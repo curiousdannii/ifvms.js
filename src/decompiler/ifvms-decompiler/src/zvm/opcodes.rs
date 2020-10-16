@@ -69,6 +69,7 @@ pub fn get_opcode_definitions(version: u8) -> FnvHashMap<u16, OpcodeDefinition> 
     let mut map = FnvHashMap::default();
 
     // Opcodes for all versions
+    // Empty lines are ordinary boring opcodes that don't branch, store, or do anything interesting
     /* je */ map.insert(1, branch());
     /* jl */ map.insert(2, branch_with_operands(vec![Signed, Signed]));
     /* jg */ map.insert(3, branch_with_operands(vec![Signed, Signed]));

@@ -3,3 +3,6 @@ members = [
     "ifvms",
     "ifvms-decompiler",
 ]
+
+[profile.release]
+lto = true

@@ -14,9 +14,7 @@ use ifvms_decompiler::zvm::*;
 
 pub fn output_block(state: &mut ZVMState, addr: u32) -> String {
 
-    // Get some variables from the image
-    let cursor = &mut state.image;
-    cursor.set_position(0);
+    // Set some variables we'll need for code gen
     let version = state.version;
     let globals_addr = state.globals_addr;
     let addr_multiplier = match version {
@@ -212,7 +210,7 @@ pub fn output_block(state: &mut ZVMState, addr: u32) -> String {
 
     // Output the code block for the current address
     let mut output = String::from("var l=e.l,s=e.s,t=0;");
-    cursor.set_position(addr as u64);
+    state.image.set_position(addr as u64);
     loop {
         let instruction = zvm::disassembler::disassemble_instruction(state);
         output = format!("{}\n/* {}/{} */ {};", output, instruction.addr, instruction.opcode, output_instruction(&instruction));
