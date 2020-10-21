@@ -253,8 +253,9 @@ const api = {
     {
         // Compile the routine with new Function()
         const pc = this.pc
-        const code = this.decompiler.output_fragment(pc)
-        this.jit[pc] = new Function('e', code)
+        const fragment = this.decompiler.fragment(pc)
+        this.jit[pc] = new Function('e', fragment.code)
+        fragment.free()
 
         // Check for a detached memory because the WASM grew
         if (this.m.buffer.byteLength === 0)
@@ -273,8 +274,7 @@ const api = {
 const VM = utils.Class.subClass(utils.extend(
 	api,
 	require( './zvm/runtime.js' ),
-	require( './zvm/text.js' ),
-	require( './zvm/disassembler.js' )
+	require( './zvm/text.js' )
 ))
 
 module.exports = VM

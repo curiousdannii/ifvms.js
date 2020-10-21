@@ -9,9 +9,10 @@ https://github.com/curiousdannii/ifvms.js
 
 */
 use std::io::Cursor;
+use js_sys;
 use wasm_bindgen::prelude::*;
 
-use ifvms_decompiler::zvm;
+use ifvms_decompiler::*;
 
 mod codegen_zvm;
 
@@ -25,12 +26,46 @@ fn setup_panic_hook() {
 #[cfg(not(feature = "panic_hook"))]
 fn setup_panic_hook() {}
 
+// Output data from compiling a function/fragment
+#[wasm_bindgen]
+pub struct DecompilationResult {
+    // Address of the function or first fragment
+    #[wasm_bindgen(readonly)]
+    pub addr: u32,
+
+    // wasm-bindgen can't handle Strings in structs directly, it needs a getter function
+    code: String,
+
+    // Functions this function calls, again needs a getter
+    depends_on: Vec<u32>,
+
+    // Number of locals
+    #[wasm_bindgen(readonly)]
+    pub locals: u32,
+
+    // Whether or not the function is safe
+    #[wasm_bindgen(readonly)]
+    pub safe: bool,
+}
+
+#[wasm_bindgen]
+impl DecompilationResult {
+    #[wasm_bindgen(getter)]
+    pub fn code(&self) -> String {
+        self.code.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn depends_on(&self) -> js_sys::Uint32Array {
+        let slice: &[u32] = &self.depends_on;
+        js_sys::Uint32Array::from(slice)
+    }
+}
+
+// The decompiler class which will be used by ZVM
 #[wasm_bindgen]
 pub struct ZVMDecompiler {
     state: ifvms_decompiler::zvm::ZVMState,
-
-    #[wasm_bindgen(readonly)]
-    pub image_addr: u32,
 }
 
 #[wasm_bindgen]
@@ -43,21 +78,33 @@ impl ZVMDecompiler {
 
         // Allocate space for the image
         let image = vec![0 as u8; image_length as usize];
-        let mut boxed_image = image.into_boxed_slice();
-        let addr = boxed_image.as_mut_ptr();
+        let boxed_image = image.into_boxed_slice();
         let cursor = Cursor::new(boxed_image);
         ZVMDecompiler {
-            state: zvm::ZVMState {
-                image: cursor,
-                version,
-                globals_addr,
-                opcode_definitions: zvm::opcodes::get_opcode_definitions(version),
-            },
-            image_addr: addr as u32,
+            state: zvm::ZVMState::new(cursor, version, globals_addr),
         }
     }
 
-    pub fn output_fragment(&mut self, addr :u32) -> String {
-        codegen_zvm::output_block(&mut self.state, addr)
+    // Attempt to decompile a function
+    pub fn function(&mut self, addr: u32) -> DecompilationResult {
+        unimplemented!()
+    }
+
+    // Output the code for one fragment
+    pub fn fragment(&mut self, addr: u32) -> DecompilationResult {
+        DecompilationResult {
+            addr,
+            code: codegen_zvm::output_block(&mut self.state, addr),
+            depends_on: Vec::new(),
+            locals: 0,
+            safe: false,
+        }
+    }
+
+    // Return the address of the image so that ZVM can fill in the data
+    #[wasm_bindgen(getter)]
+    pub fn image_addr(&mut self) -> u32 {
+        let image = self.state.image.get_mut();
+        image.as_mut_ptr() as u32
     }
 }

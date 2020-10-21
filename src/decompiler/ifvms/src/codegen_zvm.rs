@@ -209,7 +209,7 @@ pub fn output_block(state: &mut ZVMState, addr: u32) -> String {
     };
 
     // Output the code block for the current address
-    let mut output = String::from("var l=e.l,s=e.s,t=0;");
+    let mut output = String::from("let l=e.l,s=e.s,t=0;");
     state.image.set_position(addr as u64);
     loop {
         let instruction = zvm::disassembler::disassemble_instruction(state);
