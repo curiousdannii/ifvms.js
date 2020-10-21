@@ -653,9 +653,6 @@ module.exports = {
 			// Routine and string multiplier
 			addr_multipler: addr_multipler,
 
-			// Opcodes for this version of the Z-Machine
-			opcodes: require( './opcodes.js' )( version ),
-
 		});
 
 		this.init_text();
