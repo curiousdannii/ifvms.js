@@ -72,7 +72,7 @@ const zcolours = [
     0x7FFF, // White
     0x5AD6, // Light grey
     0x4631, // Medium grey
-    0x2D6B,	 // Dark grey
+    0x2D6B, // Dark grey
 ]
 
 class ZVMIO
@@ -397,7 +397,7 @@ class ZVMIO
             if (this.runtime.version3)
             {
                 this.statuswin = Glk.glk_window_open(this.mainwin, 0x12, 1, 4, 202)
-                if (this.statuswin)
+                if (this.statuswin && this.Glk.glk_gestalt(0x1100, 0))
                 {
                     Glk.garglk_set_reversevideo_stream(Glk.glk_window_get_stream(this.statuswin), 1)
                 }
@@ -407,7 +407,10 @@ class ZVMIO
         {
             // Clean up after restarting
             Glk.glk_stylehint_clear(0, 0, 8)
-            Glk.garglk_set_zcolors_stream(this.mainwin.str, this.state.fg, this.state.bg)
+            if (this.Glk.glk_gestalt(0x1100, 0))
+            {
+                Glk.garglk_set_zcolors_stream(this.mainwin.str, this.state.fg, this.state.bg)
+            }
             Glk.glk_window_clear(this.mainwin)
             if (this.upperwin)
             {
@@ -912,7 +915,10 @@ class ZVMIO
                     Glk.glk_stylehint_set(4, 0, 8, this.state.bg)
                 }
                 this.upperwin = Glk.glk_window_open(this.mainwin, 0x12, state.maxheight, 4, 203)
-                Glk.garglk_set_zcolors_stream(this.upperwin.str, this.state.fg, this.state.bg)
+                if (this.Glk.glk_gestalt(0x1100, 0))
+                {
+                    Glk.garglk_set_zcolors_stream(this.upperwin.str, this.state.fg, this.state.bg)
+                }
                 Glk.glk_stylehint_clear(4, 0, 8)
             }
             else
