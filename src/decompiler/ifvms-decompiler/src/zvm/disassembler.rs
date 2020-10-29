@@ -149,7 +149,7 @@ pub fn disassemble_instruction(state: &mut ZVMState) -> Instruction {
         } else {
             (first_branch_byte & 0x3F) as i16
         };
-        Some(Branch {
+        Some(BranchTarget {
             iftrue,
             offset,
         })

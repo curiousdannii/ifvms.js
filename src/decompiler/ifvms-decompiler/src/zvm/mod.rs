@@ -20,16 +20,18 @@ pub struct ZVMState {
     pub image: Cursor<Box<[u8]>>,
     pub version: u8,
     pub globals_addr: u16,
+    pub unsafe_io: bool,
     pub opcode_definitions: FnvHashMap<u16, opcodes::OpcodeDefinition>,
     pub functions: FnvHashMap<u32, FunctionSafety>,
 }
 
 impl ZVMState {
-    pub fn new(image: Cursor<Box<[u8]>>, version: u8, globals_addr: u16) -> ZVMState {
+    pub fn new(image: Cursor<Box<[u8]>>, version: u8, globals_addr: u16, unsafe_io: bool) -> ZVMState {
         ZVMState {
             image,
             version,
             globals_addr,
+            unsafe_io,
             opcode_definitions: opcodes::get_opcode_definitions(version),
             functions: FnvHashMap::default(),
         }
@@ -48,7 +50,7 @@ pub enum Operand {
 }
 
 #[derive(Copy, Clone)]
-pub struct Branch {
+pub struct BranchTarget {
     pub iftrue: bool,
     pub offset: i16,
 }
@@ -59,7 +61,7 @@ pub struct Instruction {
     pub operands: Vec<Operand>,
     pub result: Option<u8>,
     pub stores: bool,
-    pub branch: Option<Branch>,
+    pub branch: Option<BranchTarget>,
     pub branches: bool,
     pub text: Option<u32>,
     pub next: u32,

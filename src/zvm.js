@@ -79,7 +79,7 @@ const api = {
 			const image_view = utils.MemoryView(image)
 			const version = image_view.getUint8(0)
 			const globals_addr = image_view.getUint16(0x0C)
-			this.decompiler = new decompiler.ZVMDecompiler(image.length, version, globals_addr)
+			this.decompiler = new decompiler.ZVMDecompiler(image.length, version, globals_addr, true)
 
 			// Set up our memory
 			this.image_length = image.length

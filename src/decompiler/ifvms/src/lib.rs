@@ -36,8 +36,8 @@ pub struct DecompilationResult {
     // wasm-bindgen can't handle Strings in structs directly, it needs a getter function
     code: String,
 
-    // Functions this function calls, again needs a getter
-    depends_on: Vec<u32>,
+    // SafetyTBD functions this function calls, again needs a getter
+    calls: Vec<u32>,
 
     // Number of locals
     #[wasm_bindgen(readonly)]
@@ -56,8 +56,8 @@ impl DecompilationResult {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn depends_on(&self) -> js_sys::Uint32Array {
-        let slice: &[u32] = &self.depends_on;
+    pub fn calls(&self) -> js_sys::Uint32Array {
+        let slice: &[u32] = &self.calls;
         js_sys::Uint32Array::from(slice)
     }
 }
@@ -72,7 +72,7 @@ pub struct ZVMDecompiler {
 impl ZVMDecompiler {
     // Allocate space for the image
     #[wasm_bindgen(constructor)]
-    pub fn new(image_length: u32, version: u8, globals_addr: u16) -> ZVMDecompiler {
+    pub fn new(image_length: u32, version: u8, globals_addr: u16, unsafe_io: bool) -> ZVMDecompiler {
         // Set up the console error panic hook
         setup_panic_hook();
 
@@ -81,7 +81,7 @@ impl ZVMDecompiler {
         let boxed_image = image.into_boxed_slice();
         let cursor = Cursor::new(boxed_image);
         ZVMDecompiler {
-            state: zvm::ZVMState::new(cursor, version, globals_addr),
+            state: zvm::ZVMState::new(cursor, version, globals_addr, unsafe_io),
         }
     }
 
@@ -95,7 +95,7 @@ impl ZVMDecompiler {
         DecompilationResult {
             addr,
             code: codegen_zvm::output_block(&mut self.state, addr),
-            depends_on: Vec::new(),
+            calls: Vec::new(),
             locals: 0,
             safe: false,
         }
