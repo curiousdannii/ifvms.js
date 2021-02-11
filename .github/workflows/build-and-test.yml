@@ -12,6 +12,10 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '14'
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
       - run: npm install
       - run: npm run lint
+      - run: npm run build-decompiler
       - run: npm test
