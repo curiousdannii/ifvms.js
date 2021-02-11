@@ -753,13 +753,18 @@ module.exports = {
 
 		if ( this.version3 )
 		{
-			len++;
 			this.v3_status();
 		}
-		else
+		// The spec is badly phrased; the buffer capacity includes the zero terminator
+		// See https://github.com/DFillmore/Z-Machine-Standard/issues/76
+		if (this.version < 5)
 		{
-			//initiallen = this.m.getUint8( text + 1 );
+			len--
 		}
+		//else
+		//{
+		//initiallen = this.m.getUint8( text + 1 );
+		//}
 
 		buffer = Array( len );
 		buffer.fill( 0 )
