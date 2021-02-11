@@ -661,13 +661,18 @@ class ZVMIO
 
         if (this.runtime.version3)
         {
-            len++
             this.v3_status()
         }
-        else
+        // The spec is badly phrased; the buffer capacity includes the zero terminator
+        // See https://github.com/DFillmore/Z-Machine-Standard/issues/76
+        if (this.runtime.version < 5)
         {
-            //initiallen = this.runtime.m.getUint8(text + 1)
+            len--
         }
+        //else
+        //{
+            //initiallen = this.runtime.m.getUint8(text + 1)
+        //}
 
         const buffer = Array(len)
         buffer.fill(0)
