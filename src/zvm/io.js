@@ -1064,6 +1064,7 @@ module.exports = {
 		// Flags 1
 		ram.setUint8( 0x01,
 			(this.Glk.glk_gestalt(0x1100, 0) ? 1 : 0) // Check if colour is supported
+			| (ram.getUint8(0x01) & 0x02) // Preserve bit 1: Even though this is not specified for versions 4-5/8, it is used by Inform. See https://intfiction.org/t/online-if-game-hosting-at-borogove-io/52617/14
 			| 0x1C // Bold, italic and mono are supported
 			| 0x00 // Timed input not supported yet
 		);
