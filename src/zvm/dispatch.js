@@ -3,7 +3,7 @@
 ZVM Glk dispatch layer
 ======================
 
-Copyright (c) 2017 The ifvms.js team
+Copyright (c) 2023 The ifvms.js team
 MIT licenced
 https://github.com/curiousdannii/ifvms.js
 
@@ -23,6 +23,11 @@ class ZVMDispatch
 			'window': {},
 		}
 		this.last_used_id = 101
+	}
+
+	init(options)
+	{
+		this.vm = options.vm
 	}
 
 	check_autosave()
