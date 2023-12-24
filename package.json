@@ -27,7 +27,7 @@
   "bugs": "https://github.com/curiousdannii/ifvms.js/issues",
   "dependencies": {
     "glkote-term": "^0.4.0",
-    "mute-stream": "0.0.8",
+    "mute-stream": "1.0.0",
     "yargs": "^15.0.1"
   },
   "devDependencies": {
