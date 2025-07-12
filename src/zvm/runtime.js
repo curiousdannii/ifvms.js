@@ -620,7 +620,7 @@ module.exports = {
 			// staticmem: set in prepare()
 			eof: ( ram.getUint16( 0x1A ) || 65536 ) * addr_multipler,
 			extension: extension,
-			extension_count: extension ? ram.getUint16( extension ) : 0,
+			extension_count: extension ? this.m.getUint16( extension ) : 0,
 
 			// Routine and string multiplier
 			addr_multipler: addr_multipler,
